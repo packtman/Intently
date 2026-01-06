@@ -1,0 +1,77 @@
+# Context Graph Configuration
+# Copy to context-graph.yaml and customize
+
+# LLM Provider Settings
+llm:
+  # Enable LLM-powered analysis (requires API keys)
+  enabled: true
+  
+  # OpenAI configuration
+  openai:
+    # Set via OPENAI_API_KEY environment variable
+    model: gpt-4o
+    temperature: 0.1
+    max_tokens: 4096
+  
+  # Anthropic configuration
+  anthropic:
+    # Set via ANTHROPIC_API_KEY environment variable
+    model: claude-sonnet-4-20250514
+    temperature: 0.1
+    max_tokens: 4096
+
+# Codebase Analysis Settings
+codebase:
+  # Languages to analyze
+  languages:
+    - python
+    - kotlin
+    - typescript
+  
+  # Paths to exclude from analysis
+  exclude:
+    - node_modules
+    - __pycache__
+    - .git
+    - .venv
+    - venv
+    - dist
+    - build
+    - "*.pyc"
+    - "*.egg-info"
+
+# Security Review Settings
+security:
+  # Threat modeling frameworks to apply
+  frameworks:
+    - stride
+    - owasp_top_10
+  
+  # Minimum severity to report
+  min_severity: low  # critical, high, medium, low, info
+  
+  # Minimum confidence threshold (0.0 - 1.0)
+  min_confidence: 0.5
+
+# Report Settings
+reports:
+  # Include recommendations in reports
+  include_recommendations: true
+  
+  # Include mitigations in reports
+  include_mitigations: true
+  
+  # Output formats to generate
+  formats:
+    - markdown
+    - json
+    - dashboard
+
+# API Server Settings
+server:
+  host: "0.0.0.0"
+  port: 8000
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:5173"
+
