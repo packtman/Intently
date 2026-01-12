@@ -85,7 +85,7 @@ class ReviewConfigInput(BaseModel):
     use_llm: bool = Field(True, description="Use LLM for analysis (requires API keys)")
     dimensions: list[str] = Field(
         default=["security"], 
-        description="Review dimensions: security, privacy, compliance"
+        description="Review dimensions: security, privacy, compliance, engineering, architecture"
     )
     compliance_frameworks: list[str] = Field(
         default=["soc2", "hipaa", "pci_dss"],
@@ -296,12 +296,16 @@ async def list_reviews() -> list[dict[str, Any]]:
 
 async def run_review(review_id: str, request: ReviewRequest) -> None:
     """Run the multi-dimension security review in background."""
+    import logging
     cloned_repo: ClonedRepo | None = None
     
     try:
         # Parse dimensions from config
+        logging.info(f"=== REVIEW {review_id} STARTED ===")
+        logging.info(f"Raw dimensions from request: {request.config.dimensions}")
         requested_dimensions = _parse_dimensions(request.config.dimensions)
         dimension_names = [d.value for d in requested_dimensions]
+        logging.info(f"Parsed dimensions: {dimension_names}")
         
         review_status[review_id] = {
             "status": "running",
@@ -375,6 +379,9 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
             compliance_frameworks=compliance_frameworks,
         )
         
+        logging.info(f"Config created with dimensions: {[d.value for d in config.dimensions]}")
+        logging.info(f"LLM enabled: {llm_enabled}, pattern_matching: {config.use_pattern_matching}")
+        
         # Log status for debugging
         if use_llm_requested and not has_api_keys:
             review_status[review_id]["message"] = "Warning: LLM requested but no API keys found. Using pattern-based analysis only."
@@ -393,20 +400,34 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
         # Run review
         result = await engine.review(intent, state)
         
+        # Store config and original PRD on result for re-analysis
+        result.config = config  # Preserve original config for re-analysis
+        result.original_prd_content = intent.raw_content  # Preserve original PRD
+        
         # Store result
         reviews_store[review_id] = result
         
         # Build completion message with dimension breakdown
-        findings_summary = f"{len(result.all_findings)} total findings"
-        if len(requested_dimensions) > 1:
-            breakdowns = []
-            if ReviewDimension.SECURITY in requested_dimensions:
-                breakdowns.append(f"{len(result.security_findings)} security")
-            if ReviewDimension.PRIVACY in requested_dimensions:
-                breakdowns.append(f"{len(result.privacy_findings)} privacy")
-            if ReviewDimension.COMPLIANCE in requested_dimensions:
-                breakdowns.append(f"{len(result.compliance_findings)} compliance")
-            findings_summary = f"{len(result.all_findings)} findings ({', '.join(breakdowns)})"
+        import logging
+        logging.info(f"Review completed. All findings: {len(result.all_findings)}")
+        logging.info(f"  Security: {len(result.security_findings)}")
+        logging.info(f"  Privacy: {len(result.privacy_findings)}")
+        logging.info(f"  Compliance: {len(result.compliance_findings)}")
+        logging.info(f"  Engineering: {len(result.engineering_findings)}")
+        logging.info(f"  Architecture: {len(result.architecture_findings)}")
+        
+        breakdowns = []
+        if ReviewDimension.SECURITY in requested_dimensions:
+            breakdowns.append(f"{len(result.security_findings)} security")
+        if ReviewDimension.PRIVACY in requested_dimensions:
+            breakdowns.append(f"{len(result.privacy_findings)} privacy")
+        if ReviewDimension.COMPLIANCE in requested_dimensions:
+            breakdowns.append(f"{len(result.compliance_findings)} compliance")
+        if ReviewDimension.ENGINEERING in requested_dimensions:
+            breakdowns.append(f"{len(result.engineering_findings)} engineering")
+        if ReviewDimension.ARCHITECTURE in requested_dimensions:
+            breakdowns.append(f"{len(result.architecture_findings)} architecture")
+        findings_summary = f"{len(result.all_findings)} findings ({', '.join(breakdowns)})"
         
         review_status[review_id] = {
             "status": "completed",
@@ -469,6 +490,8 @@ def _parse_dimensions(dimension_strings: list[str]) -> list[ReviewDimension]:
         "security": ReviewDimension.SECURITY,
         "privacy": ReviewDimension.PRIVACY,
         "compliance": ReviewDimension.COMPLIANCE,
+        "engineering": ReviewDimension.ENGINEERING,
+        "architecture": ReviewDimension.ARCHITECTURE,
     }
     
     dimensions = []

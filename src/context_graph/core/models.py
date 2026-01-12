@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Union
 from uuid import UUID, uuid4
 
 
@@ -108,6 +108,8 @@ class ReviewDimension(str, Enum):
     SECURITY = "security"
     PRIVACY = "privacy"
     COMPLIANCE = "compliance"
+    ENGINEERING = "engineering"
+    ARCHITECTURE = "architecture"
 
 
 class PrivacyCategory(str, Enum):
@@ -177,6 +179,96 @@ class ComplianceFramework(str, Enum):
     ISO_27001 = "iso_27001"
     GDPR = "gdpr"
     CCPA = "ccpa"
+
+
+class EngineeringCategory(str, Enum):
+    """Engineering review categories."""
+    
+    # Code Quality
+    HIGH_COMPLEXITY = "high_complexity"
+    DEEP_NESTING = "deep_nesting"
+    LONG_FUNCTIONS = "long_functions"
+    LARGE_FILES = "large_files"
+    CODE_DUPLICATION = "code_duplication"
+    
+    # Technical Debt
+    TODO_FIXME = "todo_fixme"
+    DEPRECATED_CODE = "deprecated_code"
+    MAGIC_NUMBERS = "magic_numbers"
+    MISSING_ERROR_HANDLING = "missing_error_handling"
+    
+    # Testing
+    LOW_TEST_COVERAGE = "low_test_coverage"
+    MISSING_TESTS = "missing_tests"
+    FLAKY_TESTS = "flaky_tests"
+    
+    # Documentation
+    MISSING_DOCUMENTATION = "missing_documentation"
+    OUTDATED_DOCUMENTATION = "outdated_documentation"
+    
+    # Maintainability
+    TIGHT_COUPLING = "tight_coupling"
+    CIRCULAR_DEPENDENCIES = "circular_dependencies"
+    MISSING_TYPE_HINTS = "missing_type_hints"
+    
+    # Observability
+    INSUFFICIENT_LOGGING = "insufficient_logging"
+    MISSING_METRICS = "missing_metrics"
+    NO_HEALTH_CHECKS = "no_health_checks"
+    
+    # CI/CD
+    NO_CI_CD = "no_ci_cd"
+    NO_LINTING = "no_linting"
+    NO_AUTOMATED_TESTS = "no_automated_tests"
+
+
+class ArchitectureCategory(str, Enum):
+    """Architecture review categories."""
+    
+    # API Design
+    MISSING_API_CONTRACT = "missing_api_contract"
+    INCONSISTENT_API = "inconsistent_api"
+    NO_API_VERSIONING = "no_api_versioning"
+    BREAKING_CHANGE = "breaking_change"
+    
+    # Service Design
+    MISSING_SERVICE_BOUNDARY = "missing_service_boundary"
+    MONOLITH_COUPLING = "monolith_coupling"
+    DISTRIBUTED_MONOLITH = "distributed_monolith"
+    NO_SERVICE_MESH = "no_service_mesh"
+    
+    # Data Architecture
+    MISSING_DATA_MODEL = "missing_data_model"
+    DATA_INCONSISTENCY = "data_inconsistency"
+    NO_DATA_VALIDATION = "no_data_validation"
+    SCHEMA_DRIFT = "schema_drift"
+    
+    # Dependency Management
+    CIRCULAR_DEPENDENCY = "circular_dependency"
+    MISSING_DEPENDENCY_LOCK = "missing_dependency_lock"
+    OUTDATED_DEPENDENCIES = "outdated_dependencies"
+    TOO_MANY_DEPENDENCIES = "too_many_dependencies"
+    
+    # Communication Patterns
+    NO_RETRY_LOGIC = "no_retry_logic"
+    MISSING_CIRCUIT_BREAKER = "missing_circuit_breaker"
+    SYNC_OVER_ASYNC = "sync_over_async"
+    NO_IDEMPOTENCY = "no_idempotency"
+    
+    # Documentation
+    MISSING_ADR = "missing_adr"
+    OUTDATED_ARCHITECTURE_DOCS = "outdated_architecture_docs"
+    NO_SYSTEM_DIAGRAM = "no_system_diagram"
+    
+    # Scalability
+    SINGLE_POINT_OF_FAILURE = "single_point_of_failure"
+    NO_HORIZONTAL_SCALING = "no_horizontal_scaling"
+    STATEFUL_SERVICE = "stateful_service"
+    
+    # Resilience
+    NO_FAILOVER = "no_failover"
+    MISSING_FALLBACK = "missing_fallback"
+    NO_GRACEFUL_DEGRADATION = "no_graceful_degradation"
 
 
 @dataclass
@@ -344,6 +436,16 @@ class SecurityFinding:
     # Metadata
     confidence: float = 0.0  # 0.0 to 1.0
     found_at: datetime = field(default_factory=datetime.now)
+    
+    # Collaboration fields (optional, for team validation workflow)
+    # These are populated by the API layer when collaboration features are enabled
+    validation_status: str = "pending"  # pending, validated, rejected, needs_discussion, accepted_risk, deferred
+    validated_by: str | None = None
+    validated_at: datetime | None = None
+    validation_notes: str | None = None
+    assigned_team: str | None = None
+    assigned_user: str | None = None
+    comment_count: int = 0
 
 
 @dataclass
@@ -386,6 +488,15 @@ class PrivacyFinding:
     # Metadata
     confidence: float = 0.0
     found_at: datetime = field(default_factory=datetime.now)
+    
+    # Collaboration fields (optional, for team validation workflow)
+    validation_status: str = "pending"
+    validated_by: str | None = None
+    validated_at: datetime | None = None
+    validation_notes: str | None = None
+    assigned_team: str | None = None
+    assigned_user: str | None = None
+    comment_count: int = 0
 
 
 @dataclass
@@ -430,6 +541,136 @@ class ComplianceFinding:
     # Metadata
     confidence: float = 0.0
     found_at: datetime = field(default_factory=datetime.now)
+    
+    # Collaboration fields (optional, for team validation workflow)
+    validation_status: str = "pending"
+    validated_by: str | None = None
+    validated_at: datetime | None = None
+    validation_notes: str | None = None
+    assigned_team: str | None = None
+    assigned_user: str | None = None
+    comment_count: int = 0
+
+
+@dataclass
+class EngineeringFinding:
+    """
+    An engineering concern identified during review.
+    
+    Covers code quality, technical debt, testing, and maintainability.
+    """
+    
+    id: UUID = field(default_factory=uuid4)
+    title: str = ""
+    description: str = ""
+    
+    # Classification
+    severity: Severity = Severity.MEDIUM
+    category: EngineeringCategory = EngineeringCategory.HIGH_COMPLEXITY
+    dimension: ReviewDimension = ReviewDimension.ENGINEERING
+    
+    # Engineering-specific metrics
+    complexity_score: int = 0  # 0-100, higher = more complex
+    estimated_effort: str = ""  # "trivial", "low", "medium", "high", "very_high"
+    estimated_days: str = ""  # e.g., "1-2 days", "1-2 weeks"
+    
+    # Affected code
+    affected_files: list[str] = field(default_factory=list)
+    affected_functions: list[str] = field(default_factory=list)
+    lines_of_code_affected: int = 0
+    
+    # Technical debt indicators
+    tech_debt_items: int = 0  # TODOs, FIXMEs, etc.
+    test_coverage_gap: float = 0.0  # 0.0 to 1.0
+    
+    # Context
+    affected_entities: list[UUID] = field(default_factory=list)
+    affected_relationships: list[UUID] = field(default_factory=list)
+    
+    # Location
+    source_type: str = ""
+    source_reference: str = ""
+    
+    # Remediation
+    recommendation: str = ""
+    mitigations: list[str] = field(default_factory=list)
+    refactoring_suggestions: list[str] = field(default_factory=list)
+    
+    # Metadata
+    confidence: float = 0.0
+    found_at: datetime = field(default_factory=datetime.now)
+    
+    # Collaboration fields (optional, for team validation workflow)
+    validation_status: str = "pending"
+    validated_by: str | None = None
+    validated_at: datetime | None = None
+    validation_notes: str | None = None
+    assigned_team: str | None = None
+    assigned_user: str | None = None
+    comment_count: int = 0
+
+
+@dataclass
+class ArchitectureFinding:
+    """
+    An architecture concern identified during review.
+    
+    Covers API design, service boundaries, dependencies, and system design.
+    """
+    
+    id: UUID = field(default_factory=uuid4)
+    title: str = ""
+    description: str = ""
+    
+    # Classification
+    severity: Severity = Severity.MEDIUM
+    category: ArchitectureCategory = ArchitectureCategory.MISSING_API_CONTRACT
+    dimension: ReviewDimension = ReviewDimension.ARCHITECTURE
+    
+    # Architecture-specific
+    architectural_pattern: str = ""  # e.g., "microservices", "monolith", "event-driven"
+    affected_services: list[str] = field(default_factory=list)
+    affected_apis: list[str] = field(default_factory=list)
+    
+    # Dependency analysis
+    dependency_chain: list[str] = field(default_factory=list)
+    is_circular_dependency: bool = False
+    coupling_score: float = 0.0  # 0.0 (loose) to 1.0 (tight)
+    
+    # Impact assessment
+    breaking_change: bool = False
+    downstream_impact: list[str] = field(default_factory=list)
+    upstream_dependencies: list[str] = field(default_factory=list)
+    
+    # Context
+    affected_entities: list[UUID] = field(default_factory=list)
+    affected_relationships: list[UUID] = field(default_factory=list)
+    
+    # Location
+    source_type: str = ""
+    source_reference: str = ""
+    
+    # Remediation
+    recommendation: str = ""
+    mitigations: list[str] = field(default_factory=list)
+    design_alternatives: list[str] = field(default_factory=list)
+    
+    # Metadata
+    confidence: float = 0.0
+    found_at: datetime = field(default_factory=datetime.now)
+    
+    # Collaboration fields (optional, for team validation workflow)
+    validation_status: str = "pending"
+    validated_by: str | None = None
+    validated_at: datetime | None = None
+    validation_notes: str | None = None
+    assigned_team: str | None = None
+    assigned_user: str | None = None
+    comment_count: int = 0
+
+
+# Type alias for any finding type
+Finding = Union[SecurityFinding, PrivacyFinding, ComplianceFinding, EngineeringFinding, ArchitectureFinding]
 
 
 @dataclass
@@ -472,4 +713,202 @@ class SecurityReview:
                 result[finding.category] = []
             result[finding.category].append(finding)
         return result
+
+
+# ==================== PM-Focused Models (Unified PM Tool) ====================
+
+@dataclass
+class CodeEvidence:
+    """Code evidence that grounds a prediction."""
+    file_path: str
+    line_number: int | None = None
+    code_snippet: str = ""
+    context: str = ""  # Additional context about why this is relevant
+
+
+@dataclass
+class DiffHunk:
+    """A single hunk of a diff, for precise rendering."""
+    operation: str  # "add", "remove", "context"
+    content: str
+    line_number: int | None = None  # Line in original PRD
+
+
+@dataclass
+class PRDChange:
+    """A suggested change to the PRD, displayed as a diff."""
+    id: UUID = field(default_factory=uuid4)
+    prediction_id: UUID = field(default_factory=uuid4)  # Links to the prediction that generated this
+    
+    # Location in PRD
+    section: str = ""  # "## Technical Requirements", "## Security", etc.
+    start_line: int = 0
+    end_line: int = 0
+    
+    # Diff content
+    change_type: str = "addition"  # "addition", "modification", "restructure"
+    current_text: str = ""  # What's currently in the PRD (shown in red if modified)
+    suggested_text: str = ""  # What it should become (shown in green)
+    
+    # For rendering the diff
+    diff_hunks: list[DiffHunk] = field(default_factory=list)
+    
+    # Metadata
+    reasoning: str = ""  # Why this change is needed
+    applied_at: datetime | None = None
+    status: str = "open"  # "open", "accepted", "rejected", "dismissed"
+    
+    # Edit tracking (when PM modifies suggestion before accepting)
+    original_suggested_text: str | None = None  # AI's original, if PM edited
+    edited_by_pm: bool = False
+    edit_history: list[str] = field(default_factory=list)  # Track PM iterations
+
+
+@dataclass
+class PredictedQuestion:
+    """A question a team is likely to ask."""
+    id: UUID = field(default_factory=uuid4)
+    question: str = ""
+    team: str = ""  # "engineering", "security", "privacy", "infra"
+    severity: str = "likely"  # "blocker", "likely", "possible"
+    
+    # Code-grounded reasoning
+    reasoning: str = ""
+    code_evidence: list[CodeEvidence] = field(default_factory=list)
+    
+    # Suggested PRD change (diff-style)
+    suggested_change: PRDChange | None = None
+    
+    # Status
+    status: str = "open"  # "open", "accepted", "rejected", "dismissed", "asked_expert"
+    
+    # Expert assist (if used)
+    expert_ask_id: UUID | None = None
+
+
+@dataclass
+class ExpertResponse:
+    """Expert's lightweight response - one click + optional note."""
+    verdict: str = ""  # "correct", "wrong", "partially_right"
+    note: str | None = None  # Optional context
+    
+    # For pattern learning
+    correct_answer: str | None = None  # What should the prediction have said?
+    should_learn: bool = True  # Should this train future predictions?
+    responded_at: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class ExpertAsk:
+    """A quick ask to a specific expert - NOT a ticket."""
+    id: UUID = field(default_factory=uuid4)
+    prediction_id: UUID = field(default_factory=uuid4)  # Which prediction this relates to
+    
+    # Who's asking
+    pm_id: str = ""
+    pm_name: str = ""
+    
+    # Who's being asked (specific person, not team)
+    expert_id: str = ""
+    expert_name: str = ""
+    expert_domain: str = ""  # "security", "devops", etc.
+    
+    # The question (usually pre-filled from prediction)
+    question: str = ""
+    
+    # Response (if received)
+    response: ExpertResponse | None = None
+    
+    # Timestamps
+    asked_at: datetime = field(default_factory=datetime.now)
+    responded_at: datetime | None = None
+
+
+@dataclass
+class LearnedPattern:
+    """A pattern learned from expert feedback."""
+    id: UUID = field(default_factory=uuid4)
+    
+    # What we learned
+    pattern_description: str = ""
+    applies_when: str = ""  # Conditions for this pattern
+    correction: str = ""  # What to say instead
+    
+    # Source
+    learned_from: list[UUID] = field(default_factory=list)  # Expert response IDs
+    times_applied: int = 0
+    
+    # Validation
+    accuracy_score: float = 0.0  # How often experts agree with this pattern
+    created_at: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class PRDQualityScore:
+    """PRD quality assessment."""
+    score: float = 0.0  # 0-100
+    grade: str = "F"  # A, B, C, D, F
+    gaps: list[str] = field(default_factory=list)
+    predicted_pushback: int = 0  # Number of questions teams will likely ask
+    blockers: int = 0  # Number of blocker-level questions
+    likely_questions: int = 0
+    possible_questions: int = 0
+
+
+@dataclass
+class EffortEstimation:
+    """Code-grounded effort estimation."""
+    total_days: dict[str, int] = field(default_factory=lambda: {"min": 0, "likely": 0, "max": 0})
+    by_requirement: list[dict[str, Any]] = field(default_factory=list)
+    codebase_support: float = 0.0  # 0-100, percentage of patterns that exist
+    tldr: str = ""  # Human-readable summary
+
+
+# ==================== Side-by-Side Diff Models ====================
+
+@dataclass
+class WordChange:
+    """A word-level change within a line."""
+    start: int  # Start character index
+    end: int  # End character index
+    change_type: str  # "added", "removed"
+
+
+@dataclass
+class DiffLine:
+    """A single line in the side-by-side diff view."""
+    line_number: int | None = None
+    content: str = ""
+    status: str = "unchanged"  # "unchanged", "deleted", "added", "modified", "empty"
+    word_changes: list[WordChange] = field(default_factory=list)
+
+
+@dataclass
+class DiffStats:
+    """Statistics about a diff."""
+    lines_added: int = 0
+    lines_removed: int = 0
+    lines_modified: int = 0
+
+
+@dataclass
+class SideBySideDiff:
+    """Side-by-side diff representation for UI rendering."""
+    change_id: str = ""
+    file_name: str = ""
+    section: str = ""
+    original_lines: list[DiffLine] = field(default_factory=list)
+    suggested_lines: list[DiffLine] = field(default_factory=list)
+    stats: DiffStats = field(default_factory=DiffStats)
+
+
+@dataclass
+class PRDFileInfo:
+    """Information about the PRD file being analyzed."""
+    file_path: str = ""  # Full path to the PRD file
+    file_name: str = ""  # Just the filename
+    original_content: str = ""  # Original content when loaded
+    current_content: str = ""  # Current content (with accepted changes)
+    backup_path: str | None = None  # Path to backup file if created
+    last_saved_at: datetime | None = None
 

@@ -1,0 +1,1956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context Graph - Cursor for PMs</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #161625;
+            --bg-tertiary: #1e1e32;
+            --bg-card: #1a1a2e;
+            --bg-hover: #252542;
+            --border-primary: #3a3a5c;
+            --border-secondary: #2a2a44;
+            --text-primary: #f0f0f5;
+            --text-secondary: #a0a0b8;
+            --text-muted: #6a6a88;
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-yellow: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-pink: #ec4899;
+            --diff-add-bg: rgba(16, 185, 129, 0.15);
+            --diff-add-text: #34d399;
+            --diff-del-bg: rgba(239, 68, 68, 0.15);
+            --diff-del-text: #f87171;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-secondary);
+            padding: 1.25rem;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 100vh;
+        }
+
+        /* Sidebar */
+        .logo {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 1.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .nav-section {
+            margin-bottom: 1.75rem;
+        }
+
+        .nav-section-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-muted);
+            margin-bottom: 0.6rem;
+            padding-left: 0.5rem;
+        }
+
+        .nav-item {
+            padding: 0.55rem 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 0.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.1));
+            color: var(--text-primary);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .nav-badge {
+            margin-left: auto;
+            background: var(--accent-red);
+            color: white;
+            padding: 0.1rem 0.45rem;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            font-weight: 600;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-secondary);
+        }
+
+        .new-analysis-btn {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .new-analysis-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        /* Header */
+        .header {
+            padding: 1.25rem 2rem;
+            border-bottom: 1px solid var(--border-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-secondary);
+        }
+
+        .header-title {
+            font-size: 1.35rem;
+            font-weight: 600;
+        }
+
+        .header-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.15rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.6rem;
+        }
+
+        .btn {
+            padding: 0.55rem 1.1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-primary {
+            background: var(--accent-purple);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #7c3aed;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+        }
+
+        .btn-success {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            gap: 0.75rem;
+            padding: 1.25rem 2rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-secondary);
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-secondary);
+            border-radius: 12px;
+            padding: 0.9rem 1.25rem;
+            min-width: 120px;
+            transition: all 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-primary);
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .stat-value.blockers { color: var(--accent-red); }
+        .stat-value.changes { color: var(--accent-purple); }
+        .stat-value.ready { color: var(--accent-green); }
+        .stat-value.estimate { color: var(--accent-cyan); }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+
+        /* Bulk Action Bar */
+        .bulk-action-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(16, 185, 129, 0.05));
+            border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .bulk-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .bulk-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .bulk-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-purple);
+        }
+
+        .bulk-text {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .bulk-text strong {
+            color: var(--accent-purple);
+        }
+
+        .bulk-filters {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .filter-btn {
+            padding: 0.4rem 0.75rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-secondary);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover, .filter-btn.active {
+            border-color: var(--accent-purple);
+            color: var(--accent-purple);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .bulk-actions {
+            display: flex;
+            gap: 0.6rem;
+        }
+
+        /* Predictions Container */
+        .predictions-container {
+            padding: 1.5rem 2rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        /* Prediction Card */
+        .prediction-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-secondary);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .prediction-card:hover {
+            border-color: var(--border-primary);
+        }
+
+        .prediction-card.blocker { border-left: 4px solid var(--accent-red); }
+        .prediction-card.likely { border-left: 4px solid var(--accent-yellow); }
+        .prediction-card.possible { border-left: 4px solid var(--accent-blue); }
+        .prediction-card.accepted { 
+            border-left: 4px solid var(--accent-green);
+            opacity: 0.7;
+        }
+
+        .prediction-header {
+            padding: 1.15rem 1.25rem;
+            cursor: pointer;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .prediction-checkbox {
+            margin-top: 0.15rem;
+        }
+
+        .prediction-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-green);
+        }
+
+        .prediction-content {
+            flex: 1;
+        }
+
+        .prediction-title-row {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .severity-badge {
+            padding: 0.2rem 0.55rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .severity-badge.blocker { background: var(--accent-red); color: white; }
+        .severity-badge.likely { background: var(--accent-yellow); color: #1a1a2e; }
+        .severity-badge.possible { background: var(--accent-blue); color: white; }
+
+        .prediction-number {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-left: auto;
+        }
+
+        .prediction-question {
+            font-size: 1rem;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        .prediction-reasoning {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.35rem;
+        }
+
+        .accepted-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.25rem 0.6rem;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .prediction-body {
+            padding: 0 1.25rem 1.25rem;
+            padding-left: 3.5rem;
+            display: none;
+        }
+
+        .prediction-body.show {
+            display: block;
+        }
+
+        /* Code Evidence */
+        .code-evidence {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 0.75rem 0;
+        }
+
+        .code-header {
+            padding: 0.5rem 0.9rem;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: #8b949e;
+        }
+
+        .code-content {
+            padding: 0.75rem 0.9rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            overflow-x: auto;
+            line-height: 1.5;
+        }
+
+        .code-content .keyword { color: #ff7b72; }
+        .code-content .string { color: #a5d6ff; }
+        .code-content .type { color: #79c0ff; }
+
+        /* PRD Diff View */
+        .prd-diff {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-secondary);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 0.75rem 0;
+        }
+
+        .prd-diff-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 1rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-secondary);
+        }
+
+        .diff-location {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .file-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .diff-section {
+            font-size: 0.75rem;
+            color: var(--accent-cyan);
+            padding: 0.2rem 0.5rem;
+            background: rgba(6, 182, 212, 0.1);
+            border-radius: 4px;
+        }
+
+        .prd-diff-stats {
+            display: flex;
+            gap: 0.75rem;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .prd-diff-stats .deletions { color: var(--diff-del-text); }
+        .prd-diff-stats .additions { color: var(--diff-add-text); }
+
+        .prd-diff-content {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+        }
+
+        .diff-line {
+            display: flex;
+            padding: 0.2rem 0;
+            position: relative;
+        }
+
+        .diff-line .line-number {
+            width: 35px;
+            text-align: right;
+            padding-right: 0.75rem;
+            color: var(--text-muted);
+            user-select: none;
+            flex-shrink: 0;
+            opacity: 0.6;
+        }
+
+        .diff-line .line-prefix {
+            width: 18px;
+            text-align: center;
+            flex-shrink: 0;
+            font-weight: 600;
+        }
+
+        .diff-line .line-content {
+            flex: 1;
+            padding-right: 1rem;
+            white-space: pre-wrap;
+        }
+
+        .diff-line .edit-line-btn {
+            position: absolute;
+            right: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 0.15rem 0.4rem;
+            background: var(--bg-hover);
+            border: 1px solid var(--border-primary);
+            border-radius: 4px;
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+        }
+
+        .diff-line:hover .edit-line-btn {
+            opacity: 1;
+        }
+
+        .diff-line.context { background: var(--bg-primary); }
+
+        .diff-line.deletion {
+            background: var(--diff-del-bg);
+        }
+        .diff-line.deletion .line-prefix,
+        .diff-line.deletion .line-content {
+            color: var(--diff-del-text);
+        }
+
+        .diff-line.addition {
+            background: var(--diff-add-bg);
+        }
+        .diff-line.addition .line-prefix,
+        .diff-line.addition .line-content {
+            color: var(--diff-add-text);
+        }
+
+        /* Diff Actions */
+        .diff-actions {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-secondary);
+        }
+
+        .action-btn {
+            padding: 0.45rem 0.9rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border-primary);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .action-btn:hover { background: var(--bg-hover); }
+
+        .action-btn.accept {
+            background: var(--accent-green);
+            border-color: var(--accent-green);
+            color: white;
+        }
+        .action-btn.accept:hover { background: #059669; }
+
+        .action-btn.edit {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+        .action-btn.edit:hover { background: #2563eb; }
+
+        .action-btn.ask {
+            background: var(--accent-purple);
+            border-color: var(--accent-purple);
+            color: white;
+        }
+        .action-btn.ask:hover { background: #7c3aed; }
+
+        /* Quality Sidebar */
+        .quality-sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-secondary);
+            padding: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .quality-score-card {
+            text-align: center;
+            padding: 1.25rem;
+            background: var(--bg-card);
+            border-radius: 12px;
+            margin-bottom: 1.25rem;
+        }
+
+        .quality-score {
+            font-size: 3rem;
+            font-weight: 700;
+        }
+
+        .quality-score.low { color: var(--accent-red); }
+        .quality-score.medium { color: var(--accent-yellow); }
+        .quality-score.high { color: var(--accent-green); }
+
+        .quality-grade {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+        }
+
+        .quality-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.35rem;
+        }
+
+        .quality-bar {
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.75rem;
+        }
+
+        .quality-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-red), var(--accent-yellow), var(--accent-green));
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        .quality-status {
+            margin-top: 0.75rem;
+            padding: 0.6rem 0.75rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+
+        .quality-status.warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent-yellow);
+        }
+
+        .quality-status.success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
+        }
+
+        .dimension-list {
+            margin-top: 1rem;
+        }
+
+        .dimension-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border-secondary);
+        }
+
+        .dimension-name {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .dimension-score {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .dimension-score.high { color: var(--accent-green); }
+        .dimension-score.medium { color: var(--accent-yellow); }
+        .dimension-score.low { color: var(--accent-red); }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 2rem;
+        }
+
+        .modal-overlay.show { display: flex; }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalIn 0.2s ease;
+        }
+
+        .modal.large {
+            max-width: 800px;
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.95) translateY(-20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .modal-header {
+            padding: 1.15rem 1.5rem;
+            border-bottom: 1px solid var(--border-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.25rem;
+            line-height: 1;
+        }
+
+        .modal-close:hover { color: var(--text-primary); }
+
+        .modal-body { padding: 1.5rem; }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-secondary);
+            display: flex;
+            gap: 0.6rem;
+            justify-content: flex-end;
+        }
+
+        /* Edit Modal Specific */
+        .edit-section {
+            margin-bottom: 1.25rem;
+        }
+
+        .edit-section-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .original-text {
+            background: var(--bg-card);
+            border: 1px solid var(--border-secondary);
+            border-radius: 8px;
+            padding: 0.9rem 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.6;
+        }
+
+        .edit-textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 0.9rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--accent-blue);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.6;
+            resize: vertical;
+        }
+
+        .edit-textarea:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+
+        .edit-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        /* Upload Modal */
+        .upload-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-option {
+            padding: 1.25rem;
+            background: var(--bg-card);
+            border: 2px solid var(--border-secondary);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .upload-option:hover {
+            border-color: var(--accent-purple);
+            background: rgba(139, 92, 246, 0.05);
+        }
+
+        .upload-option.selected {
+            border-color: var(--accent-purple);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .upload-option-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-option-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .upload-option-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .paste-area {
+            width: 100%;
+            min-height: 200px;
+            padding: 1rem;
+            background: var(--bg-card);
+            border: 2px dashed var(--border-primary);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            resize: vertical;
+            margin-bottom: 1rem;
+        }
+
+        .paste-area:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+        }
+
+        .url-input {
+            width: 100%;
+            padding: 0.9rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .url-input::placeholder { color: var(--text-muted); }
+
+        .codebase-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-secondary);
+            border-radius: 8px;
+        }
+
+        .codebase-selector label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .codebase-selector select {
+            flex: 1;
+            padding: 0.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        /* Success Banner */
+        .success-banner {
+            display: none;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1.25rem 1.5rem;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 182, 212, 0.05));
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            margin-bottom: 1.25rem;
+        }
+
+        .success-banner.show { display: flex; }
+
+        .success-icon {
+            font-size: 1.75rem;
+            color: var(--accent-green);
+        }
+
+        .success-content { flex: 1; }
+
+        .success-content h4 {
+            color: var(--accent-green);
+            font-size: 1rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .success-content p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .success-changes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .success-change-tag {
+            padding: 0.25rem 0.6rem;
+            background: rgba(16, 185, 129, 0.2);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--diff-add-text);
+        }
+
+        .success-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent-purple);
+            border-radius: 12px;
+            padding: 0.9rem 1.25rem;
+            display: none;
+            align-items: center;
+            gap: 0.75rem;
+            z-index: 1001;
+            animation: slideIn 0.3s ease;
+            max-width: 350px;
+        }
+
+        .toast.show { display: flex; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .toast-icon { font-size: 1.25rem; }
+
+        .toast-content { flex: 1; }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .toast-message {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 15, 26, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .loading-overlay.show { display: flex; }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--border-secondary);
+            border-top-color: var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-text {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+        }
+
+        .loading-subtext {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .quality-sidebar { display: none; }
+        }
+
+        @media (max-width: 900px) {
+            .sidebar { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">CG</div>
+                Context Graph
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Current PRD</div>
+                <div class="nav-item active">
+                    User Authentication
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Views</div>
+                <div class="nav-item active">
+                    Predicted Feedback
+                    <span class="nav-badge">4</span>
+                </div>
+                <div class="nav-item">
+                    PRD Quality
+                </div>
+                <div class="nav-item">
+                    Effort Estimate
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Recent PRDs</div>
+                <div class="nav-item">Product Search</div>
+                <div class="nav-item">Payment Flow</div>
+                <div class="nav-item">User Onboarding</div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="new-analysis-btn" onclick="showUploadModal()">
+                    + New Analysis
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div>
+                    <h1 class="header-title">User Authentication System</h1>
+                    <p class="header-subtitle">Predicted cross-functional feedback from codebase analysis</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary">Download PRD</button>
+                    <button class="btn btn-primary" onclick="showLoading()">Re-analyze</button>
+                </div>
+            </header>
+
+            <!-- Stats -->
+            <div class="stats-bar">
+                <div class="stat-card">
+                    <div class="stat-value blockers" id="blockerCount">4</div>
+                    <div class="stat-label">Blockers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value changes" id="changesCount">7</div>
+                    <div class="stat-label">Suggested Changes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value ready" id="readyPercent">56%</div>
+                    <div class="stat-label">Ready for Review</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value estimate">18 days</div>
+                    <div class="stat-label">Estimated Effort</div>
+                </div>
+            </div>
+
+            <!-- Bulk Action Bar -->
+            <div class="bulk-action-bar" id="bulkActionBar">
+                <div class="bulk-info">
+                    <div class="bulk-checkbox">
+                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
+                        <label for="selectAll">Select all</label>
+                    </div>
+                    <span class="bulk-text"><strong id="selectedCount">0</strong> of 7 selected</span>
+                </div>
+                <div class="bulk-filters">
+                    <button class="filter-btn active">All (7)</button>
+                    <button class="filter-btn">Blockers (4)</button>
+                    <button class="filter-btn">Engineering (3)</button>
+                    <button class="filter-btn">Security (2)</button>
+                </div>
+                <div class="bulk-actions">
+                    <button class="btn btn-secondary" onclick="dismissSelected()">Dismiss</button>
+                    <button class="btn btn-success" onclick="acceptSelected()">Accept Selected</button>
+                </div>
+            </div>
+
+            <!-- Success Banner (shown after bulk accept) -->
+            <div class="success-banner" id="successBanner">
+                <span class="success-icon">&#10003;</span>
+                <div class="success-content">
+                    <h4>PRD Updated Successfully</h4>
+                    <p>4 changes applied to your PRD. Score improved from 56% to 89%.</p>
+                    <div class="success-changes">
+                        <span class="success-change-tag">+ Session Migration (line 48)</span>
+                        <span class="success-change-tag">+ Rate Limiting (line 72)</span>
+                        <span class="success-change-tag">~ Data Retention (line 89)</span>
+                        <span class="success-change-tag">+ Performance Targets (line 95)</span>
+                    </div>
+                </div>
+                <div class="success-actions">
+                    <button class="btn btn-secondary" onclick="undoChanges()">Undo</button>
+                    <button class="btn btn-primary">Download PRD</button>
+                </div>
+            </div>
+
+            <!-- Predictions -->
+            <div class="predictions-container" id="predictionsContainer">
+                <div class="section-header">
+                    <span class="section-title">Engineering Will Ask</span>
+                </div>
+
+                <!-- Prediction 1: Session Handling -->
+                <div class="prediction-card blocker" id="pred1" onclick="togglePrediction(this)">
+                    <div class="prediction-header">
+                        <div class="prediction-checkbox" onclick="event.stopPropagation()">
+                            <input type="checkbox" onchange="updateSelectedCount()">
+                        </div>
+                        <div class="prediction-content">
+                            <div class="prediction-title-row">
+                                <span class="severity-badge blocker">Blocker</span>
+                                <span class="prediction-question">"What happens to existing sessions when we deploy?"</span>
+                                <span class="prediction-number">1 of 7</span>
+                            </div>
+                            <div class="prediction-reasoning">
+                                Because: session_manager.py:78-92 stores sessions with user_id as key. PRD doesn't specify migration.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="prediction-body show">
+                        <div class="code-evidence">
+                            <div class="code-header">session_manager.py:78-92</div>
+                            <div class="code-content"><span class="keyword">class</span> <span class="type">SessionStore</span>:
+    <span class="keyword">def</span> create_session(self, user_id: <span class="type">str</span>) -> <span class="type">Session</span>:
+        session = {
+            <span class="string">"user_id"</span>: user_id,
+            <span class="string">"created_at"</span>: datetime.now(),
+            <span class="string">"expires_at"</span>: datetime.now() + timedelta(hours=24),
+        }
+        <span class="keyword">return</span> self.store.set(user_id, session)</div>
+                        </div>
+
+                        <div class="prd-diff">
+                            <div class="prd-diff-header">
+                                <div class="diff-location">
+                                    <span class="file-name">user-authentication-prd.md</span>
+                                    <span class="diff-section">## Technical Considerations</span>
+                                </div>
+                                <div class="prd-diff-stats">
+                                    <span class="deletions">- 1</span>
+                                    <span class="additions">+ 6</span>
+                                </div>
+                            </div>
+                            <div class="prd-diff-content">
+                                <div class="diff-line context">
+                                    <span class="line-number">42</span>
+                                    <span class="line-prefix"></span>
+                                    <span class="line-content">## Technical Considerations</span>
+                                </div>
+                                <div class="diff-line context">
+                                    <span class="line-number">43</span>
+                                    <span class="line-prefix"></span>
+                                    <span class="line-content"></span>
+                                </div>
+                                <div class="diff-line deletion">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">-</span>
+                                    <span class="line-content">(No session handling specified)</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">### Session Handling During Migration</span>
+                                    <button class="edit-line-btn" onclick="event.stopPropagation(); showEditModal()">edit</button>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content"></span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **Existing sessions**: Will be invalidated on deploy</span>
+                                    <button class="edit-line-btn" onclick="event.stopPropagation(); showEditModal()">edit</button>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **User impact**: Users will need to re-login after migration</span>
+                                    <button class="edit-line-btn" onclick="event.stopPropagation(); showEditModal()">edit</button>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **Data loss**: None - user data preserved, only sessions reset</span>
+                                    <button class="edit-line-btn" onclick="event.stopPropagation(); showEditModal()">edit</button>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **Rollback**: Feature flag allows reverting to old auth</span>
+                                    <button class="edit-line-btn" onclick="event.stopPropagation(); showEditModal()">edit</button>
+                                </div>
+                                <div class="diff-line context">
+                                    <span class="line-number">44</span>
+                                    <span class="line-prefix"></span>
+                                    <span class="line-content"></span>
+                                </div>
+                            </div>
+                            <div class="diff-actions">
+                                <button class="action-btn accept" onclick="event.stopPropagation(); acceptSingle(this)">Accept</button>
+                                <button class="action-btn edit" onclick="event.stopPropagation(); showEditModal()">Edit</button>
+                                <button class="action-btn" onclick="event.stopPropagation()">Reject</button>
+                                <button class="action-btn ask" onclick="event.stopPropagation(); showAskModal()">Ask Expert</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prediction 2: Performance Requirements -->
+                <div class="prediction-card likely" id="pred2" onclick="togglePrediction(this)">
+                    <div class="prediction-header">
+                        <div class="prediction-checkbox" onclick="event.stopPropagation()">
+                            <input type="checkbox" onchange="updateSelectedCount()">
+                        </div>
+                        <div class="prediction-content">
+                            <div class="prediction-title-row">
+                                <span class="severity-badge likely">Likely</span>
+                                <span class="prediction-question">"What are the performance targets for auth endpoints?"</span>
+                                <span class="prediction-number">2 of 7</span>
+                            </div>
+                            <div class="prediction-reasoning">
+                                Because: PRD doesn't specify latency/throughput requirements. Current auth_service.py has no SLOs defined.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="prediction-body">
+                        <div class="prd-diff">
+                            <div class="prd-diff-header">
+                                <div class="diff-location">
+                                    <span class="file-name">user-authentication-prd.md</span>
+                                    <span class="diff-section">## Non-Functional Requirements</span>
+                                </div>
+                                <div class="prd-diff-stats">
+                                    <span class="deletions">- 1</span>
+                                    <span class="additions">+ 7</span>
+                                </div>
+                            </div>
+                            <div class="prd-diff-content">
+                                <div class="diff-line context">
+                                    <span class="line-number">78</span>
+                                    <span class="line-prefix"></span>
+                                    <span class="line-content">## Non-Functional Requirements</span>
+                                </div>
+                                <div class="diff-line deletion">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">-</span>
+                                    <span class="line-content">(No performance requirements specified)</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">### Performance Requirements</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content"></span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **Response time**: p50 &lt; 100ms, p99 &lt; 500ms</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **Throughput**: 100 requests/second sustained</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **Concurrent users**: 1,000 simultaneous logins</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **Load testing**: Required before GA release</span>
+                                </div>
+                            </div>
+                            <div class="diff-actions">
+                                <button class="action-btn accept" onclick="event.stopPropagation(); acceptSingle(this)">Accept</button>
+                                <button class="action-btn edit" onclick="event.stopPropagation(); showEditModal()">Edit</button>
+                                <button class="action-btn" onclick="event.stopPropagation()">Reject</button>
+                                <button class="action-btn ask" onclick="event.stopPropagation(); showAskModal()">Ask Expert</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Section Header -->
+                <div class="section-header" style="margin-top: 1.5rem;">
+                    <span class="section-title">Security Will Ask</span>
+                </div>
+
+                <!-- Prediction 3: Data Retention -->
+                <div class="prediction-card blocker" id="pred3" onclick="togglePrediction(this)">
+                    <div class="prediction-header">
+                        <div class="prediction-checkbox" onclick="event.stopPropagation()">
+                            <input type="checkbox" onchange="updateSelectedCount()">
+                        </div>
+                        <div class="prediction-content">
+                            <div class="prediction-title-row">
+                                <span class="severity-badge blocker">Blocker</span>
+                                <span class="prediction-question">"What's the data retention policy for auth tokens?"</span>
+                                <span class="prediction-number">3 of 7</span>
+                            </div>
+                            <div class="prediction-reasoning">
+                                Because: PRD mentions storing tokens but no retention/cleanup policy. token_store.py has no TTL settings.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="prediction-body">
+                        <div class="prd-diff">
+                            <div class="prd-diff-header">
+                                <div class="diff-location">
+                                    <span class="file-name">user-authentication-prd.md</span>
+                                    <span class="diff-section">## Security Requirements</span>
+                                </div>
+                                <div class="prd-diff-stats">
+                                    <span class="deletions">- 1</span>
+                                    <span class="additions">+ 5</span>
+                                </div>
+                            </div>
+                            <div class="prd-diff-content">
+                                <div class="diff-line context">
+                                    <span class="line-number">56</span>
+                                    <span class="line-prefix"></span>
+                                    <span class="line-content">## Security Requirements</span>
+                                </div>
+                                <div class="diff-line deletion">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">-</span>
+                                    <span class="line-content">- Data retention: Standard policy</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">### Data Retention</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content"></span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **Access tokens**: 24 hours, auto-expire</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **Refresh tokens**: 30 days, revocable</span>
+                                </div>
+                                <div class="diff-line addition">
+                                    <span class="line-number"></span>
+                                    <span class="line-prefix">+</span>
+                                    <span class="line-content">- **Audit logs**: 7 years (compliance requirement)</span>
+                                </div>
+                            </div>
+                            <div class="diff-actions">
+                                <button class="action-btn accept" onclick="event.stopPropagation(); acceptSingle(this)">Accept</button>
+                                <button class="action-btn edit" onclick="event.stopPropagation(); showEditModal()">Edit</button>
+                                <button class="action-btn" onclick="event.stopPropagation()">Reject</button>
+                                <button class="action-btn ask" onclick="event.stopPropagation(); showAskModal()">Ask Expert</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prediction 4: Already Accepted -->
+                <div class="prediction-card accepted" id="pred4">
+                    <div class="prediction-header">
+                        <div class="prediction-checkbox" onclick="event.stopPropagation()">
+                            <input type="checkbox" disabled checked>
+                        </div>
+                        <div class="prediction-content">
+                            <div class="prediction-title-row">
+                                <span class="severity-badge blocker" style="opacity: 0.5;">Blocker</span>
+                                <span class="prediction-question" style="opacity: 0.7;">"Rate limiting not specified"</span>
+                                <span class="accepted-badge">&#10003; Accepted</span>
+                            </div>
+                            <div class="prediction-reasoning" style="opacity: 0.6;">
+                                Rate limiting section added to Security Requirements at line 72.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Quality Sidebar -->
+        <aside class="quality-sidebar">
+            <div class="quality-score-card">
+                <div>
+                    <span class="quality-score medium" id="qualityScore">56</span>
+                    <span class="quality-grade">/100</span>
+                </div>
+                <div class="quality-label">PRD Quality Score</div>
+                <div class="quality-bar">
+                    <div class="quality-bar-fill" id="qualityBar" style="width: 56%"></div>
+                </div>
+                <div class="quality-status warning" id="qualityStatus">
+                    Likely to face pushback in reviews
+                </div>
+            </div>
+
+            <div class="dimension-list">
+                <div class="dimension-item">
+                    <span class="dimension-name">Requirements Clarity</span>
+                    <span class="dimension-score high">80%</span>
+                </div>
+                <div class="dimension-item">
+                    <span class="dimension-name">Technical Spec</span>
+                    <span class="dimension-score high">85%</span>
+                </div>
+                <div class="dimension-item">
+                    <span class="dimension-name">Security & Privacy</span>
+                    <span class="dimension-score medium" id="securityScore">45%</span>
+                </div>
+                <div class="dimension-item">
+                    <span class="dimension-name">Edge Cases</span>
+                    <span class="dimension-score low" id="edgeScore">30%</span>
+                </div>
+                <div class="dimension-item">
+                    <span class="dimension-name">Non-Functional</span>
+                    <span class="dimension-score low" id="nfScore">25%</span>
+                </div>
+                <div class="dimension-item">
+                    <span class="dimension-name">Success Metrics</span>
+                    <span class="dimension-score medium">60%</span>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal-overlay" id="uploadModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Start New Analysis</h3>
+                <button class="modal-close" onclick="hideUploadModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-options">
+                    <div class="upload-option selected" onclick="selectUploadOption(this, 'paste')">
+                        <div class="upload-option-icon">&#128203;</div>
+                        <div class="upload-option-title">Paste Text</div>
+                        <div class="upload-option-desc">Copy/paste your PRD</div>
+                    </div>
+                    <div class="upload-option" onclick="selectUploadOption(this, 'upload')">
+                        <div class="upload-option-icon">&#128194;</div>
+                        <div class="upload-option-title">Upload File</div>
+                        <div class="upload-option-desc">.md, .docx, .txt</div>
+                    </div>
+                    <div class="upload-option" onclick="selectUploadOption(this, 'gdocs')">
+                        <div class="upload-option-icon">&#128196;</div>
+                        <div class="upload-option-title">Google Docs</div>
+                        <div class="upload-option-desc">Paste sharing link</div>
+                    </div>
+                    <div class="upload-option" onclick="selectUploadOption(this, 'notion')">
+                        <div class="upload-option-icon">&#128221;</div>
+                        <div class="upload-option-title">Notion</div>
+                        <div class="upload-option-desc">Paste page URL</div>
+                    </div>
+                </div>
+
+                <div id="pasteSection">
+                    <textarea class="paste-area" placeholder="Paste your PRD content here...
+
+# Product Requirements Document
+
+## Overview
+..."></textarea>
+                </div>
+
+                <div id="urlSection" style="display: none;">
+                    <input type="text" class="url-input" placeholder="https://docs.google.com/document/d/...">
+                </div>
+
+                <div class="codebase-selector">
+                    <label>Analyze against:</label>
+                    <select>
+                        <option>acme-corp/backend</option>
+                        <option>acme-corp/frontend</option>
+                        <option>acme-corp/mobile-app</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideUploadModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="startAnalysis()">Analyze PRD</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal large">
+            <div class="modal-header">
+                <h3 class="modal-title">Edit Suggestion</h3>
+                <button class="modal-close" onclick="hideEditModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="edit-section">
+                    <div class="edit-section-label">Original AI Suggestion</div>
+                    <div class="original-text">### Session Handling During Migration
+
+- **Existing sessions**: Will be invalidated on deploy
+- **User impact**: Users will need to re-login after migration
+- **Data loss**: None - user data preserved, only sessions reset
+- **Rollback**: Feature flag allows reverting to old auth</div>
+                </div>
+
+                <div class="edit-section">
+                    <div class="edit-section-label">Your Version (edit below)</div>
+                    <textarea class="edit-textarea">### Session Handling During Migration
+
+- **Existing sessions**: Will be invalidated on deploy
+- **User impact**: Users will need to re-login after migration
+- **Data loss**: None - user data preserved, only sessions reset
+- **Rollback**: Feature flag allows reverting to old auth
+- **Communication**: Marketing to send email 48 hours before migration
+- **Support**: Brief support team on expected ticket volume increase</textarea>
+                    <div class="edit-hint">Add business context, adjust scope, or refine terminology as needed</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideEditModal()">Cancel</button>
+                <button class="btn btn-secondary" onclick="revertEdit()">Revert to Original</button>
+                <button class="btn btn-success" onclick="acceptEditedVersion()">Accept Edited Version</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ask Expert Modal -->
+    <div class="modal-overlay" id="askModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Quick Ask</h3>
+                <button class="modal-close" onclick="hideAskModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="edit-section">
+                    <div class="edit-section-label">Regarding</div>
+                    <div class="original-text" style="font-family: inherit;">"What happens to existing sessions when we deploy?"</div>
+                </div>
+
+                <div class="edit-section">
+                    <div class="edit-section-label">Ask someone who knows</div>
+                    <input type="text" class="url-input" placeholder="Search experts..." style="margin-bottom: 0.5rem;">
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="filter-btn active">Sarah Chen (Backend)</button>
+                        <button class="filter-btn">Mike Ross (Security)</button>
+                        <button class="filter-btn">Lisa Park (DevOps)</button>
+                    </div>
+                </div>
+
+                <div class="edit-section">
+                    <div class="edit-section-label">Your question</div>
+                    <textarea class="edit-textarea" style="min-height: 80px;">Tool says session migration isn't addressed in the PRD. Do we need to specify this, or is there a standard pattern we follow?</textarea>
+                    <div class="edit-hint">Auto-filled from prediction - edit if needed</div>
+                </div>
+
+                <div style="padding: 0.75rem 1rem; background: rgba(59, 130, 246, 0.1); border-radius: 8px; font-size: 0.85rem; color: var(--accent-blue);">
+                    This is a quick ping, not a formal review. Sarah will get a notification and can respond in 1 click.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideAskModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="sendAsk()">Send to Sarah Chen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <span class="toast-icon" id="toastIcon">&#10003;</span>
+        <div class="toast-content">
+            <div class="toast-title" id="toastTitle">Change Accepted</div>
+            <div class="toast-message" id="toastMessage">Session handling section added to PRD</div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Analyzing PRD...</div>
+        <div class="loading-subtext">Scanning codebase for relevant patterns</div>
+    </div>
+
+    <script>
+        // Toggle prediction expansion
+        function togglePrediction(card) {
+            if (card.classList.contains('accepted')) return;
+            const body = card.querySelector('.prediction-body');
+            if (body) body.classList.toggle('show');
+        }
+
+        // Upload modal
+        function showUploadModal() {
+            document.getElementById('uploadModal').classList.add('show');
+        }
+
+        function hideUploadModal() {
+            document.getElementById('uploadModal').classList.remove('show');
+        }
+
+        function selectUploadOption(el, type) {
+            document.querySelectorAll('.upload-option').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+            
+            if (type === 'paste') {
+                document.getElementById('pasteSection').style.display = 'block';
+                document.getElementById('urlSection').style.display = 'none';
+            } else {
+                document.getElementById('pasteSection').style.display = 'none';
+                document.getElementById('urlSection').style.display = 'block';
+            }
+        }
+
+        function startAnalysis() {
+            hideUploadModal();
+            showLoading();
+        }
+
+        // Edit modal
+        function showEditModal() {
+            document.getElementById('editModal').classList.add('show');
+        }
+
+        function hideEditModal() {
+            document.getElementById('editModal').classList.remove('show');
+        }
+
+        function revertEdit() {
+            const textarea = document.querySelector('.edit-textarea');
+            textarea.value = document.querySelector('.original-text').textContent;
+        }
+
+        function acceptEditedVersion() {
+            hideEditModal();
+            showToast('Edited Version Accepted', 'Your changes have been applied to the PRD');
+        }
+
+        // Ask modal
+        function showAskModal() {
+            document.getElementById('askModal').classList.add('show');
+        }
+
+        function hideAskModal() {
+            document.getElementById('askModal').classList.remove('show');
+        }
+
+        function sendAsk() {
+            hideAskModal();
+            showToast('Question Sent', 'Sarah Chen will receive a notification');
+        }
+
+        // Accept single suggestion
+        function acceptSingle(btn) {
+            const card = btn.closest('.prediction-card');
+            card.classList.add('accepted');
+            card.classList.remove('blocker', 'likely', 'possible');
+            
+            const titleRow = card.querySelector('.prediction-title-row');
+            const existingBadge = titleRow.querySelector('.accepted-badge');
+            if (!existingBadge) {
+                const badge = document.createElement('span');
+                badge.className = 'accepted-badge';
+                badge.innerHTML = '&#10003; Accepted';
+                titleRow.appendChild(badge);
+            }
+            
+            const body = card.querySelector('.prediction-body');
+            if (body) body.classList.remove('show');
+            
+            updateStats();
+            showToast('Change Accepted', 'Section added to your PRD');
+        }
+
+        // Bulk selection
+        function toggleSelectAll(checkbox) {
+            const checkboxes = document.querySelectorAll('.prediction-checkbox input:not(:disabled)');
+            checkboxes.forEach(cb => cb.checked = checkbox.checked);
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const checked = document.querySelectorAll('.prediction-checkbox input:checked:not(:disabled)').length;
+            document.getElementById('selectedCount').textContent = checked;
+        }
+
+        function acceptSelected() {
+            const checkboxes = document.querySelectorAll('.prediction-checkbox input:checked:not(:disabled)');
+            if (checkboxes.length === 0) return;
+            
+            showLoading();
+            
+            setTimeout(() => {
+                hideLoading();
+                checkboxes.forEach(cb => {
+                    const card = cb.closest('.prediction-card');
+                    if (card) {
+                        card.classList.add('accepted');
+                        card.classList.remove('blocker', 'likely', 'possible');
+                        
+                        const titleRow = card.querySelector('.prediction-title-row');
+                        const existingBadge = titleRow.querySelector('.accepted-badge');
+                        if (!existingBadge) {
+                            const badge = document.createElement('span');
+                            badge.className = 'accepted-badge';
+                            badge.innerHTML = '&#10003; Accepted';
+                            titleRow.appendChild(badge);
+                        }
+                        
+                        const body = card.querySelector('.prediction-body');
+                        if (body) body.classList.remove('show');
+                    }
+                });
+                
+                document.getElementById('successBanner').classList.add('show');
+                document.getElementById('bulkActionBar').style.display = 'none';
+                updateStatsAfterBulk();
+            }, 1500);
+        }
+
+        function dismissSelected() {
+            document.querySelectorAll('.prediction-checkbox input:checked').forEach(cb => cb.checked = false);
+            updateSelectedCount();
+        }
+
+        function undoChanges() {
+            document.getElementById('successBanner').classList.remove('show');
+            document.getElementById('bulkActionBar').style.display = 'flex';
+            // Reset cards (simplified)
+            location.reload();
+        }
+
+        // Update stats
+        function updateStats() {
+            const accepted = document.querySelectorAll('.prediction-card.accepted').length;
+            const total = document.querySelectorAll('.prediction-card').length;
+            const remaining = total - accepted;
+            
+            document.getElementById('changesCount').textContent = remaining;
+            const ready = Math.round(56 + (accepted * 10));
+            document.getElementById('readyPercent').textContent = ready + '%';
+        }
+
+        function updateStatsAfterBulk() {
+            document.getElementById('blockerCount').textContent = '0';
+            document.getElementById('changesCount').textContent = '2';
+            document.getElementById('readyPercent').textContent = '89%';
+            
+            const score = document.getElementById('qualityScore');
+            score.textContent = '89';
+            score.classList.remove('medium');
+            score.classList.add('high');
+            
+            document.getElementById('qualityBar').style.width = '89%';
+            
+            const status = document.getElementById('qualityStatus');
+            status.textContent = 'Ready for stakeholder review';
+            status.classList.remove('warning');
+            status.classList.add('success');
+            
+            document.getElementById('securityScore').textContent = '90%';
+            document.getElementById('securityScore').classList.remove('medium');
+            document.getElementById('securityScore').classList.add('high');
+            
+            document.getElementById('edgeScore').textContent = '75%';
+            document.getElementById('edgeScore').classList.remove('low');
+            document.getElementById('edgeScore').classList.add('medium');
+            
+            document.getElementById('nfScore').textContent = '85%';
+            document.getElementById('nfScore').classList.remove('low');
+            document.getElementById('nfScore').classList.add('high');
+        }
+
+        // Loading
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.add('show');
+            setTimeout(hideLoading, 2000);
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('show');
+        }
+
+        // Toast
+        function showToast(title, message) {
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastMessage').textContent = message;
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Close modals on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === this) this.classList.remove('show');
+            });
+        });
+
+        // Filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (this.closest('.bulk-filters')) {
+                    this.closest('.bulk-filters').querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                }
+                this.classList.toggle('active');
+            });
+        });
+    </script>
+</body>
+</html>

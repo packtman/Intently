@@ -196,6 +196,87 @@ class ParallelLLMAnalyzer:
         
         return self._merge_compliance_results(valid_responses)
     
+    async def engineering_review(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+        engineering_metrics: dict[str, Any] | None = None,
+    ) -> ParallelAnalysisResult:
+        """Perform engineering feasibility and effort review using all providers in parallel.
+        
+        This review focuses on:
+        1. Understanding the current codebase context (metrics, complexity, patterns)
+        2. Assessing PRD feature feasibility based on existing code
+        3. Providing detailed time estimates based on actual codebase metrics
+        
+        Args:
+            intent: PRD intent data
+            state: Current codebase state
+            delta: Changes between intent and state
+            engineering_metrics: Detailed metrics from EngineeringAnalyzer
+        """
+        import logging
+        
+        logging.info(f"Starting engineering review with metrics: {bool(engineering_metrics)}")
+        if engineering_metrics:
+            logging.info(f"Metrics summary: {engineering_metrics.get('source_files', 0)} files, "
+                        f"{engineering_metrics.get('total_lines', 0)} lines, "
+                        f"test ratio: {engineering_metrics.get('test_to_code_ratio', 0):.2f}")
+        
+        tasks = [
+            provider.engineering_review(intent, state, delta, engineering_metrics)
+            for provider in self.providers
+        ]
+        
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        valid_responses = []
+        for i, r in enumerate(responses):
+            if isinstance(r, LLMResponse):
+                valid_responses.append(r)
+                # Log more details about the response
+                findings_count = len(r.structured_data.get('findings', []))
+                feasibility = r.structured_data.get('feasibility_assessment', {}).get('overall_feasibility', 'N/A')
+                logging.info(f"LLM provider {self.providers[i].provider_name} returned "
+                            f"{findings_count} findings, feasibility: {feasibility}")
+            elif isinstance(r, Exception):
+                logging.error(f"LLM provider {self.providers[i].provider_name} engineering review failed: {r}")
+        
+        if not valid_responses:
+            logging.warning("All LLM providers failed or returned no valid engineering responses")
+        
+        return self._merge_engineering_results(valid_responses)
+    
+    async def architecture_review(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+    ) -> ParallelAnalysisResult:
+        """Perform architecture review using all providers in parallel."""
+        import logging
+        
+        tasks = [
+            provider.architecture_review(intent, state, delta)
+            for provider in self.providers
+        ]
+        
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        valid_responses = []
+        for i, r in enumerate(responses):
+            if isinstance(r, LLMResponse):
+                valid_responses.append(r)
+                logging.info(f"LLM provider {self.providers[i].provider_name} returned {len(r.structured_data.get('findings', []))} architecture findings")
+            elif isinstance(r, Exception):
+                logging.error(f"LLM provider {self.providers[i].provider_name} architecture review failed: {r}")
+        
+        if not valid_responses:
+            logging.warning("All LLM providers failed or returned no valid architecture responses")
+        
+        return self._merge_architecture_results(valid_responses)
+    
     def _merge_intent_results(
         self, 
         responses: list[LLMResponse]
@@ -470,6 +551,135 @@ class ParallelLLMAnalyzer:
             key=lambda f: (
                 severity_order.get(f.get("severity", "info"), 5),
                 f.get("framework", "zzz")
+            )
+        )
+        
+        return result
+    
+    def _merge_engineering_results(
+        self,
+        responses: list[LLMResponse]
+    ) -> ParallelAnalysisResult:
+        """Merge engineering review results from multiple providers."""
+        result = ParallelAnalysisResult(
+            responses=responses,
+            providers_used=[r.provider for r in responses],
+            total_tokens=sum(r.tokens_used for r in responses),
+            total_latency_ms=max(r.latency_ms for r in responses) if responses else 0,
+        )
+        
+        if not responses:
+            return result
+        
+        # Collect all findings
+        finding_signatures: dict[str, dict[str, Any]] = {}
+        
+        for response in responses:
+            findings = response.structured_data.get("findings", [])
+            for finding in findings:
+                # Create signature for dedup
+                sig = self._finding_signature(finding)
+                
+                if sig in finding_signatures:
+                    # Found by multiple providers - increase confidence
+                    existing = finding_signatures[sig]
+                    existing["providers"].append(response.provider)
+                    existing["confidence"] = min(
+                        existing.get("confidence", 0.5) + 0.2,
+                        1.0
+                    )
+                    # Merge affected files
+                    existing["affected_files"] = list(set(
+                        existing.get("affected_files", []) + 
+                        finding.get("affected_files", [])
+                    ))
+                else:
+                    finding_signatures[sig] = {
+                        **finding,
+                        "providers": [response.provider],
+                    }
+        
+        # Categorize findings
+        for sig, finding in finding_signatures.items():
+            if len(finding.get("providers", [])) > 1:
+                result.consensus_items.append(finding)
+            else:
+                result.divergent_items.append(finding)
+            result.merged_findings.append(finding)
+        
+        # Sort by severity
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+        result.merged_findings.sort(
+            key=lambda f: severity_order.get(f.get("severity", "info"), 5)
+        )
+        
+        return result
+    
+    def _merge_architecture_results(
+        self,
+        responses: list[LLMResponse]
+    ) -> ParallelAnalysisResult:
+        """Merge architecture review results from multiple providers."""
+        result = ParallelAnalysisResult(
+            responses=responses,
+            providers_used=[r.provider for r in responses],
+            total_tokens=sum(r.tokens_used for r in responses),
+            total_latency_ms=max(r.latency_ms for r in responses) if responses else 0,
+        )
+        
+        if not responses:
+            return result
+        
+        # Collect all findings
+        finding_signatures: dict[str, dict[str, Any]] = {}
+        
+        for response in responses:
+            findings = response.structured_data.get("findings", [])
+            for finding in findings:
+                # Create signature for dedup - include breaking_change for architecture
+                title = finding.get("title", "").lower()[:30]
+                category = finding.get("category", "").lower()
+                severity = finding.get("severity", "").lower()
+                breaking = "breaking" if finding.get("breaking_change") else "non-breaking"
+                sig = f"{severity}:{category}:{breaking}:{title}"
+                
+                if sig in finding_signatures:
+                    # Found by multiple providers - increase confidence
+                    existing = finding_signatures[sig]
+                    existing["providers"].append(response.provider)
+                    existing["confidence"] = min(
+                        existing.get("confidence", 0.5) + 0.2,
+                        1.0
+                    )
+                    # Merge affected services
+                    existing["affected_services"] = list(set(
+                        existing.get("affected_services", []) + 
+                        finding.get("affected_services", [])
+                    ))
+                    existing["affected_apis"] = list(set(
+                        existing.get("affected_apis", []) + 
+                        finding.get("affected_apis", [])
+                    ))
+                else:
+                    finding_signatures[sig] = {
+                        **finding,
+                        "providers": [response.provider],
+                    }
+        
+        # Categorize findings
+        for sig, finding in finding_signatures.items():
+            if len(finding.get("providers", [])) > 1:
+                result.consensus_items.append(finding)
+            else:
+                result.divergent_items.append(finding)
+            result.merged_findings.append(finding)
+        
+        # Sort by severity and breaking changes first
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+        result.merged_findings.sort(
+            key=lambda f: (
+                0 if f.get("breaking_change") else 1,
+                severity_order.get(f.get("severity", "info"), 5)
             )
         )
         

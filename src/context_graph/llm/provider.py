@@ -20,6 +20,8 @@ class AnalysisType(str, Enum):
     SECURITY_REVIEW = "security_review"
     PRIVACY_REVIEW = "privacy_review"
     COMPLIANCE_REVIEW = "compliance_review"
+    ENGINEERING_REVIEW = "engineering_review"
+    ARCHITECTURE_REVIEW = "architecture_review"
     THREAT_MODELING = "threat_modeling"
     CODE_ANALYSIS = "code_analysis"
     DELTA_ANALYSIS = "delta_analysis"
@@ -139,6 +141,35 @@ class LLMProvider(ABC):
         """Perform compliance review against selected frameworks."""
         pass
     
+    @abstractmethod
+    async def engineering_review(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+        engineering_metrics: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        """Perform engineering feasibility and effort review.
+        
+        Args:
+            intent: PRD intent data
+            state: Current codebase state
+            delta: Changes between intent and state
+            engineering_metrics: Detailed metrics from codebase analysis including
+                                 complexity scores, test coverage, tech debt indicators, etc.
+        """
+        pass
+    
+    @abstractmethod
+    async def architecture_review(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+    ) -> LLMResponse:
+        """Perform architecture review (API design, dependencies, patterns)."""
+        pass
+    
     def _get_system_prompt(self, analysis_type: AnalysisType) -> str:
         """Get the system prompt for an analysis type."""
         prompts = {
@@ -146,6 +177,8 @@ class LLMProvider(ABC):
             AnalysisType.SECURITY_REVIEW: SECURITY_REVIEW_PROMPT,
             AnalysisType.PRIVACY_REVIEW: PRIVACY_REVIEW_PROMPT,
             AnalysisType.COMPLIANCE_REVIEW: COMPLIANCE_REVIEW_PROMPT,
+            AnalysisType.ENGINEERING_REVIEW: ENGINEERING_REVIEW_PROMPT,
+            AnalysisType.ARCHITECTURE_REVIEW: ARCHITECTURE_REVIEW_PROMPT,
             AnalysisType.THREAT_MODELING: THREAT_MODELING_PROMPT,
             AnalysisType.CODE_ANALYSIS: CODE_ANALYSIS_PROMPT,
             AnalysisType.DELTA_ANALYSIS: DELTA_ANALYSIS_PROMPT,
@@ -607,4 +640,321 @@ FRAMEWORK DETAILS:
    - Annex A Controls
 
 Be comprehensive. Compliance gaps can result in significant fines, audit findings, and reputational damage."""
+
+
+ENGINEERING_REVIEW_PROMPT = """You are an expert software engineer performing a comprehensive engineering feasibility and effort assessment. Your PRIMARY goal is to analyze the CURRENT codebase context and assess how feasible the PRD requirements are to implement, along with detailed time estimates.
+
+IMPORTANT: You must respond with valid json only, no markdown or explanations.
+
+CRITICAL ANALYSIS STEPS (follow this order):
+
+STEP 1: UNDERSTAND CURRENT CODEBASE CONTEXT
+First, thoroughly analyze the current_state and codebase_metrics to understand:
+- What code already exists (file structure, modules, patterns)
+- Current complexity levels and technical debt
+- Existing test coverage and quality infrastructure
+- Tech stack, frameworks, and dependencies already in use
+- Architectural patterns and conventions established
+
+STEP 2: EVALUATE PRD FEATURE FEASIBILITY
+For EACH feature in the PRD intent, assess:
+- Does similar functionality already exist? Can it be extended vs built from scratch?
+- Which existing files/modules need modification?
+- Are there architectural constraints that make this easy or difficult?
+- Does the current codebase support this feature pattern?
+
+STEP 3: ESTIMATE IMPLEMENTATION EFFORT
+Based on the ACTUAL codebase metrics (not generic estimates), provide:
+- Realistic time estimates considering current code complexity
+- Breakdown by implementation phase (core, testing, integration, polish)
+- Risk factors specific to THIS codebase
+
+Response Format:
+
+{
+    "codebase_context_summary": {
+        "tech_stack": ["languages, frameworks, and major dependencies identified"],
+        "codebase_size": "small (<5K lines)|medium (5-50K)|large (50-200K)|very_large (200K+)",
+        "code_health_assessment": "healthy|moderate_debt|high_debt|critical_debt",
+        "complexity_level": "low|moderate|high|very_high",
+        "test_coverage_status": "comprehensive|adequate|minimal|none",
+        "key_existing_patterns": ["design patterns, architectural patterns already in use"],
+        "relevant_existing_modules": ["modules/files that relate to PRD features"],
+        "reusable_components": ["existing code that can be leveraged for new features"],
+        "technical_debt_hotspots": ["areas of code that will slow down development"]
+    },
+    "feasibility_assessment": {
+        "overall_feasibility": "straightforward|achievable|challenging|very_difficult|impractical",
+        "feasibility_score": 1-10,
+        "executive_summary": "2-3 sentences explaining overall feasibility given the current codebase",
+        "feature_breakdown": [
+            {
+                "feature_name": "name from PRD",
+                "feasibility": "easy|moderate|difficult|very_difficult",
+                "rationale": "why this assessment based on CURRENT code",
+                "existing_foundation": "what exists that helps or hinders",
+                "new_code_required": "percentage estimate of new vs modified code",
+                "integration_points": ["where this connects to existing code"],
+                "blockers": ["technical blockers in current codebase"],
+                "enablers": ["existing code that makes this easier"]
+            }
+        ],
+        "architectural_fit": "how well does the PRD fit current architecture",
+        "refactoring_needed": "none|minor|moderate|significant|major restructure"
+    },
+    "implementation_time_estimate": {
+        "total_estimate": {
+            "optimistic_days": number,
+            "realistic_days": number,
+            "pessimistic_days": number,
+            "confidence_level": "high|medium|low"
+        },
+        "breakdown_by_phase": {
+            "planning_and_design": {"days": number, "notes": "considerations"},
+            "core_implementation": {"days": number, "notes": "main development work"},
+            "testing": {"days": number, "notes": "unit, integration, e2e tests needed"},
+            "integration": {"days": number, "notes": "connecting with existing systems"},
+            "code_review_and_polish": {"days": number, "notes": "quality improvements"},
+            "buffer_for_unknowns": {"days": number, "notes": "based on codebase complexity"}
+        },
+        "breakdown_by_feature": [
+            {
+                "feature": "feature name",
+                "estimated_days": number,
+                "complexity_reasoning": "why this estimate based on current code"
+            }
+        ],
+        "factors_affecting_estimate": {
+            "increasing_factors": ["what in the current codebase increases time"],
+            "decreasing_factors": ["what in the current codebase decreases time"],
+            "uncertainty_factors": ["unknowns that could significantly change estimate"]
+        },
+        "recommended_team_size": "1 developer|2 developers|small team (3-4)|larger team",
+        "parallelization_possible": "what work streams can run in parallel"
+    },
+    "findings": [
+        {
+            "id": "unique-id",
+            "title": "Clear, specific title describing the engineering concern",
+            "severity": "critical|high|medium|low|info",
+            "category": "feasibility_blocker|high_complexity|missing_foundation|tech_debt_impact|test_gap|integration_risk|dependency_issue|skill_gap|timeline_risk",
+            "description": "DETAILED explanation connecting to CURRENT codebase state",
+            "affected_files": ["specific files in current codebase"],
+            "impact_on_timeline": "how many days this adds or could add",
+            "recommendation": "specific actionable steps",
+            "estimated_effort": "trivial|low|medium|high|very_high",
+            "confidence": 0.0-1.0
+        }
+    ],
+    "implementation_roadmap": {
+        "recommended_approach": "description of best implementation strategy",
+        "phase_1_mvp": {
+            "scope": "what to build first",
+            "estimated_days": number,
+            "deliverables": ["specific outputs"]
+        },
+        "phase_2_complete": {
+            "scope": "remaining features",
+            "estimated_days": number,
+            "deliverables": ["specific outputs"]
+        },
+        "prerequisites": ["what must be done/fixed before starting"],
+        "parallel_workstreams": ["work that can happen simultaneously"],
+        "dependencies": ["external dependencies or blockers"],
+        "milestones": [
+            {"name": "milestone", "target_day": number, "criteria": "completion criteria"}
+        ]
+    },
+    "risks_and_mitigations": {
+        "technical_risks": [
+            {
+                "risk": "description",
+                "probability": "low|medium|high",
+                "impact_days": number,
+                "mitigation": "how to address"
+            }
+        ],
+        "schedule_risks": ["factors that could delay timeline"],
+        "quality_risks": ["factors that could impact code quality"]
+    },
+    "summary": {
+        "engineering_risk_rating": "critical|high|medium|low",
+        "total_findings": number,
+        "critical_count": number,
+        "high_count": number,
+        "key_recommendations": ["top 3-5 most important actions"],
+        "go_no_go_assessment": "recommend_proceed|proceed_with_caution|significant_concerns|recommend_against",
+        "bottom_line": "1-2 sentence final assessment for decision makers"
+    }
+}
+
+ESTIMATION GUIDELINES:
+
+Time estimates should be based on the ACTUAL codebase metrics provided:
+- Small codebase (<5K lines): Features typically take 0.5-2x the naive estimate
+- Medium codebase (5-50K lines): Features typically take 1-3x the naive estimate  
+- Large codebase (50-200K lines): Features typically take 2-4x the naive estimate
+- Very large codebase (200K+ lines): Features typically take 3-5x the naive estimate
+
+Adjust for:
+- High complexity files (>70 complexity score): +50-100% time
+- Low test coverage (<30%): +30-50% time for proper testing
+- High technical debt (many TODOs/FIXMEs): +20-40% time
+- Missing CI/CD: +10-20% time for quality assurance
+- Good existing patterns matching PRD: -20-30% time
+- Reusable components available: -10-30% time
+
+Be REALISTIC not optimistic. Development always takes longer than expected.
+Base your estimates on what the CURRENT codebase actually looks like, not ideal conditions."""
+
+
+ARCHITECTURE_REVIEW_PROMPT = """You are an expert software architect performing a comprehensive architecture review. Analyze the proposed changes for API design, service boundaries, dependency management, scalability, and architectural patterns.
+
+IMPORTANT: You must respond with valid json only, no markdown or explanations.
+
+Be THOROUGH and DETAILED. For EACH architecture concern, provide in-depth analysis:
+
+{
+    "findings": [
+        {
+            "id": "unique-id",
+            "title": "Clear, specific title describing the architecture concern",
+            "severity": "critical|high|medium|low|info",
+            "category": "missing_api_contract|inconsistent_api|breaking_change|missing_versioning|poor_service_boundary|circular_dependency|missing_abstraction|wrong_pattern|missing_resilience|missing_caching|poor_data_model|missing_event_schema|tight_coupling|missing_documentation",
+            "description": "DETAILED explanation of: 1) What the architecture concern is 2) Why it matters for system design 3) What problems it can cause at scale",
+            "affected_services": ["list of services/components affected"],
+            "affected_apis": ["specific APIs/endpoints affected"],
+            "architectural_pattern": "pattern violated or needed (e.g., CQRS, Event Sourcing, Repository, etc.)",
+            "breaking_change": true/false,
+            "backward_compatible": true/false,
+            "scalability_impact": "How does this affect system scalability?",
+            "reliability_impact": "How does this affect system reliability?",
+            "performance_impact": "How does this affect performance?",
+            "migration_required": true/false,
+            "migration_complexity": "none|simple|moderate|complex",
+            "recommendation": "SPECIFIC actionable steps to improve architecture",
+            "implementation_guidance": "Architectural changes, patterns to apply, migration strategies",
+            "trade_offs": ["trade-offs to consider with the recommendation"],
+            "confidence": 0.0-1.0
+        }
+    ],
+    "architecture_analysis": {
+        "api_design": {
+            "new_endpoints": [
+                {
+                    "method": "GET|POST|PUT|DELETE|PATCH",
+                    "path": "/api/path",
+                    "consistency_issues": ["naming, versioning, response format issues"],
+                    "contract_defined": true/false,
+                    "authentication": "required auth mechanism",
+                    "rate_limiting": true/false
+                }
+            ],
+            "breaking_changes": ["list of breaking API changes"],
+            "versioning_strategy": "url|header|query|none",
+            "documentation_status": "complete|partial|missing"
+        },
+        "service_design": {
+            "service_boundaries": ["how services are bounded"],
+            "boundary_violations": ["where boundaries are crossed incorrectly"],
+            "coupling_issues": ["services that are too tightly coupled"],
+            "cohesion_issues": ["services that lack cohesion"],
+            "communication_patterns": ["sync|async|event-driven patterns used"]
+        },
+        "data_architecture": {
+            "data_models": ["new/modified data models"],
+            "schema_changes": ["database schema changes needed"],
+            "data_consistency": "how is consistency maintained?",
+            "data_ownership": "which service owns which data?",
+            "migration_requirements": ["data migrations needed"]
+        },
+        "dependency_analysis": {
+            "new_dependencies": ["new service/package dependencies"],
+            "circular_dependencies": ["circular dependency chains found"],
+            "dependency_direction": "are dependencies pointing in the right direction?",
+            "abstraction_layers": "are proper abstraction layers in place?"
+        },
+        "resilience_patterns": {
+            "retry_logic": "where retry logic is needed",
+            "circuit_breakers": "where circuit breakers are needed",
+            "timeout_handling": "timeout configurations",
+            "fallback_strategies": "fallback mechanisms",
+            "bulkhead_isolation": "isolation patterns"
+        },
+        "scalability_considerations": {
+            "horizontal_scalability": "can this scale horizontally?",
+            "bottlenecks": ["potential bottlenecks identified"],
+            "caching_strategy": "caching approach",
+            "async_processing": "async/background processing needs",
+            "resource_limits": ["resource constraints to consider"]
+        }
+    },
+    "integration_impact": {
+        "upstream_dependencies": ["services this depends on"],
+        "downstream_consumers": ["services that depend on this"],
+        "contract_changes": ["API contract changes affecting consumers"],
+        "event_schema_changes": ["event schema changes"],
+        "migration_coordination": "coordination needed with other teams"
+    },
+    "summary": {
+        "architecture_risk_rating": "critical|high|medium|low",
+        "executive_summary": "2-3 sentence summary focusing on architectural implications",
+        "total_findings": number,
+        "critical_count": number,
+        "high_count": number,
+        "key_concerns": ["top 3-5 most important architecture concerns"],
+        "positive_observations": ["good architectural practices observed"],
+        "adr_recommended": true/false,
+        "adr_topics": ["topics that should be documented in Architecture Decision Records"],
+        "review_required_by": ["teams/roles that should review these changes"]
+    }
+}
+
+ANALYSIS FRAMEWORK:
+
+1. API Design Principles:
+   - RESTful conventions and consistency
+   - Proper HTTP methods and status codes
+   - Versioning strategy
+   - Request/response schemas (OpenAPI)
+   - Error response formats
+   - Pagination, filtering, sorting
+
+2. Service Architecture:
+   - Single Responsibility Principle for services
+   - Clear bounded contexts (DDD)
+   - Proper service boundaries
+   - Appropriate communication patterns
+   - Event-driven where applicable
+
+3. Dependency Management:
+   - Direction of dependencies (toward stable abstractions)
+   - Dependency Inversion Principle
+   - Interface segregation
+   - Avoiding circular dependencies
+   - Package/module organization
+
+4. Resilience Patterns:
+   - Retry with exponential backoff
+   - Circuit breaker pattern
+   - Bulkhead isolation
+   - Timeout handling
+   - Graceful degradation
+   - Health checks
+
+5. Data Architecture:
+   - Data ownership and bounded contexts
+   - Schema evolution strategy
+   - Consistency patterns (eventual vs strong)
+   - CQRS where applicable
+   - Event sourcing consideration
+
+6. Scalability & Performance:
+   - Horizontal scaling capability
+   - Caching strategy
+   - Async processing
+   - Resource pooling
+   - Load balancing consideration
+
+Be comprehensive. Architectural decisions have long-lasting impact and are expensive to change later."""
 

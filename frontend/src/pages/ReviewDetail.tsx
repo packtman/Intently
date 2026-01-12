@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Shield,
   AlertTriangle,
@@ -10,9 +10,32 @@ import {
   ChevronRight,
   ExternalLink,
   Activity,
-  Sparkles
+  Sparkles,
+  Layers,
+  Code,
+  Eye,
+  FileCheck,
+  Code2,
+  Network,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { 
+  FindingValidationPanel, 
+  ValidationStatusBadge,
+  CommentsThread,
+  CommentCountBadge,
+  TeamAssignmentPanel,
+  AssignmentBadge,
+  ExpertFeedbackForm,
+} from '../components/collaboration'
+import {
+  PRDChangesView,
+  PRDQualityScore,
+  EffortEstimation,
+  ExpertAskModal,
+} from '../components/pm'
+import { api } from '../services/api'
+import type { Finding, CollaborationFeatures } from '../types'
 import {
   PieChart,
   Pie,
@@ -38,6 +61,8 @@ interface DashboardData {
       security: number
       privacy: number
       compliance: number
+      engineering: number
+      architecture: number
     }
   }
   severity_chart: {
@@ -58,7 +83,7 @@ interface DashboardData {
     title: string
     description?: string
     category: string
-    dimension?: string  // security, privacy, or compliance
+    dimension?: string  // security, privacy, compliance, engineering, or architecture
     confidence: string
     recommendation: string
     source_type?: string
@@ -110,6 +135,14 @@ interface DashboardData {
       positive_observations?: string[]
       missing_considerations?: string[]
     }
+    // Per-dimension summaries for compact display
+    dimension_summaries?: {
+      security?: string
+      privacy?: string
+      compliance?: string
+      engineering?: string
+      architecture?: string
+    }
   }
 }
 
@@ -122,10 +155,27 @@ interface ReviewStatus {
 
 export default function ReviewDetail() {
   const { id } = useParams()
+  const queryClient = useQueryClient()
   const [expandedFindings, setExpandedFindings] = useState<Set<string>>(new Set())
   const [aiOnlyFilter, setAiOnlyFilter] = useState(true) // Default to AI-only for cross-functional reviews
   const [filterInitialized, setFilterInitialized] = useState(false)
   const [selectedDimension, setSelectedDimension] = useState<string | 'all'>('all')
+  const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool'>('findings')
+  const [expertAskModal, setExpertAskModal] = useState<{ isOpen: boolean; predictionId: string; question: string } | null>(null)
+
+  // Fetch collaboration features (to know which features are enabled)
+  const { data: collaborationFeatures } = useQuery<CollaborationFeatures>({
+    queryKey: ['collaboration-features'],
+    queryFn: () => api.getCollaborationFeatures(),
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    retry: false, // Don't retry if API doesn't exist (feature not enabled)
+  })
+
+  // Feature flags
+  const validationEnabled = collaborationFeatures?.validation ?? false
+  const commentsEnabled = collaborationFeatures?.comments ?? false
+  const teamAssignmentEnabled = collaborationFeatures?.team_assignment ?? false
+  const expertFeedbackEnabled = collaborationFeatures?.expert_feedback ?? false
 
   // Poll for status while pending/running
   const { data: status } = useQuery<ReviewStatus>({
@@ -408,281 +458,316 @@ export default function ReviewDetail() {
         </div>
       )}
 
-      {/* LLM Analysis Section */}
+      {/* LLM Analysis Section - Compact summaries for all analyzers */}
       {dashboard.llm_analysis && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-primary-500/10 to-accent-500/10 rounded-2xl border border-primary-500/30 p-6 space-y-6"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500/20 to-accent-500/20 flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-primary-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-white flex items-center gap-2">
-                  AI Security Analysis
-                  <span className="px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-400 text-xs font-medium">
-                    Powered by {dashboard.llm_analysis.providers.join(' + ')}
-                  </span>
-                </h3>
-                <p className="text-surface-400 text-sm">
-                  Deep security analysis of your PRD intent
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-white">{dashboard.llm_analysis.findings_count}</p>
-                <p className="text-xs text-surface-400">Security Issues</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Executive Summary */}
-          {dashboard.llm_analysis.summary_details?.executive_summary && (
-            <div className="p-4 rounded-xl bg-surface-800/50 border border-surface-700">
-              <h4 className="text-sm font-medium text-surface-400 mb-2">Executive Summary</h4>
-              <p className="text-white">{dashboard.llm_analysis.summary_details.executive_summary}</p>
-            </div>
-          )}
-
-          {/* Key Concerns */}
-          {dashboard.llm_analysis.summary_details?.key_concerns && dashboard.llm_analysis.summary_details.key_concerns.length > 0 && (
-            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
-              <h4 className="text-sm font-medium text-red-400 mb-3 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                Key Security Concerns
-              </h4>
-              <ul className="space-y-2">
-                {dashboard.llm_analysis.summary_details.key_concerns.map((concern, i) => (
-                  <li key={i} className="text-sm text-white flex items-start gap-2">
-                    <span className="text-red-400 mt-1">•</span>
-                    {concern}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* STRIDE Breakdown */}
-          {dashboard.llm_analysis.threat_analysis?.stride_breakdown && (
-            <div className="p-4 rounded-xl bg-surface-800/50 border border-surface-700">
-              <h4 className="text-sm font-medium text-surface-400 mb-3">STRIDE Threat Analysis</h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {Object.entries(dashboard.llm_analysis.threat_analysis.stride_breakdown).map(([key, threats]) => (
-                  threats && threats.length > 0 && (
-                    <div key={key} className="p-3 rounded-lg bg-surface-900/50 border border-surface-700">
-                      <p className="text-xs font-medium text-primary-400 uppercase mb-2">
-                        {key.replace(/_/g, ' ')}
-                      </p>
-                      <ul className="space-y-1">
-                        {threats.slice(0, 3).map((threat, i) => (
-                          <li key={i} className="text-xs text-surface-300 truncate" title={threat}>
-                            • {threat}
-                          </li>
-                        ))}
-                        {threats.length > 3 && (
-                          <li className="text-xs text-surface-500">+{threats.length - 3} more</li>
-                        )}
-                      </ul>
-                    </div>
-                  )
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Attack Surface */}
-          {dashboard.llm_analysis.threat_analysis?.attack_surface && dashboard.llm_analysis.threat_analysis.attack_surface.length > 0 && (
-            <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/30">
-              <h4 className="text-sm font-medium text-orange-400 mb-2">Attack Surface</h4>
-              <div className="flex flex-wrap gap-2">
-                {dashboard.llm_analysis.threat_analysis.attack_surface.map((entry, i) => (
-                  <span key={i} className="px-2 py-1 rounded-md bg-orange-500/20 text-orange-300 text-xs">
-                    {entry}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Positive Observations */}
-          {dashboard.llm_analysis.summary_details?.positive_observations && dashboard.llm_analysis.summary_details.positive_observations.length > 0 && (
-            <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30">
-              <h4 className="text-sm font-medium text-green-400 mb-2 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" />
-                Positive Observations
-              </h4>
-              <ul className="space-y-1">
-                {dashboard.llm_analysis.summary_details.positive_observations.map((obs, i) => (
-                  <li key={i} className="text-sm text-green-300 flex items-start gap-2">
-                    <span className="text-green-400 mt-1">✓</span>
-                    {obs}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </motion.div>
+        <LLMAnalysisSection
+          analysis={dashboard.llm_analysis}
+          dimensionsAnalyzed={dashboard.overview.dimensions_analyzed}
+          findings={dashboard.findings_table}
+        />
       )}
 
-      {/* Findings Table */}
-      <div className="bg-surface-900/50 backdrop-blur-sm rounded-2xl border border-surface-800 p-6">
-        {/* Header with dimension tabs */}
-        <div className="flex flex-col gap-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h3 className="font-semibold text-white flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-primary-400" />
-                AI-Powered Findings
-              </h3>
-              {dashboard.findings_table.length > 0 && 
-               dashboard.findings_table.every(f => f.source_type === 'llm') && (
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-500/15 border border-primary-500/30 text-primary-400 text-xs font-medium">
-                  100% AI Analysis
-                </span>
-              )}
-            </div>
-            {dashboard.findings_table.length > 0 && (
-              <button
-                onClick={() => {
-                  const filteredFindings = dashboard.findings_table.filter(f => 
-                    (aiOnlyFilter ? f.source_type === 'llm' : true) &&
-                    (selectedDimension === 'all' || f.dimension === selectedDimension)
-                  )
-                  
-                  if (expandedFindings.size === filteredFindings.length) {
-                    setExpandedFindings(new Set())
-                  } else {
-                    setExpandedFindings(new Set(filteredFindings.map(f => f.id)))
-                  }
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-surface-800 border border-surface-700 
-                           rounded-lg text-surface-300 hover:text-white hover:border-surface-600 transition-all"
-              >
-                <ChevronRight className="w-4 h-4" />
-                Toggle All
-              </button>
-            )}
-          </div>
+      {/* PM Tool Section - Tab Navigation */}
+      <div className="bg-surface-900/50 rounded-2xl border border-surface-800 overflow-hidden">
+        {/* Tabs */}
+        <div className="border-b border-surface-800 flex">
+          <button
+            onClick={() => setActiveTab('findings')}
+            className={`
+              flex-1 px-6 py-4 font-medium transition-all
+              ${activeTab === 'findings'
+                ? 'text-white border-b-2 border-primary-500 bg-surface-900'
+                : 'text-surface-400 hover:text-white'
+              }
+            `}
+          >
+            Findings
+          </button>
+          <button
+            onClick={() => setActiveTab('pm-tool')}
+            className={`
+              flex-1 px-6 py-4 font-medium transition-all
+              ${activeTab === 'pm-tool'
+                ? 'text-white border-b-2 border-primary-500 bg-surface-900'
+                : 'text-surface-400 hover:text-white'
+              }
+            `}
+          >
+            PRD Changes
+          </button>
+        </div>
 
-          {/* Dimension Tabs */}
-          {dashboard.overview.dimensions_analyzed && dashboard.overview.dimensions_analyzed.length > 1 && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSelectedDimension('all')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  selectedDimension === 'all'
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
-                }`}
-              >
-                All ({dashboard.findings_table.filter(f => aiOnlyFilter ? f.source_type === 'llm' : true).length})
-              </button>
-              {dashboard.overview.dimensions_analyzed.includes('security') && (
-                <button
-                  onClick={() => setSelectedDimension('security')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                    selectedDimension === 'security'
-                      ? 'bg-cyan-500 text-white'
-                      : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
-                  }`}
-                >
-                  <Shield className="w-4 h-4" />
-                  Security ({dashboard.findings_table.filter(f => f.dimension === 'security' && (aiOnlyFilter ? f.source_type === 'llm' : true)).length})
-                </button>
-              )}
-              {dashboard.overview.dimensions_analyzed.includes('privacy') && (
-                <button
-                  onClick={() => setSelectedDimension('privacy')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                    selectedDimension === 'privacy'
-                      ? 'bg-purple-500 text-white'
-                      : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
-                  }`}
-                >
-                  <Activity className="w-4 h-4" />
-                  Privacy ({dashboard.findings_table.filter(f => f.dimension === 'privacy' && (aiOnlyFilter ? f.source_type === 'llm' : true)).length})
-                </button>
-              )}
-              {dashboard.overview.dimensions_analyzed.includes('compliance') && (
-                <button
-                  onClick={() => setSelectedDimension('compliance')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                    selectedDimension === 'compliance'
-                      ? 'bg-amber-500 text-white'
-                      : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
-                  }`}
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Compliance ({dashboard.findings_table.filter(f => f.dimension === 'compliance' && (aiOnlyFilter ? f.source_type === 'llm' : true)).length})
-                </button>
-              )}
+        {/* Tab Content */}
+        <div className="p-6">
+          {activeTab === 'findings' && (
+            <FindingsTabContent
+              dashboard={dashboard}
+              id={id || ''}
+              expandedFindings={expandedFindings}
+              setExpandedFindings={setExpandedFindings}
+              aiOnlyFilter={aiOnlyFilter}
+              setAiOnlyFilter={setAiOnlyFilter}
+              selectedDimension={selectedDimension}
+              setSelectedDimension={setSelectedDimension}
+              validationEnabled={validationEnabled}
+              commentsEnabled={commentsEnabled}
+              teamAssignmentEnabled={teamAssignmentEnabled}
+              expertFeedbackEnabled={expertFeedbackEnabled}
+              queryClient={queryClient}
+            />
+          )}
+          {activeTab === 'pm-tool' && id && (
+            <div className="space-y-6">
+              {/* Quality Score & Effort Estimation */}
+              <div className="grid grid-cols-2 gap-6">
+                <PRDQualityScore reviewId={id} />
+                <EffortEstimation reviewId={id} />
+              </div>
+              
+              {/* PRD Changes */}
+              <PRDChangesView
+                reviewId={id}
+                onAskExpert={(predictionId, question) => {
+                  setExpertAskModal({ isOpen: true, predictionId, question })
+                }}
+              />
             </div>
           )}
         </div>
-
-        {/* Findings List */}
-        {(() => {
-          const filteredFindings = dashboard.findings_table.filter(f => 
-            (aiOnlyFilter ? f.source_type === 'llm' : true) &&
-            (selectedDimension === 'all' || f.dimension === selectedDimension)
-          )
-          
-          return filteredFindings.length > 0 ? (
-            <div className="space-y-3">
-              {filteredFindings.map((finding) => (
-                <FindingRow
-                  key={finding.id}
-                  finding={finding}
-                  expanded={expandedFindings.has(finding.id)}
-                  onToggle={() => {
-                    setExpandedFindings(prev => {
-                      const next = new Set(prev)
-                      if (next.has(finding.id)) {
-                        next.delete(finding.id)
-                      } else {
-                        next.add(finding.id)
-                      }
-                      return next
-                    })
-                  }}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              {dashboard.llm_analysis?.used && dashboard.findings_table.length === 0 ? (
-                <>
-                  <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-                  <p className="text-white font-medium">AI Analysis Complete - No Issues Found!</p>
-                  <p className="text-surface-400 text-sm">
-                    The AI analysis found no significant concerns with this implementation.
-                  </p>
-                </>
-              ) : selectedDimension !== 'all' ? (
-                <>
-                  <Shield className="w-12 h-12 text-surface-600 mx-auto mb-4" />
-                  <p className="text-white font-medium">No {selectedDimension} findings</p>
-                  <p className="text-surface-400 text-sm">
-                    Try selecting a different dimension or view all findings.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-                  <p className="text-white font-medium">No findings!</p>
-                  <p className="text-surface-400 text-sm">Great job on maintaining secure code.</p>
-                </>
-              )}
-            </div>
-          )
-        })()}
       </div>
+
+      {/* Expert Ask Modal */}
+      {expertAskModal && id && (
+        <ExpertAskModal
+          isOpen={expertAskModal.isOpen}
+          onClose={() => setExpertAskModal(null)}
+          predictionId={expertAskModal.predictionId}
+          defaultQuestion={expertAskModal.question}
+          reviewId={id}
+        />
+      )}
+
     </div>
+  )
+}
+
+// Findings Tab Content Component
+function FindingsTabContent({
+  dashboard,
+  id,
+  expandedFindings,
+  setExpandedFindings,
+  aiOnlyFilter,
+  setAiOnlyFilter,
+  selectedDimension,
+  setSelectedDimension,
+  validationEnabled,
+  commentsEnabled,
+  teamAssignmentEnabled,
+  expertFeedbackEnabled,
+  queryClient,
+}: {
+  dashboard: DashboardData
+  id: string
+  expandedFindings: Set<string>
+  setExpandedFindings: (set: Set<string> | ((prev: Set<string>) => Set<string>)) => void
+  aiOnlyFilter: boolean
+  setAiOnlyFilter: (value: boolean) => void
+  selectedDimension: string | 'all'
+  setSelectedDimension: (value: string | 'all') => void
+  validationEnabled: boolean
+  commentsEnabled: boolean
+  teamAssignmentEnabled: boolean
+  expertFeedbackEnabled: boolean
+  queryClient: any
+}) {
+  return (
+    <>
+      {/* Header with dimension tabs */}
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary-400" />
+              AI-Powered Findings
+            </h3>
+            {dashboard.findings_table.length > 0 && 
+             dashboard.findings_table.every(f => f.source_type === 'llm') && (
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-500/15 border border-primary-500/30 text-primary-400 text-xs font-medium">
+                100% AI Analysis
+              </span>
+            )}
+          </div>
+          {dashboard.findings_table.length > 0 && (
+            <button
+              onClick={() => {
+                const filteredFindings = dashboard.findings_table.filter(f => 
+                  (aiOnlyFilter ? f.source_type === 'llm' : true) &&
+                  (selectedDimension === 'all' || f.dimension === selectedDimension)
+                )
+                
+                if (expandedFindings.size === filteredFindings.length) {
+                  setExpandedFindings(new Set())
+                } else {
+                  setExpandedFindings(new Set(filteredFindings.map(f => f.id)))
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-surface-800 border border-surface-700 
+                         rounded-lg text-surface-300 hover:text-white hover:border-surface-600 transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+              Toggle All
+            </button>
+          )}
+        </div>
+
+        {/* Dimension Tabs */}
+        {dashboard.overview.dimensions_analyzed && dashboard.overview.dimensions_analyzed.length > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedDimension('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                selectedDimension === 'all'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
+              }`}
+            >
+              All ({dashboard.findings_table.filter(f => aiOnlyFilter ? f.source_type === 'llm' : true).length})
+            </button>
+            {dashboard.overview.dimensions_analyzed.includes('security') && (
+              <button
+                onClick={() => setSelectedDimension('security')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  selectedDimension === 'security'
+                    ? 'bg-cyan-500 text-white'
+                    : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                Security ({dashboard.findings_table.filter(f => f.dimension === 'security' && (aiOnlyFilter ? f.source_type === 'llm' : true)).length})
+              </button>
+            )}
+            {dashboard.overview.dimensions_analyzed.includes('privacy') && (
+              <button
+                onClick={() => setSelectedDimension('privacy')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  selectedDimension === 'privacy'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
+                }`}
+              >
+                <Activity className="w-4 h-4" />
+                Privacy ({dashboard.findings_table.filter(f => f.dimension === 'privacy' && (aiOnlyFilter ? f.source_type === 'llm' : true)).length})
+              </button>
+            )}
+            {dashboard.overview.dimensions_analyzed.includes('compliance') && (
+              <button
+                onClick={() => setSelectedDimension('compliance')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  selectedDimension === 'compliance'
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
+                }`}
+              >
+                <CheckCircle className="w-4 h-4" />
+                Compliance ({dashboard.findings_table.filter(f => f.dimension === 'compliance' && (aiOnlyFilter ? f.source_type === 'llm' : true)).length})
+              </button>
+            )}
+            {dashboard.overview.dimensions_analyzed.includes('engineering') && (
+              <button
+                onClick={() => setSelectedDimension('engineering')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  selectedDimension === 'engineering'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
+                }`}
+              >
+                <Code className="w-4 h-4" />
+                Engineering ({dashboard.findings_table.filter(f => f.dimension === 'engineering' && (aiOnlyFilter ? f.source_type === 'llm' : true)).length})
+              </button>
+            )}
+            {dashboard.overview.dimensions_analyzed.includes('architecture') && (
+              <button
+                onClick={() => setSelectedDimension('architecture')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  selectedDimension === 'architecture'
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700'
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                Architecture ({dashboard.findings_table.filter(f => f.dimension === 'architecture' && (aiOnlyFilter ? f.source_type === 'llm' : true)).length})
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Findings List */}
+      {(() => {
+        const filteredFindings = dashboard.findings_table.filter(f => 
+          (aiOnlyFilter ? f.source_type === 'llm' : true) &&
+          (selectedDimension === 'all' || f.dimension === selectedDimension)
+        )
+        
+        return filteredFindings.length > 0 ? (
+          <div className="space-y-3">
+            {filteredFindings.map((finding) => (
+              <FindingRow
+                key={finding.id}
+                finding={finding as Finding}
+                reviewId={id}
+                expanded={expandedFindings.has(finding.id)}
+                onToggle={() => {
+                  setExpandedFindings(prev => {
+                    const next = new Set(prev)
+                    if (next.has(finding.id)) {
+                      next.delete(finding.id)
+                    } else {
+                      next.add(finding.id)
+                    }
+                    return next
+                  })
+                }}
+                validationEnabled={validationEnabled}
+                commentsEnabled={commentsEnabled}
+                teamAssignmentEnabled={teamAssignmentEnabled}
+                expertFeedbackEnabled={expertFeedbackEnabled}
+                onFindingUpdated={() => {
+                  queryClient.invalidateQueries({ queryKey: ['review-dashboard', id] })
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            {dashboard.llm_analysis?.used && dashboard.findings_table.length === 0 ? (
+              <>
+                <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
+                <p className="text-white font-medium">AI Analysis Complete - No Issues Found!</p>
+                <p className="text-surface-400 text-sm">
+                  The AI analysis found no significant concerns with this implementation.
+                </p>
+              </>
+            ) : selectedDimension !== 'all' ? (
+              <>
+                <Shield className="w-12 h-12 text-surface-600 mx-auto mb-4" />
+                <p className="text-white font-medium">No {selectedDimension} findings</p>
+                <p className="text-surface-400 text-sm">
+                  Try selecting a different dimension or view all findings.
+                </p>
+              </>
+            ) : (
+              <>
+                <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
+                <p className="text-white font-medium">No findings!</p>
+                <p className="text-surface-400 text-sm">Great job on maintaining secure code.</p>
+              </>
+            )}
+          </div>
+        )
+      })()}
+    </>
   )
 }
 
@@ -787,14 +872,212 @@ function Flag({ label, color }: { label: string; color: string }) {
   )
 }
 
+function LLMAnalysisSection({
+  analysis,
+  dimensionsAnalyzed,
+  findings,
+}: {
+  analysis: DashboardData['llm_analysis']
+  dimensionsAnalyzed?: string[]
+  findings: DashboardData['findings_table']
+}) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  
+  if (!analysis) return null
+
+  // Dimension config for icons and colors
+  const dimensionConfig: Record<string, { icon: typeof Shield; color: string; label: string }> = {
+    security: { icon: Shield, label: 'Security', color: 'cyan' },
+    privacy: { icon: Eye, label: 'Privacy', color: 'purple' },
+    compliance: { icon: FileCheck, label: 'Compliance', color: 'amber' },
+    engineering: { icon: Code2, label: 'Engineering', color: 'green' },
+    architecture: { icon: Network, label: 'Architecture', color: 'orange' },
+  }
+
+  const colorClasses: Record<string, string> = {
+    cyan: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+    purple: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+    amber: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    green: 'bg-green-500/10 text-green-400 border-green-500/30',
+    orange: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
+  }
+
+  // Generate summary for each dimension based on findings
+  const getDimensionSummary = (dimension: string): string => {
+    // First check if backend provided a summary
+    if (analysis.dimension_summaries?.[dimension as keyof typeof analysis.dimension_summaries]) {
+      return analysis.dimension_summaries[dimension as keyof typeof analysis.dimension_summaries]!
+    }
+    
+    // Otherwise generate from findings
+    const dimFindings = findings.filter(f => f.dimension === dimension)
+    const criticalCount = dimFindings.filter(f => f.severity === 'critical').length
+    const highCount = dimFindings.filter(f => f.severity === 'high').length
+    
+    if (dimFindings.length === 0) {
+      return 'No issues identified'
+    }
+    
+    const parts = []
+    if (criticalCount > 0) parts.push(`${criticalCount} critical`)
+    if (highCount > 0) parts.push(`${highCount} high`)
+    
+    const otherCount = dimFindings.length - criticalCount - highCount
+    if (otherCount > 0) parts.push(`${otherCount} other`)
+    
+    return `${dimFindings.length} findings: ${parts.join(', ')}`
+  }
+
+  const analyzedDimensions = dimensionsAnalyzed || ['security']
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gradient-to-r from-primary-500/10 to-accent-500/10 rounded-2xl border border-primary-500/30 p-6"
+    >
+      {/* Header - Always visible */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500/20 to-accent-500/20 flex items-center justify-center">
+            <Sparkles className="w-6 h-6 text-primary-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white flex items-center gap-2">
+              AI Analysis Summary
+              <span className="px-2 py-0.5 rounded-full bg-primary-500/20 text-primary-400 text-xs font-medium">
+                Powered by {analysis.providers.join(' + ')}
+              </span>
+            </h3>
+            <p className="text-surface-400 text-sm">{analysis.findings_count} total findings across {analyzedDimensions.length} dimension{analyzedDimensions.length > 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-800/50 border border-surface-700 text-surface-400 hover:text-white hover:border-surface-600 transition-colors text-sm"
+        >
+          {isExpanded ? 'Collapse' : 'Expand'}
+          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {/* Compact Analyzer Summaries - One line per dimension */}
+      <div className="mt-4 space-y-2">
+        {analyzedDimensions.map((dimension) => {
+          const config = dimensionConfig[dimension]
+          if (!config) return null
+          const Icon = config.icon
+          const summary = getDimensionSummary(dimension)
+          const dimFindings = findings.filter(f => f.dimension === dimension)
+          const hasCritical = dimFindings.some(f => f.severity === 'critical')
+          const hasHigh = dimFindings.some(f => f.severity === 'high')
+          
+          return (
+            <div
+              key={dimension}
+              className={`flex items-center gap-3 p-3 rounded-xl border ${colorClasses[config.color]}`}
+            >
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span className="font-medium text-sm w-24 flex-shrink-0">{config.label}</span>
+              <span className="text-sm opacity-80 flex-1 truncate">{summary}</span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {hasCritical && (
+                  <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">CRIT</span>
+                )}
+                {hasHigh && !hasCritical && (
+                  <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 text-xs">HIGH</span>
+                )}
+                {dimFindings.length === 0 && (
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Expanded Details */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-6 pt-6 border-t border-surface-700 space-y-4">
+              {/* Executive Summary */}
+              {analysis.summary_details?.executive_summary && (
+                <div className="p-4 rounded-xl bg-surface-800/50 border border-surface-700">
+                  <h4 className="text-sm font-medium text-surface-400 mb-2">Executive Summary</h4>
+                  <p className="text-white text-sm">{analysis.summary_details.executive_summary}</p>
+                </div>
+              )}
+
+              {/* Key Concerns */}
+              {analysis.summary_details?.key_concerns && analysis.summary_details.key_concerns.length > 0 && (
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+                  <h4 className="text-sm font-medium text-red-400 mb-3 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Key Concerns
+                  </h4>
+                  <ul className="space-y-2">
+                    {analysis.summary_details.key_concerns.map((concern, i) => (
+                      <li key={i} className="text-sm text-white flex items-start gap-2">
+                        <span className="text-red-400 mt-1">-</span>
+                        {concern}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Positive Observations */}
+              {analysis.summary_details?.positive_observations &&
+                analysis.summary_details.positive_observations.length > 0 && (
+                  <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30">
+                    <h4 className="text-sm font-medium text-green-400 mb-2 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Positive Observations
+                    </h4>
+                    <ul className="space-y-1">
+                      {analysis.summary_details.positive_observations.map((obs, i) => (
+                        <li key={i} className="text-sm text-green-300 flex items-start gap-2">
+                          <span className="text-green-400 mt-1">+</span>
+                          {obs}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
 function FindingRow({
   finding,
+  reviewId,
   expanded,
   onToggle,
+  validationEnabled,
+  commentsEnabled,
+  teamAssignmentEnabled,
+  expertFeedbackEnabled,
+  onFindingUpdated,
 }: {
-  finding: DashboardData['findings_table'][0]
+  finding: Finding
+  reviewId: string
   expanded: boolean
   onToggle: () => void
+  validationEnabled?: boolean
+  commentsEnabled?: boolean
+  teamAssignmentEnabled?: boolean
+  expertFeedbackEnabled?: boolean
+  onFindingUpdated?: () => void
 }) {
   const severityColors: Record<string, string> = {
     critical: 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -808,12 +1091,16 @@ function FindingRow({
     security: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
     privacy: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
     compliance: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    engineering: 'bg-green-500/10 text-green-400 border-green-500/30',
+    architecture: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
   }
 
   const dimensionLabels: Record<string, string> = {
     security: 'Security',
     privacy: 'Privacy',
     compliance: 'Compliance',
+    engineering: 'Engineering',
+    architecture: 'Architecture',
   }
 
   const isAI = finding.source_type === 'llm'
@@ -838,6 +1125,18 @@ function FindingRow({
               <Sparkles className="w-3 h-3 text-primary-400" />
               <span className="text-xs text-primary-400">AI</span>
             </span>
+          )}
+          {/* Validation status badge */}
+          {finding.validationStatus && finding.validationStatus !== 'pending' && (
+            <ValidationStatusBadge status={finding.validationStatus} />
+          )}
+          {/* Team assignment badge */}
+          {finding.assignedTeam && (
+            <AssignmentBadge team={finding.assignedTeam} />
+          )}
+          {/* Comment count badge */}
+          {finding.commentCount !== undefined && finding.commentCount > 0 && (
+            <CommentCountBadge count={finding.commentCount} />
           )}
         </div>
         <div className="flex items-center gap-4">
@@ -959,6 +1258,39 @@ function FindingRow({
                 <p className="text-sm text-white font-medium">{finding.category}</p>
               </div>
             </div>
+
+            {/* Collaboration Components - only render if features are enabled */}
+            
+            {/* Validation Panel (Phase 1) */}
+            <FindingValidationPanel
+              finding={finding}
+              reviewId={reviewId}
+              enabled={validationEnabled ?? false}
+              onValidated={onFindingUpdated}
+            />
+
+            {/* Team Assignment Panel (Phase 3) */}
+            <TeamAssignmentPanel
+              finding={finding}
+              reviewId={reviewId}
+              enabled={teamAssignmentEnabled ?? false}
+              onAssigned={onFindingUpdated}
+            />
+
+            {/* Comments Thread (Phase 2) */}
+            <CommentsThread
+              finding={finding}
+              reviewId={reviewId}
+              enabled={commentsEnabled ?? false}
+            />
+
+            {/* Expert Feedback Form (Phase 4) */}
+            <ExpertFeedbackForm
+              finding={finding}
+              reviewId={reviewId}
+              enabled={expertFeedbackEnabled ?? false}
+              onFeedbackSubmitted={onFindingUpdated}
+            />
           </div>
         </motion.div>
       )}

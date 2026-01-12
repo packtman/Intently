@@ -123,7 +123,7 @@ export default function NewReview() {
       {/* Header */}
       <div>
         <h1 className="font-display text-3xl font-bold text-white">
-          New Security Review
+          New Product Review
         </h1>
         <p className="text-surface-400 mt-1">
           Analyze a PRD against your codebase for security concerns
@@ -648,6 +648,18 @@ function StepConfig({
       description: 'SOC 2, HIPAA, PCI-DSS, ISO 27001 framework analysis',
       color: 'blue',
     },
+    engineering: {
+      icon: Code,
+      label: 'Engineering',
+      description: 'Code quality, maintainability, technical debt, best practices',
+      color: 'green',
+    },
+    architecture: {
+      icon: Layers,
+      label: 'Architecture',
+      description: 'System design, scalability, patterns, component coupling',
+      color: 'orange',
+    },
   }
   return (
     <motion.div
@@ -661,7 +673,7 @@ function StepConfig({
           Analysis Configuration
         </h2>
         <p className="text-surface-400">
-          Configure how the security review should be performed
+          Configure how the product review should be performed
         </p>
       </div>
 
@@ -673,7 +685,7 @@ function StepConfig({
         <p className="text-sm text-surface-400 mb-4">
           Select which types of analysis to perform. You can run multiple dimensions together for a comprehensive cross-functional review.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {(Object.keys(dimensionInfo) as Array<keyof typeof dimensionInfo>).map((dim) => {
             const info = dimensionInfo[dim]
             const Icon = info.icon
@@ -682,6 +694,8 @@ function StepConfig({
               primary: isSelected ? 'bg-primary-500/20 border-primary-500/50 text-primary-400' : 'bg-surface-800 border-surface-700 text-surface-400',
               purple: isSelected ? 'bg-purple-500/20 border-purple-500/50 text-purple-400' : 'bg-surface-800 border-surface-700 text-surface-400',
               blue: isSelected ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-surface-800 border-surface-700 text-surface-400',
+              green: isSelected ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-surface-800 border-surface-700 text-surface-400',
+              orange: isSelected ? 'bg-orange-500/20 border-orange-500/50 text-orange-400' : 'bg-surface-800 border-surface-700 text-surface-400',
             }
             
             return (
@@ -699,11 +713,21 @@ function StepConfig({
                   <div className={`
                     w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0
                     ${isSelected 
-                      ? info.color === 'primary' ? 'bg-primary-500/20' : info.color === 'purple' ? 'bg-purple-500/20' : 'bg-blue-500/20'
+                      ? info.color === 'primary' ? 'bg-primary-500/20' 
+                        : info.color === 'purple' ? 'bg-purple-500/20' 
+                        : info.color === 'blue' ? 'bg-blue-500/20'
+                        : info.color === 'green' ? 'bg-green-500/20'
+                        : 'bg-orange-500/20'
                       : 'bg-surface-700'
                     }
                   `}>
-                    <Icon className={`w-5 h-5 ${isSelected ? info.color === 'primary' ? 'text-primary-400' : info.color === 'purple' ? 'text-purple-400' : 'text-blue-400' : 'text-surface-500'}`} />
+                    <Icon className={`w-5 h-5 ${isSelected 
+                      ? info.color === 'primary' ? 'text-primary-400' 
+                        : info.color === 'purple' ? 'text-purple-400' 
+                        : info.color === 'blue' ? 'text-blue-400'
+                        : info.color === 'green' ? 'text-green-400'
+                        : 'text-orange-400' 
+                      : 'text-surface-500'}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -721,11 +745,11 @@ function StepConfig({
             )
           })}
         </div>
-        {dimensions.length === 3 && (
+        {dimensions.length >= 3 && (
           <div className="mt-3 p-3 rounded-lg bg-primary-500/10 border border-primary-500/30">
             <p className="text-sm text-primary-400 flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
-              Cross-functional review enabled: All dimensions will be analyzed in parallel
+              Cross-functional review enabled: {dimensions.length} dimensions will be analyzed in parallel
             </p>
           </div>
         )}
@@ -876,9 +900,33 @@ function StepConfig({
               </li>
             </>
           )}
+          {dimensions.includes('engineering') && (
+            <>
+              <li className="flex items-center gap-2 text-surface-300">
+                <Check className="w-4 h-4 text-green-400" />
+                Engineering: Code Quality Analysis
+              </li>
+              <li className="flex items-center gap-2 text-surface-300">
+                <Check className="w-4 h-4 text-green-400" />
+                Engineering: Technical Debt Assessment
+              </li>
+            </>
+          )}
+          {dimensions.includes('architecture') && (
+            <>
+              <li className="flex items-center gap-2 text-surface-300">
+                <Check className="w-4 h-4 text-orange-400" />
+                Architecture: System Design Patterns
+              </li>
+              <li className="flex items-center gap-2 text-surface-300">
+                <Check className="w-4 h-4 text-orange-400" />
+                Architecture: Scalability Analysis
+              </li>
+            </>
+          )}
           <li className="flex items-center gap-2 text-surface-300">
             <Check className="w-4 h-4 text-primary-400" />
-            Context Graph Analysis
+            Intent Analysis
           </li>
           {useLLM && (
             <>
@@ -942,6 +990,8 @@ function StepReview({
     security: 'Security',
     privacy: 'Privacy',
     compliance: 'Compliance',
+    engineering: 'Engineering',
+    architecture: 'Architecture',
   }
   return (
     <motion.div
@@ -955,7 +1005,7 @@ function StepReview({
           Review Summary
         </h2>
         <p className="text-surface-400">
-          Confirm your configuration and start the security review
+          Confirm your configuration and start the product review
         </p>
       </div>
 
@@ -1021,10 +1071,10 @@ function StepReview({
                 </span>
               ))}
             </div>
-            {dimensions.length === 3 && (
+            {dimensions.length >= 3 && (
               <p className="text-xs text-primary-400 mt-2 flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
-                Cross-functional review enabled
+                Cross-functional review enabled ({dimensions.length} dimensions)
               </p>
             )}
           </div>
@@ -1064,7 +1114,7 @@ function StepReview({
           ) : (
             <>
               <Shield className="w-5 h-5" />
-              Start Security Review
+              Start Product Review
             </>
           )}
         </button>

@@ -57,10 +57,10 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-bold text-white">
-            Security Dashboard
+            Product Dashboard
           </h1>
           <p className="text-surface-400 mt-1">
-            Monitor and manage security reviews
+            Monitor and manage your product feature reviews
           </p>
         </div>
         <Link
@@ -176,7 +176,7 @@ export default function Dashboard() {
             <QuickAction
               icon={Shield}
               title="Full Review"
-              description="Complete security review with LLM analysis"
+              description="Complete product review with LLM analysis"
               href="/new"
             />
           </div>
@@ -286,7 +286,7 @@ function EmptyState() {
       </div>
       <h3 className="text-lg font-medium text-white mb-2">No reviews yet</h3>
       <p className="text-surface-400 mb-6">
-        Start your first security review to see results here
+        Start your first product review to see results here
       </p>
       <Link
         to="/new"

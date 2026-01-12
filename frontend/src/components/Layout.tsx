@@ -35,8 +35,8 @@ export default function Layout({ children }: LayoutProps) {
               <div className="absolute -inset-1 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl blur opacity-30 group-hover:opacity-50 transition-opacity" />
             </div>
             <div>
-              <h1 className="font-display font-bold text-lg text-white">Context Graph</h1>
-              <p className="text-xs text-surface-400">Security Review</p>
+              <h1 className="font-display font-bold text-lg text-white">Intently</h1>
+              <p className="text-xs text-surface-400">Product Review</p>
             </div>
           </Link>
         </div>

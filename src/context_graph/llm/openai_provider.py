@@ -198,6 +198,65 @@ class OpenAIProvider(LLMProvider):
         )
         return await self.analyze(request)
     
+    async def engineering_review(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+        engineering_metrics: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        """Perform engineering feasibility and effort review.
+        
+        This review focuses on:
+        1. Understanding the current codebase context
+        2. Assessing PRD feature feasibility based on existing code
+        3. Providing detailed time estimates based on actual codebase metrics
+        """
+        # Build enhanced state with engineering metrics for context-aware analysis
+        enhanced_state = {
+            **state,
+            "codebase_metrics": engineering_metrics or {},
+        }
+        
+        request = AnalysisRequest(
+            analysis_type=AnalysisType.ENGINEERING_REVIEW,
+            content=json.dumps({
+                "intent": intent,
+                "current_state": enhanced_state,
+                "codebase_metrics": engineering_metrics or {},
+                "delta": delta,
+            }, indent=2),
+            context={
+                "intent": intent,
+                "state": enhanced_state,
+                "engineering_metrics": engineering_metrics,
+                "delta": delta,
+            },
+        )
+        return await self.analyze(request)
+    
+    async def architecture_review(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+    ) -> LLMResponse:
+        """Perform architecture review (API design, dependencies, patterns)."""
+        request = AnalysisRequest(
+            analysis_type=AnalysisType.ARCHITECTURE_REVIEW,
+            content=json.dumps({
+                "intent": intent,
+                "current_state": state,
+                "delta": delta,
+            }, indent=2),
+            context={
+                "intent": intent,
+                "state": state,
+                "delta": delta,
+            },
+        )
+        return await self.analyze(request)
+    
     def _build_user_prompt(self, request: AnalysisRequest) -> str:
         """Build the user prompt from request."""
         parts = []

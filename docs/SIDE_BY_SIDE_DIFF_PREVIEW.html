@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Side-by-Side Diff View - Context Graph</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #161625;
+            --bg-tertiary: #1e1e32;
+            --bg-card: #1a1a2e;
+            --bg-hover: #252542;
+            --border-primary: #3a3a5c;
+            --border-secondary: #2a2a44;
+            --text-primary: #f0f0f5;
+            --text-secondary: #a0a0b8;
+            --text-muted: #6a6a88;
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-yellow: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-pink: #ec4899;
+            --diff-add-bg: rgba(16, 185, 129, 0.15);
+            --diff-add-text: #34d399;
+            --diff-add-border: rgba(16, 185, 129, 0.4);
+            --diff-del-bg: rgba(239, 68, 68, 0.15);
+            --diff-del-text: #f87171;
+            --diff-del-border: rgba(239, 68, 68, 0.4);
+            --diff-highlight-bg: rgba(139, 92, 246, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 0.5rem;
+            font-size: 1.75rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        /* Demo Container */
+        .demo-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .demo-section {
+            margin-bottom: 3rem;
+        }
+
+        .demo-title {
+            font-size: 1.1rem;
+            color: var(--accent-cyan);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .demo-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: var(--accent-cyan);
+            border-radius: 2px;
+        }
+
+        /* Side-by-Side Diff Container */
+        .side-by-side-diff {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Diff Header */
+        .diff-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-secondary);
+        }
+
+        .diff-header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .diff-file-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .file-icon {
+            font-size: 1.25rem;
+        }
+
+        .file-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .file-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .diff-stats {
+            display: flex;
+            gap: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .stat-additions {
+            color: var(--diff-add-text);
+        }
+
+        .stat-deletions {
+            color: var(--diff-del-text);
+        }
+
+        .diff-header-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.6rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-accept {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .btn-accept:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .btn-reject {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-primary);
+        }
+
+        .btn-reject:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-edit {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #2563eb;
+        }
+
+        /* Split Panes Container */
+        .split-panes {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        /* Individual Pane */
+        .pane {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .pane:first-child {
+            border-right: 1px solid var(--border-secondary);
+        }
+
+        .pane-header {
+            padding: 0.75rem 1rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .pane-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .pane.original .pane-title {
+            color: var(--diff-del-text);
+        }
+
+        .pane.suggested .pane-title {
+            color: var(--diff-add-text);
+        }
+
+        .pane-badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .pane.original .pane-badge {
+            background: var(--diff-del-bg);
+            color: var(--diff-del-text);
+        }
+
+        .pane.suggested .pane-badge {
+            background: var(--diff-add-bg);
+            color: var(--diff-add-text);
+        }
+
+        /* Code Content */
+        .pane-content {
+            flex: 1;
+            overflow: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.7;
+        }
+
+        .code-line {
+            display: flex;
+            min-height: 1.7em;
+            padding: 0 1rem;
+        }
+
+        .line-number {
+            width: 45px;
+            text-align: right;
+            padding-right: 1rem;
+            color: var(--text-muted);
+            user-select: none;
+            flex-shrink: 0;
+            opacity: 0.6;
+        }
+
+        .line-content {
+            flex: 1;
+            white-space: pre-wrap;
+            word-break: break-word;
+            padding-right: 1rem;
+        }
+
+        /* Line States */
+        .code-line.unchanged {
+            background: transparent;
+        }
+
+        .code-line.deleted {
+            background: var(--diff-del-bg);
+            border-left: 3px solid var(--diff-del-border);
+        }
+
+        .code-line.deleted .line-content {
+            color: var(--diff-del-text);
+            text-decoration: line-through;
+            text-decoration-color: rgba(248, 113, 113, 0.5);
+        }
+
+        .code-line.added {
+            background: var(--diff-add-bg);
+            border-left: 3px solid var(--diff-add-border);
+        }
+
+        .code-line.added .line-content {
+            color: var(--diff-add-text);
+        }
+
+        .code-line.highlight {
+            background: var(--diff-highlight-bg);
+            border-left: 3px solid var(--accent-purple);
+        }
+
+        .code-line.empty {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .code-line.empty .line-content {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* Inline Word Highlights */
+        .word-added {
+            background: rgba(16, 185, 129, 0.3);
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
+        .word-removed {
+            background: rgba(239, 68, 68, 0.3);
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
+        /* Section Divider */
+        .section-divider {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border-secondary);
+            border-bottom: 1px solid var(--border-secondary);
+        }
+
+        .divider-icon {
+            margin-right: 0.5rem;
+            color: var(--text-muted);
+        }
+
+        .divider-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Change Summary Footer */
+        .diff-footer {
+            padding: 1rem 1.5rem;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .change-summary {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .summary-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .summary-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .summary-icon.added {
+            background: var(--accent-green);
+        }
+
+        .summary-icon.removed {
+            background: var(--accent-red);
+        }
+
+        .summary-icon.modified {
+            background: var(--accent-yellow);
+        }
+
+        .summary-label {
+            color: var(--text-secondary);
+        }
+
+        .summary-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Action Confirmation */
+        .action-confirmation {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .confirm-text {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Sync Indicator */
+        .sync-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .sync-icon {
+            color: var(--accent-purple);
+        }
+
+        .sync-text {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .sync-text strong {
+            color: var(--accent-purple);
+        }
+
+        /* Mini Preview Card */
+        .mini-preview-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-secondary);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-top: 1.5rem;
+        }
+
+        .mini-preview-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .mini-preview-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .mini-preview-badge {
+            padding: 0.25rem 0.6rem;
+            background: var(--accent-red);
+            color: white;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .mini-preview-content {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .view-diff-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-diff-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        /* Expanded Diff Modal Simulation */
+        .modal-simulation {
+            margin-top: 2rem;
+            border: 2px dashed var(--border-primary);
+            border-radius: 16px;
+            padding: 1rem;
+            position: relative;
+        }
+
+        .modal-label {
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: var(--bg-primary);
+            padding: 0 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Success State */
+        .success-overlay {
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent-green);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            margin-top: 2rem;
+        }
+
+        .success-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .success-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--accent-green);
+            margin-bottom: 0.5rem;
+        }
+
+        .success-message {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        .success-details {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-item {
+            text-align: center;
+        }
+
+        .detail-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .detail-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Markdown Headers in Code */
+        .md-h2 {
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        .md-h3 {
+            color: var(--accent-purple);
+            font-weight: 500;
+        }
+
+        .md-bullet {
+            color: var(--accent-yellow);
+        }
+
+        .md-bold {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Inline Connected Lines */
+        .connected-lines {
+            position: relative;
+        }
+
+        .connection-indicator {
+            position: absolute;
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 2px;
+            background: var(--accent-purple);
+        }
+
+        /* Navigation dots between panes */
+        .nav-connector {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            z-index: 10;
+        }
+
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-purple);
+            border-radius: 50%;
+            opacity: 0.5;
+        }
+
+        .nav-dot.active {
+            opacity: 1;
+            box-shadow: 0 0 8px var(--accent-purple);
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>📄 Side-by-Side Diff View</h1>
+        <p class="subtitle">When accepting PRD changes, users see original vs. suggested content compared</p>
+
+        <!-- Demo Section 1: Main Split View -->
+        <div class="demo-section">
+            <div class="demo-title">Full Side-by-Side Comparison (appears when clicking "Accept" or "View Diff")</div>
+            
+            <div class="side-by-side-diff">
+                <!-- Header -->
+                <div class="diff-header">
+                    <div class="diff-header-left">
+                        <div class="diff-file-info">
+                            <span class="file-icon">📝</span>
+                            <div>
+                                <div class="file-name">user-authentication-prd.md</div>
+                                <div class="file-path">PRD Changes • Section: Technical Considerations</div>
+                            </div>
+                        </div>
+                        <div class="diff-stats">
+                            <span class="stat-deletions">−3 lines</span>
+                            <span class="stat-additions">+8 lines</span>
+                        </div>
+                    </div>
+                    <div class="diff-header-actions">
+                        <button class="btn btn-reject">✕ Reject</button>
+                        <button class="btn btn-edit">✎ Edit</button>
+                        <button class="btn btn-accept">✓ Accept Changes</button>
+                    </div>
+                </div>
+
+                <!-- Split Panes -->
+                <div class="split-panes">
+                    <!-- Original Pane -->
+                    <div class="pane original">
+                        <div class="pane-header">
+                            <span class="pane-title">← Original PRD</span>
+                            <span class="pane-badge">Current Version</span>
+                        </div>
+                        <div class="pane-content">
+                            <div class="code-line unchanged">
+                                <span class="line-number">40</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line unchanged">
+                                <span class="line-number">41</span>
+                                <span class="line-content"><span class="md-h2">## Technical Considerations</span></span>
+                            </div>
+                            <div class="code-line unchanged">
+                                <span class="line-number">42</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line deleted">
+                                <span class="line-number">43</span>
+                                <span class="line-content">The system will use JWT tokens for authentication.</span>
+                            </div>
+                            <div class="code-line deleted">
+                                <span class="line-number">44</span>
+                                <span class="line-content">Sessions will be managed server-side.</span>
+                            </div>
+                            <div class="code-line deleted">
+                                <span class="line-number">45</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line empty">
+                                <span class="line-number"></span>
+                                <span class="line-content">(no content - new section added)</span>
+                            </div>
+                            <div class="code-line empty">
+                                <span class="line-number"></span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line empty">
+                                <span class="line-number"></span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line empty">
+                                <span class="line-number"></span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line empty">
+                                <span class="line-number"></span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line unchanged">
+                                <span class="line-number">46</span>
+                                <span class="line-content"><span class="md-h2">## Success Metrics</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Suggested Pane -->
+                    <div class="pane suggested">
+                        <div class="pane-header">
+                            <span class="pane-title">Suggested Changes →</span>
+                            <span class="pane-badge">AI Suggestion</span>
+                        </div>
+                        <div class="pane-content">
+                            <div class="code-line unchanged">
+                                <span class="line-number">40</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line unchanged">
+                                <span class="line-number">41</span>
+                                <span class="line-content"><span class="md-h2">## Technical Considerations</span></span>
+                            </div>
+                            <div class="code-line unchanged">
+                                <span class="line-number">42</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">43</span>
+                                <span class="line-content">The system will use JWT tokens for authentication <span class="word-added">with RS256 signing</span>.</span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">44</span>
+                                <span class="line-content">Sessions will be managed server-side <span class="word-added">using Redis for distributed caching</span>.</span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">45</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">46</span>
+                                <span class="line-content"><span class="md-h3">### Session Handling During Migration</span></span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">47</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">48</span>
+                                <span class="line-content"><span class="md-bullet">-</span> <span class="md-bold">**Existing sessions**</span>: Will be invalidated on deploy</span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">49</span>
+                                <span class="line-content"><span class="md-bullet">-</span> <span class="md-bold">**User impact**</span>: Users will need to re-login after migration</span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">50</span>
+                                <span class="line-content"><span class="md-bullet">-</span> <span class="md-bold">**Rollback**</span>: Feature flag allows reverting to old auth</span>
+                            </div>
+                            <div class="code-line unchanged">
+                                <span class="line-number">51</span>
+                                <span class="line-content"><span class="md-h2">## Success Metrics</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="diff-footer">
+                    <div class="change-summary">
+                        <div class="summary-item">
+                            <span class="summary-icon added"></span>
+                            <span class="summary-label">Lines added:</span>
+                            <span class="summary-value">8</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-icon removed"></span>
+                            <span class="summary-label">Lines removed:</span>
+                            <span class="summary-value">3</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-icon modified"></span>
+                            <span class="summary-label">Lines modified:</span>
+                            <span class="summary-value">2</span>
+                        </div>
+                    </div>
+                    <div class="action-confirmation">
+                        <span class="confirm-text">This will update the PRD file on disk</span>
+                        <button class="btn btn-accept">✓ Confirm & Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backend Sync Indicator -->
+            <div class="sync-indicator">
+                <span class="sync-icon">🔄</span>
+                <span class="sync-text">
+                    <strong>Backend Sync:</strong> Accepting will automatically update 
+                    <code style="background: rgba(139, 92, 246, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px;">user-authentication-prd.md</code> 
+                    in your workspace
+                </span>
+            </div>
+        </div>
+
+        <!-- Demo Section 2: Compact Preview Card -->
+        <div class="demo-section">
+            <div class="demo-title">Compact Card View (in the main list, before expanding)</div>
+            
+            <div class="mini-preview-card">
+                <div class="mini-preview-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <input type="checkbox" style="width: 18px; height: 18px; accent-color: var(--accent-green);">
+                        <span class="mini-preview-badge">BLOCKER</span>
+                        <span class="mini-preview-title">"What happens to existing sessions when we deploy?"</span>
+                    </div>
+                    <span style="color: var(--text-muted); font-size: 0.85rem;">1 of 5 ↓</span>
+                </div>
+                <div class="mini-preview-content">
+                    <strong>Because:</strong> Found in codebase: <code>session_manager.py:78-92</code> stores sessions with user_id as key. 
+                    PRD doesn't specify migration strategy for existing sessions during deployment.
+                </div>
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                    <button class="view-diff-btn">
+                        <span>⇆</span> View Side-by-Side Diff
+                    </button>
+                    <button class="btn btn-accept" style="padding: 0.5rem 1rem;">✓ Quick Accept</button>
+                    <button class="btn btn-reject" style="padding: 0.5rem 1rem;">✕ Dismiss</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Demo Section 3: Success State -->
+        <div class="demo-section">
+            <div class="demo-title">After Accepting Changes (Success State)</div>
+            
+            <div class="success-overlay">
+                <div class="success-icon">✅</div>
+                <div class="success-title">PRD Updated Successfully</div>
+                <div class="success-message">
+                    Changes have been applied to <code>user-authentication-prd.md</code> and synced with backend.
+                </div>
+                <div class="success-details">
+                    <div class="detail-item">
+                        <div class="detail-value" style="color: var(--accent-green);">+8</div>
+                        <div class="detail-label">Lines Added</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value" style="color: var(--accent-red);">−3</div>
+                        <div class="detail-label">Lines Removed</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-value" style="color: var(--accent-purple);">89%</div>
+                        <div class="detail-label">New Quality Score</div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: center; gap: 1rem;">
+                    <button class="btn btn-reject">↺ Undo Changes</button>
+                    <button class="btn btn-edit">📥 Download Updated PRD</button>
+                    <button class="btn btn-accept">→ Continue to Next Issue</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Demo Section 4: Security Blocker Example -->
+        <div class="demo-section">
+            <div class="demo-title">Another Example: Security Blocker - Data Retention Policy</div>
+            
+            <div class="side-by-side-diff">
+                <div class="diff-header">
+                    <div class="diff-header-left">
+                        <div class="diff-file-info">
+                            <span class="file-icon">🔒</span>
+                            <div>
+                                <div class="file-name">user-authentication-prd.md</div>
+                                <div class="file-path">Security Issue • Section: Security Requirements</div>
+                            </div>
+                        </div>
+                        <div class="diff-stats">
+                            <span class="stat-deletions">−1 line</span>
+                            <span class="stat-additions">+6 lines</span>
+                        </div>
+                    </div>
+                    <div class="diff-header-actions">
+                        <button class="btn btn-reject">✕ Reject</button>
+                        <button class="btn btn-edit">✎ Edit</button>
+                        <button class="btn btn-accept">✓ Accept Changes</button>
+                    </div>
+                </div>
+
+                <div class="split-panes">
+                    <div class="pane original">
+                        <div class="pane-header">
+                            <span class="pane-title">← Original PRD</span>
+                            <span class="pane-badge">Current Version</span>
+                        </div>
+                        <div class="pane-content">
+                            <div class="code-line unchanged">
+                                <span class="line-number">54</span>
+                                <span class="line-content"><span class="md-h2">## Security Requirements</span></span>
+                            </div>
+                            <div class="code-line unchanged">
+                                <span class="line-number">55</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line deleted">
+                                <span class="line-number">56</span>
+                                <span class="line-content"><span class="md-bullet">-</span> Data retention: <span class="word-removed">Standard policy</span></span>
+                            </div>
+                            <div class="code-line empty">
+                                <span class="line-number"></span>
+                                <span class="line-content">(no content)</span>
+                            </div>
+                            <div class="code-line empty">
+                                <span class="line-number"></span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line empty">
+                                <span class="line-number"></span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line empty">
+                                <span class="line-number"></span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line unchanged">
+                                <span class="line-number">57</span>
+                                <span class="line-content"><span class="md-bullet">-</span> Encryption: TLS 1.3 required</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pane suggested">
+                        <div class="pane-header">
+                            <span class="pane-title">Suggested Changes →</span>
+                            <span class="pane-badge">AI Suggestion</span>
+                        </div>
+                        <div class="pane-content">
+                            <div class="code-line unchanged">
+                                <span class="line-number">54</span>
+                                <span class="line-content"><span class="md-h2">## Security Requirements</span></span>
+                            </div>
+                            <div class="code-line unchanged">
+                                <span class="line-number">55</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">56</span>
+                                <span class="line-content"><span class="md-h3">### Data Retention Policy</span></span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">57</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">58</span>
+                                <span class="line-content"><span class="md-bullet">-</span> <span class="md-bold">**Access tokens**</span>: 24 hours, auto-expire</span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">59</span>
+                                <span class="line-content"><span class="md-bullet">-</span> <span class="md-bold">**Refresh tokens**</span>: 30 days, revocable</span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">60</span>
+                                <span class="line-content"><span class="md-bullet">-</span> <span class="md-bold">**Audit logs**</span>: 7 years (compliance requirement)</span>
+                            </div>
+                            <div class="code-line added">
+                                <span class="line-number">61</span>
+                                <span class="line-content"></span>
+                            </div>
+                            <div class="code-line unchanged">
+                                <span class="line-number">62</span>
+                                <span class="line-content"><span class="md-bullet">-</span> Encryption: TLS 1.3 required</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="diff-footer">
+                    <div class="change-summary">
+                        <div class="summary-item">
+                            <span class="summary-icon added"></span>
+                            <span class="summary-label">Sections added:</span>
+                            <span class="summary-value">1</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-icon modified"></span>
+                            <span class="summary-label">Vague → Specific:</span>
+                            <span class="summary-value">1</span>
+                        </div>
+                    </div>
+                    <div class="action-confirmation">
+                        <button class="btn btn-accept">✓ Accept & Update PRD</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes Section -->
+        <div class="demo-section" style="background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-secondary);">
+            <h3 style="margin-bottom: 1rem; color: var(--accent-cyan);">💡 Implementation Notes</h3>
+            <ul style="color: var(--text-secondary); line-height: 2;">
+                <li><strong>Contextual Insertion:</strong> Suggestions are inserted at semantically appropriate locations (near related content), not appended at section end - just like code edits</li>
+                <li><strong>Keyword Matching:</strong> System analyzes finding keywords to find related content in PRD (e.g., auth suggestions near auth bullets)</li>
+                <li><strong>Smart Fallback:</strong> If no related content found, inserts after existing bullets or before subsections</li>
+                <li><strong>Backend Integration:</strong> When user clicks "Accept", send PUT request to <code>/api/prd/{id}/apply-suggestion</code> with the diff</li>
+                <li><strong>File Update:</strong> Backend reads original .md file, applies changes, writes updated file back to disk</li>
+                <li><strong>Real-time Sync:</strong> WebSocket or polling to show "Syncing..." → "Synced ✓" status</li>
+                <li><strong>Undo Support:</strong> Keep backup of original file for 24 hours to support undo</li>
+                <li><strong>Conflict Detection:</strong> Check if file was modified externally before applying changes</li>
+                <li><strong>Line-by-line Accept:</strong> Each line in the diff can be individually accepted/rejected</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

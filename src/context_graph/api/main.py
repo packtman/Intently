@@ -16,16 +16,38 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from context_graph.api.routes import router as api_router
+from context_graph.api.collaboration_routes import router as collaboration_router
+from context_graph.api.pm_routes import router as pm_router
+from context_graph.config.features import get_features
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
     # Startup
-    print("🚀 Context Graph Security Review API starting...")
+    print("Context Graph Security Review API starting...")
+    features = get_features()
+    enabled = features.get_enabled_features()
+    if enabled:
+        print(f"Enabled features: {', '.join(enabled)}")
+    else:
+        print("All optional features: disabled (set FEATURE_* env vars to enable)")
+    
+    # Print PM features status
+    pm_features = []
+    if features.enable_prd_changes:
+        pm_features.append("PRD changes")
+    if features.enable_prd_quality_scoring:
+        pm_features.append("PRD quality scoring")
+    if features.enable_effort_estimation:
+        pm_features.append("Effort estimation")
+    if features.enable_expert_assist:
+        pm_features.append("Expert assist")
+    if pm_features:
+        print(f"Enabled PM features: {', '.join(pm_features)}")
     yield
     # Shutdown
-    print("👋 Context Graph API shutting down...")
+    print("Context Graph API shutting down...")
 
 
 def create_app() -> FastAPI:
@@ -50,6 +72,12 @@ def create_app() -> FastAPI:
     
     # Include API routes
     app.include_router(api_router, prefix="/api")
+    
+    # Include collaboration routes (feature-flag protected)
+    app.include_router(collaboration_router, prefix="/api")
+    
+    # Include PM-focused routes (feature-flag protected)
+    app.include_router(pm_router, prefix="/api")
     
     # Health check
     @app.get("/health")

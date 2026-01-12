@@ -208,6 +208,8 @@ class DashboardDataGenerator:
             "security": len(result.security_findings),
             "privacy": len(result.privacy_findings),
             "compliance": len(result.compliance_findings),
+            "engineering": len(result.engineering_findings),
+            "architecture": len(result.architecture_findings),
         }
         
         # Get dimensions that were analyzed
@@ -288,14 +290,25 @@ class DashboardDataGenerator:
         """Data for findings table with detailed LLM analysis."""
         findings_data = []
         
-        # Get detailed findings from LLM responses if available
+        # Get detailed findings from all LLM responses if available
         llm_findings_details = {}
-        if result.llm_result:
-            for response in result.llm_result.responses:
-                if response.structured_data and "findings" in response.structured_data:
-                    for f in response.structured_data["findings"]:
-                        if "id" in f:
-                            llm_findings_details[f["id"]] = f
+        
+        # Collect from all LLM results (security, privacy, compliance, engineering, architecture)
+        llm_results = [
+            result.llm_result,  # security
+            result.privacy_llm_result,
+            result.compliance_llm_result,
+            result.engineering_llm_result,
+            result.architecture_llm_result,
+        ]
+        
+        for llm_result in llm_results:
+            if llm_result:
+                for response in llm_result.responses:
+                    if response.structured_data and "findings" in response.structured_data:
+                        for f in response.structured_data["findings"]:
+                            if "id" in f:
+                                llm_findings_details[f["id"]] = f
         
         for finding in result.all_findings:
             finding_id = str(finding.id)
@@ -305,7 +318,7 @@ class DashboardDataGenerator:
             
             # Get dimension from finding
             dimension = getattr(finding, 'dimension', None)
-            dimension_value = dimension.value if dimension else "security"
+            dimension_value = dimension.value if dimension else "unknown"
             
             findings_data.append({
                 "id": finding_id,
