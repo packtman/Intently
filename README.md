@@ -168,17 +168,57 @@ context-graph review examples/sample-prd.md /path/to/codebase --llm -o report.md
 
 ### 4. Start Web UI
 
+**Option A: Quick Start (using start script)**
+
 ```bash
-# Start backend
+# Start both backend and frontend with one command
+./scripts/start-servers.sh
+```
+
+Open http://localhost:3000 to access the dashboard.
+
+**Option B: Manual Start**
+
+```bash
+# Terminal 1: Start backend
 context-graph serve
 
-# In another terminal, start frontend
+# Terminal 2: Start frontend
 cd frontend
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000 to access the dashboard.
+### 5. Desktop App (Electron)
+
+For a native desktop experience with local file system integration:
+
+```bash
+# Clone the desktop app (separate repo)
+git clone https://github.com/packtman/intently-desktop.git
+cd intently-desktop
+
+# Install dependencies
+npm install
+
+# Configure in Settings:
+# - Intently Path: path to this main repo
+# - Python Path: path to your python3 (or venv)
+# - API Keys: OpenAI/Anthropic keys
+
+# Run in development mode
+npm run electron:dev
+
+# Or build for production
+npm run electron:build
+```
+
+**Desktop App Features:**
+- Native file/folder selection dialogs
+- Auto-start/stop Python backend
+- PRD Generator from codebases
+- Keyboard shortcuts (Cmd+N: New Review, Cmd+O: Open PRD)
+- Works offline (after initial setup)
 
 ## CLI Commands
 
