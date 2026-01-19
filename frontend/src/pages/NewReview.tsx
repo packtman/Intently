@@ -507,12 +507,51 @@ function StepCodebase({
   onNext: () => void
   onBack: () => void
 }) {
+  const [browseError, setBrowseError] = useState<string | null>(null)
+  const [isElectron] = useState(() => !!(window as any).electronAPI)
+  
   const toggleLanguage = (lang: string) => {
     if (languages.includes(lang)) {
       onLanguagesChange(languages.filter(l => l !== lang))
     } else {
       onLanguagesChange([...languages, lang])
     }
+  }
+
+  // Handle directory selection - works in both Electron and modern browsers
+  const handleBrowse = async () => {
+    setBrowseError(null)
+    
+    // Check if running in Electron
+    if ((window as any).electronAPI?.selectDirectory) {
+      const selectedPath = await (window as any).electronAPI.selectDirectory()
+      if (selectedPath) {
+        onPathChange(selectedPath)
+      }
+      return
+    }
+    
+    // Use File System Access API for modern browsers (Chrome, Edge)
+    if ('showDirectoryPicker' in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker({
+          mode: 'read',
+        })
+        // Get the directory name - in browser we can't get the full path
+        // but we can use the handle for further operations
+        onPathChange(dirHandle.name)
+        // Store the handle for potential future use
+        ;(window as any).__selectedDirHandle = dirHandle
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          setBrowseError('Failed to select directory')
+        }
+      }
+      return
+    }
+    
+    // Fallback for unsupported browsers
+    setBrowseError('Directory browsing is not supported in this browser. Please enter the path manually or use Chrome/Edge.')
   }
 
   return (
@@ -535,18 +574,37 @@ function StepCodebase({
         <label className="block text-sm font-medium text-surface-300 mb-2">
           Codebase Path
         </label>
-        <div className="relative">
-          <FolderOpen className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500" />
-          <input
-            type="text"
-            value={path}
-            onChange={(e) => onPathChange(e.target.value)}
-            placeholder="/path/to/your/codebase"
-            className="w-full pl-12 pr-4 py-3 bg-surface-800 border border-surface-700 rounded-lg
-                       text-white placeholder-surface-500 focus:border-primary-500 focus:ring-1 
-                       focus:ring-primary-500 transition-all"
-          />
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <FolderOpen className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500" />
+            <input
+              type="text"
+              value={path}
+              onChange={(e) => onPathChange(e.target.value)}
+              placeholder={isElectron ? "/path/to/your/codebase" : "Enter path or click Browse"}
+              className="w-full pl-12 pr-4 py-3 bg-surface-800 border border-surface-700 rounded-lg
+                         text-white placeholder-surface-500 focus:border-primary-500 focus:ring-1 
+                         focus:ring-primary-500 transition-all"
+            />
+          </div>
+          <button
+            onClick={handleBrowse}
+            className="flex items-center gap-2 px-4 py-3 bg-surface-800 border border-surface-700 
+                       text-surface-300 font-medium rounded-lg hover:bg-surface-700 hover:border-surface-600
+                       transition-all"
+          >
+            <FolderOpen className="w-4 h-4" />
+            Browse
+          </button>
         </div>
+        {browseError && (
+          <p className="text-sm text-red-400 mt-2">{browseError}</p>
+        )}
+        {!isElectron && (
+          <p className="text-xs text-surface-500 mt-2">
+            Tip: For full filesystem access, use the desktop app or enter a server-accessible path.
+          </p>
+        )}
       </div>
 
       <div>

@@ -8,6 +8,7 @@ import {
   GitBranch,
   Zap,
   Layers,
+  FileText,
   Settings,
 } from 'lucide-react'
 
@@ -22,6 +23,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/new', icon: Plus, label: 'New Review' },
     { path: '/bulk-analysis', icon: Layers, label: 'Bulk Analysis' },
+    { path: '/prd-generator', icon: FileText, label: 'PRD Generator' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ]
 
