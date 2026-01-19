@@ -38,11 +38,16 @@ env/
 .env.local
 .env.*.local
 
-# Node.js (frontend)
+# Node.js (frontend & desktop)
 node_modules/
 frontend/dist/
 frontend/.vite/
+desktop/dist/
+desktop/dist-electron/
+desktop/release/
+desktop/.vite/
 *.log
+*.tsbuildinfo
 
 # OS
 .DS_Store

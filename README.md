@@ -194,17 +194,11 @@ npm run dev
 For a native desktop experience with local file system integration:
 
 ```bash
-# Clone the desktop app (separate repo)
-git clone https://github.com/packtman/Intently-Desktop.git
-cd Intently-Desktop
+# From the repo root
+cd desktop
 
 # Install dependencies
 npm install
-
-# Configure in Settings:
-# - Intently Path: path to this main repo
-# - Python Path: path to your python3 (or venv)
-# - API Keys: OpenAI/Anthropic keys
 
 # Run in development mode
 npm run electron:dev
@@ -212,6 +206,11 @@ npm run electron:dev
 # Or build for production
 npm run electron:build
 ```
+
+**First-time setup:** Go to Settings and configure:
+- **Intently Path**: Path to this repo root (e.g., `/path/to/Intently`)
+- **Python Path**: Path to your python3 or venv (e.g., `.venv/bin/python`)
+- **API Keys**: OpenAI and/or Anthropic keys
 
 **Desktop App Features:**
 - Native file/folder selection dialogs
@@ -289,19 +288,24 @@ context-graph review prd.md private-org/private-repo --llm
 ## Project Structure
 
 ```
-Context graph/
-├── src/context_graph/
-│   ├── core/           # Core models and graph
-│   ├── parsers/        # PRD parsers (Markdown, Notion, GDocs)
-│   ├── analyzers/      # Codebase analyzers (Python, Kotlin)
-│   ├── llm/            # LLM providers (OpenAI, Anthropic)
-│   ├── security/       # Security review engine
-│   ├── reports/        # Report generators
-│   ├── api/            # FastAPI web API
-│   └── cli.py          # CLI interface
-├── frontend/           # React dashboard
-├── examples/           # Sample PRDs
-└── context-graph.yaml  # Configuration
+Intently/
+├── src/context_graph/     # Python backend
+│   ├── core/              # Core models and graph
+│   ├── parsers/           # PRD parsers (Markdown, Notion, GDocs)
+│   ├── analyzers/         # Codebase analyzers (Python, Kotlin, TS)
+│   ├── llm/               # LLM providers (OpenAI, Anthropic)
+│   ├── security/          # Security review engine
+│   ├── reports/           # Report generators
+│   ├── api/               # FastAPI web API
+│   └── cli.py             # CLI interface
+├── frontend/              # React web dashboard
+├── desktop/               # Electron desktop app
+│   ├── electron/          # Main process (backend management)
+│   ├── src/               # Desktop-specific React UI
+│   └── package.json       # Desktop dependencies
+├── scripts/               # Server startup scripts
+├── examples/              # Sample PRDs
+└── context-graph.yaml     # Configuration
 ```
 
 ## License

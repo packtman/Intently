@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 15, 26, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 255, 248, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 255, 248, 0.3);
+}
+
+/* Base styles */
+body {
+  @apply bg-void-950 text-white font-body antialiased;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom utilities */
+@layer utilities {
+  .glow-neon {
+    box-shadow: 0 0 20px rgba(0, 217, 212, 0.3), 0 0 40px rgba(0, 217, 212, 0.1);
+  }
+  
+  .glow-ember {
+    box-shadow: 0 0 20px rgba(255, 125, 17, 0.3), 0 0 40px rgba(255, 125, 17, 0.1);
+  }
+  
+  .glow-aurora {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), 0 0 40px rgba(168, 85, 247, 0.1);
+  }
+  
+  .text-gradient-neon {
+    @apply bg-gradient-to-r from-neon-400 to-neon-500 bg-clip-text text-transparent;
+  }
+  
+  .text-gradient-ember {
+    @apply bg-gradient-to-r from-ember-400 to-ember-500 bg-clip-text text-transparent;
+  }
+  
+  .text-gradient-aurora {
+    @apply bg-gradient-to-r from-aurora-400 to-aurora-500 bg-clip-text text-transparent;
+  }
+  
+  .card-glass {
+    @apply bg-void-900/40 backdrop-blur-xl border border-void-700/50;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-300 hover:border-neon-500/30 hover:shadow-lg hover:shadow-neon-500/5;
+  }
+  
+  .btn-primary {
+    @apply px-6 py-3 bg-gradient-to-r from-neon-500 to-neon-600 text-void-950 font-semibold rounded-xl
+           hover:from-neon-400 hover:to-neon-500 transition-all duration-300 glow-neon;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-3 bg-void-800 border border-void-600 text-white font-medium rounded-xl
+           hover:bg-void-700 hover:border-void-500 transition-all duration-300;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 bg-void-900/50 border border-void-700 rounded-xl text-white
+           placeholder-void-500 focus:border-neon-500/50 focus:ring-2 focus:ring-neon-500/20 
+           outline-none transition-all duration-300;
+  }
+  
+  .drag-area {
+    -webkit-app-region: drag;
+  }
+  
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
+
+/* Animation classes */
+@layer components {
+  .animate-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .pattern-grid {
+    background-image: 
+      linear-gradient(rgba(99, 255, 248, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99, 255, 248, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  
+  .pattern-dots {
+    background-image: radial-gradient(rgba(99, 255, 248, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+}
+
+/* Selection color */
+::selection {
+  background: rgba(0, 217, 212, 0.3);
+  color: white;
+}
+
