@@ -195,8 +195,8 @@ For a native desktop experience with local file system integration:
 
 ```bash
 # Clone the desktop app (separate repo)
-git clone https://github.com/packtman/intently-desktop.git
-cd intently-desktop
+git clone https://github.com/packtman/Intently-Desktop.git
+cd Intently-Desktop
 
 # Install dependencies
 npm install
