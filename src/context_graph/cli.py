@@ -7,6 +7,15 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file in project root
+_project_root = Path(__file__).parent.parent.parent
+_env_file = _project_root / ".env"
+if _env_file.exists():
+    load_dotenv(_env_file)
+else:
+    load_dotenv()
 from typing import Optional
 
 import typer

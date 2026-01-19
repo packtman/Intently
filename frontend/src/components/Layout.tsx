@@ -6,7 +6,9 @@ import {
   Plus, 
   LayoutDashboard, 
   GitBranch,
-  Zap 
+  Zap,
+  Layers,
+  Settings,
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -19,6 +21,8 @@ export default function Layout({ children }: LayoutProps) {
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/new', icon: Plus, label: 'New Review' },
+    { path: '/bulk-analysis', icon: Layers, label: 'Bulk Analysis' },
+    { path: '/settings', icon: Settings, label: 'Settings' },
   ]
 
   return (

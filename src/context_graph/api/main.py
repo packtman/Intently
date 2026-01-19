@@ -7,6 +7,17 @@ from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+# Look for .env in the project root (4 levels up from this file)
+_project_root = Path(__file__).parent.parent.parent.parent
+_env_file = _project_root / ".env"
+if _env_file.exists():
+    load_dotenv(_env_file)
+else:
+    # Fallback: try current working directory
+    load_dotenv()
 from typing import Any, AsyncGenerator
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
@@ -18,6 +29,8 @@ from pydantic import BaseModel, Field
 from context_graph.api.routes import router as api_router
 from context_graph.api.collaboration_routes import router as collaboration_router
 from context_graph.api.pm_routes import router as pm_router
+from context_graph.api.bulk_prd_routes import router as bulk_prd_router
+from context_graph.api.prd_generator_routes import router as prd_generator_router
 from context_graph.config.features import get_features
 
 
@@ -79,10 +92,24 @@ def create_app() -> FastAPI:
     # Include PM-focused routes (feature-flag protected)
     app.include_router(pm_router, prefix="/api")
     
+    # Include bulk PRD analysis routes
+    app.include_router(bulk_prd_router, prefix="/api")
+    
+    # Include PRD generator routes
+    app.include_router(prd_generator_router, prefix="/api")
+    
     # Health check
     @app.get("/health")
+    @app.get("/api/health")
     async def health_check() -> dict[str, str]:
         return {"status": "healthy", "service": "context-graph"}
+    
+    # Feature flags endpoint
+    @app.get("/api/features")
+    async def get_feature_flags() -> dict[str, Any]:
+        """Get current feature flags configuration."""
+        features = get_features()
+        return features.to_dict()
     
     # Serve static frontend (if built)
     static_dir = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"

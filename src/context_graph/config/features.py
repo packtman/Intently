@@ -28,6 +28,16 @@ Environment Variables:
     FEATURE_PM_PATTERN_LEARNING=true
     FEATURE_PRD_SAVE_TO_FILE=true
     FEATURE_SIDE_BY_SIDE_DIFF=true
+    
+    # Bulk PRD Analysis Features
+    FEATURE_BULK_PRD_ANALYSIS=true
+    BULK_PRD_MAX_FILES=20
+    BULK_PRD_MAX_PARALLEL_REVIEWS=10
+    FEATURE_BULK_PRD_SMART_CODEBASE_DEFAULT=true
+    BULK_PRD_CODEBASE_AUTO_DEFAULT_THRESHOLD=3
+    
+    # PRD Generator
+    FEATURE_PRD_GENERATOR=true
 """
 
 from __future__ import annotations
@@ -120,6 +130,30 @@ class FeatureFlags:
     # Shows original vs suggested PRD changes in a side-by-side view
     enable_side_by_side_diff: bool = False
     
+    # ==================== Bulk PRD Analysis Features ====================
+    
+    # Enable bulk PRD analysis
+    # Allows analyzing up to 20 PRD files in parallel
+    enable_bulk_prd_analysis: bool = False
+    
+    # Maximum number of PRD files for bulk analysis
+    bulk_prd_max_files: int = 20
+    
+    # Maximum parallel review workers for bulk analysis
+    bulk_prd_max_parallel_reviews: int = 10
+    
+    # Enable smart codebase defaulting based on usage frequency
+    enable_bulk_prd_smart_codebase_default: bool = True
+    
+    # Threshold for auto-setting default codebase (selection count)
+    bulk_prd_codebase_auto_default_threshold: int = 3
+    
+    # ==================== PRD Generator Features ====================
+    
+    # Enable PRD generator
+    # Generates PRD documents from codebase analysis
+    enable_prd_generator: bool = False
+    
     # ==================== Utility Methods ====================
     
     @classmethod
@@ -147,6 +181,14 @@ class FeatureFlags:
             enable_pm_pattern_learning=_env_bool("FEATURE_PM_PATTERN_LEARNING"),
             enable_prd_save_to_file=_env_bool("FEATURE_PRD_SAVE_TO_FILE"),
             enable_side_by_side_diff=_env_bool("FEATURE_SIDE_BY_SIDE_DIFF"),
+            # Bulk PRD analysis features
+            enable_bulk_prd_analysis=_env_bool("FEATURE_BULK_PRD_ANALYSIS"),
+            bulk_prd_max_files=int(os.getenv("BULK_PRD_MAX_FILES", "20")),
+            bulk_prd_max_parallel_reviews=int(os.getenv("BULK_PRD_MAX_PARALLEL_REVIEWS", "10")),
+            enable_bulk_prd_smart_codebase_default=_env_bool("FEATURE_BULK_PRD_SMART_CODEBASE_DEFAULT", True),
+            bulk_prd_codebase_auto_default_threshold=int(os.getenv("BULK_PRD_CODEBASE_AUTO_DEFAULT_THRESHOLD", "3")),
+            # PRD generator
+            enable_prd_generator=_env_bool("FEATURE_PRD_GENERATOR"),
         )
     
     @classmethod
@@ -169,6 +211,14 @@ class FeatureFlags:
             enable_pm_pattern_learning=True,
             enable_prd_save_to_file=True,
             enable_side_by_side_diff=True,
+            # Bulk PRD analysis features
+            enable_bulk_prd_analysis=True,
+            bulk_prd_max_files=20,
+            bulk_prd_max_parallel_reviews=10,
+            enable_bulk_prd_smart_codebase_default=True,
+            bulk_prd_codebase_auto_default_threshold=3,
+            # PRD generator
+            enable_prd_generator=True,
         )
     
     def to_dict(self) -> dict[str, bool]:
@@ -190,6 +240,14 @@ class FeatureFlags:
             "pm_pattern_learning": self.enable_pm_pattern_learning,
             "prd_save_to_file": self.enable_prd_save_to_file,
             "side_by_side_diff": self.enable_side_by_side_diff,
+            # Bulk PRD analysis features
+            "bulk_prd_analysis": self.enable_bulk_prd_analysis,
+            "bulk_prd_max_files": self.bulk_prd_max_files,
+            "bulk_prd_max_parallel_reviews": self.bulk_prd_max_parallel_reviews,
+            "bulk_prd_smart_codebase_default": self.enable_bulk_prd_smart_codebase_default,
+            "bulk_prd_codebase_auto_default_threshold": self.bulk_prd_codebase_auto_default_threshold,
+            # PRD generator
+            "prd_generator": self.enable_prd_generator,
         }
     
     def get_enabled_features(self) -> list[str]:
@@ -226,6 +284,14 @@ class FeatureFlags:
             enabled.append("prd_save_to_file")
         if self.enable_side_by_side_diff:
             enabled.append("side_by_side_diff")
+        # Bulk PRD analysis features
+        if self.enable_bulk_prd_analysis:
+            enabled.append("bulk_prd_analysis")
+        if self.enable_bulk_prd_smart_codebase_default:
+            enabled.append("bulk_prd_smart_codebase_default")
+        # PRD generator
+        if self.enable_prd_generator:
+            enabled.append("prd_generator")
         return enabled
 
 
