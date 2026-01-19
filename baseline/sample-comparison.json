@@ -1,0 +1,143 @@
+{
+  "timestamp": "2026-01-19T00:26:00.759797",
+  "traditional": {
+    "method": "traditional",
+    "timestamp": "2026-01-19T00:25:30.646989",
+    "elapsed_ms": 45.99905014038086,
+    "files_analyzed": 3,
+    "lines_of_code": 132,
+    "entities": 9,
+    "relationships": 0,
+    "api_endpoints": 4,
+    "data_models": 5,
+    "auth_patterns": 0,
+    "existing_controls": 3,
+    "details": {
+      "endpoints": [
+        {
+          "path": "/api/users",
+          "method": "POST",
+          "file": "examples/sample-codebase/app/main.py"
+        },
+        {
+          "path": "/api/users/{user_id}",
+          "method": "GET",
+          "file": "examples/sample-codebase/app/main.py"
+        },
+        {
+          "path": "/api/admin/users",
+          "method": "GET",
+          "file": "examples/sample-codebase/app/main.py"
+        },
+        {
+          "path": "/api/data/export",
+          "method": "POST",
+          "file": "examples/sample-codebase/app/main.py"
+        }
+      ],
+      "models": [
+        {
+          "name": "User",
+          "file": "examples/sample-codebase/app/models.py"
+        },
+        {
+          "name": "Session",
+          "file": "examples/sample-codebase/app/models.py"
+        },
+        {
+          "name": "AuditLog",
+          "file": "examples/sample-codebase/app/models.py"
+        },
+        {
+          "name": "UserCreate",
+          "file": "examples/sample-codebase/app/main.py"
+        },
+        {
+          "name": "UserResponse",
+          "file": "examples/sample-codebase/app/main.py"
+        }
+      ],
+      "controls": [
+        "logging",
+        "potential_hardcoded_secret",
+        "encryption"
+      ]
+    }
+  },
+  "graph_enhanced": {
+    "method": "graph_enhanced_lsp_True",
+    "timestamp": "2026-01-19T00:26:00.759002",
+    "elapsed_ms": 30110.70990562439,
+    "lsp_used": true,
+    "files_analyzed": 3,
+    "lines_of_code": 132,
+    "graph_nodes": 12,
+    "graph_edges": 28,
+    "nodes_by_kind": {
+      "file": 3,
+      "function": 4,
+      "class": 5
+    },
+    "nodes_by_language": {
+      "python": 12
+    },
+    "entities": 12,
+    "relationships": 28,
+    "api_endpoints": 0,
+    "data_models": 0,
+    "auth_patterns": 0,
+    "coupling_metrics": {
+      "total_nodes": 12,
+      "total_edges": 28,
+      "avg_dependencies_per_node": 1.1666666666666667,
+      "highly_coupled_nodes": [
+        {
+          "id": "app/models.py",
+          "dependencies": 5
+        },
+        {
+          "id": "app/main.py",
+          "dependencies": 7
+        }
+      ]
+    },
+    "unused_exports_count": 0,
+    "findings_count": 2,
+    "details": {
+      "endpoints": [],
+      "findings_by_type": {
+        "architecture": 2
+      },
+      "unused_exports": []
+    }
+  },
+  "baseline": null,
+  "improvements": [
+    {
+      "metric": "entities",
+      "traditional": 9,
+      "graph_enhanced": 12,
+      "delta": 3
+    },
+    {
+      "metric": "relationships",
+      "traditional": 0,
+      "graph_enhanced": 28,
+      "delta": 28
+    }
+  ],
+  "regressions": [
+    {
+      "metric": "api_endpoints",
+      "traditional": 4,
+      "graph_enhanced": 0,
+      "delta": -4
+    },
+    {
+      "metric": "data_models",
+      "traditional": 5,
+      "graph_enhanced": 0,
+      "delta": -5
+    }
+  ]
+}

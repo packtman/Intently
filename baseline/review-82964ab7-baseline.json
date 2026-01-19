@@ -1,0 +1,260 @@
+{
+  "meta": {
+    "review_id": "82964ab7-6543-44a9-b65c-dd89be9894dc",
+    "feature_title": "Product Requirements Document: Service Touch Map",
+    "reviewed_at": "2026-01-18T23:48:50.155989",
+    "risk_rating": "CRITICAL",
+    "version": "1.0",
+    "baseline_captured_at": "2026-01-19",
+    "analysis_method": "regex_and_ast_based"
+  },
+  "summary": {
+    "total_findings": 22,
+    "by_severity": {
+      "critical": 2,
+      "high": 8,
+      "medium": 9,
+      "low": 1,
+      "info": 2
+    },
+    "risk_score": 15.0,
+    "executive_summary": "Multi-Dimension Review completed for: Product Requirements Document: Service Touch Map\n\n**Total Findings:** 22\n- Critical: 2\n- High: 8\n- Medium: 9\n- Low: 1\n\n**By Dimension:**\n- Security (STRIDE/OWASP): 7 findings\n- Engineering (Quality/Testing): 15 findings\n\n**Change Summary:** adds external integrations\n**Risk Score:** 15/100\n\n⚠️ **Critical Issues Require Immediate Attention**\n- [SECURITY] Lack of Authentication on API Endpoints\n- [ENGINEERING] No Existing Service Discovery Mechanism"
+  },
+  "delta": {
+    "summary": "adds external integrations",
+    "new_endpoints": [],
+    "modified_endpoints": [],
+    "new_data_models": [],
+    "new_data_flows": [],
+    "attack_surface_changes": [],
+    "trust_boundary_impacts": [
+      "New external integration: aws",
+      "New external integration: stripe",
+      "New external integration: stripe",
+      "New external integration: sendgrid"
+    ],
+    "auth_requirement_changes": [],
+    "risk_indicators": {
+      "introduces_pii": false,
+      "introduces_external_integration": true,
+      "modifies_auth_flow": false,
+      "expands_attack_surface": true
+    }
+  },
+  "findings": [
+    {
+      "id": "729a3351-12ab-45c7-81fb-446783bb386d",
+      "title": "Payment Integration Security",
+      "description": "Payment processing integration requires PCI-DSS compliance considerations. Ensure card data never touches your servers.",
+      "severity": "high",
+      "category": "sensitive_data_exposure",
+      "confidence": 0.9,
+      "source_type": "pattern",
+      "source_reference": "New external integration: stripe"
+    },
+    {
+      "id": "a513d918-a0ae-4628-9333-32a49125ef49",
+      "title": "Third-Party Data Leakage",
+      "description": "External integration may expose data to third parties",
+      "severity": "medium",
+      "category": "information_disclosure",
+      "confidence": 0.7,
+      "source_type": "pattern"
+    },
+    {
+      "id": "1",
+      "title": "Lack of Authentication on API Endpoints",
+      "description": "The API endpoints listed in the current state do not require authentication. This means that any user, including unauthorized users, can access these endpoints and potentially modify or retrieve sensitive data.",
+      "severity": "critical",
+      "category": "broken_access_control",
+      "confidence": 0.9,
+      "source_type": "llm"
+    },
+    {
+      "id": "2",
+      "title": "Potential Hardcoded Secrets",
+      "description": "The existing controls mention 'potential_hardcoded_secret', indicating that there might be hardcoded secrets within the codebase.",
+      "severity": "high",
+      "category": "sensitive_data_exposure",
+      "confidence": 0.8,
+      "source_type": "llm"
+    },
+    {
+      "id": "3",
+      "title": "Lack of Input Validation",
+      "description": "The PRD does not specify input validation mechanisms for the API endpoints.",
+      "severity": "high",
+      "category": "injection",
+      "confidence": 0.85,
+      "source_type": "llm"
+    },
+    {
+      "id": "4",
+      "title": "Missing Rate Limiting",
+      "description": "The PRD does not mention rate limiting for API endpoints.",
+      "severity": "medium",
+      "category": "security_misconfiguration",
+      "confidence": 0.7,
+      "source_type": "llm"
+    },
+    {
+      "id": "5",
+      "title": "External Integration Security Risks",
+      "description": "The PRD introduces new external integrations with AWS, Stripe, and SendGrid.",
+      "severity": "medium",
+      "category": "information_disclosure",
+      "confidence": 0.75,
+      "source_type": "llm"
+    },
+    {
+      "id": "4adaab66-22c6-4975-95f1-63201f253570",
+      "title": "Low Test Coverage",
+      "description": "Test coverage is insufficient for confident deployments",
+      "severity": "high",
+      "category": "low_test_coverage",
+      "confidence": 0.8,
+      "source_type": "pattern"
+    },
+    {
+      "id": "a8219824-1e58-4bd8-8b89-3e292edac9c1",
+      "title": "Missing Tests for Affected Code",
+      "description": "Code changes affect areas without test coverage",
+      "severity": "medium",
+      "category": "missing_tests",
+      "confidence": 0.8,
+      "source_type": "pattern"
+    },
+    {
+      "id": "13e759cd-741d-42d1-ae13-9a0f48656369",
+      "title": "Insufficient Logging",
+      "description": "Logging is insufficient for debugging and monitoring",
+      "severity": "medium",
+      "category": "insufficient_logging",
+      "confidence": 0.8,
+      "source_type": "pattern"
+    },
+    {
+      "id": "bc4c9be3-af5b-476a-ba47-7d3289c7a490",
+      "title": "No Health Checks",
+      "description": "Service lacks health check endpoints for monitoring",
+      "severity": "medium",
+      "category": "no_health_checks",
+      "confidence": 0.8,
+      "source_type": "pattern"
+    },
+    {
+      "id": "7fc324a1-93f8-4eea-a12f-b83992c44dfe",
+      "title": "No CI/CD Pipeline",
+      "description": "Project lacks automated CI/CD pipeline",
+      "severity": "high",
+      "category": "no_ci_cd",
+      "confidence": 0.8,
+      "source_type": "pattern"
+    },
+    {
+      "id": "8a1e014b-393d-4b1a-a303-fb3324572997",
+      "title": "No Linting Configuration",
+      "description": "Project lacks linting configuration for code consistency",
+      "severity": "low",
+      "category": "no_linting",
+      "confidence": 0.8,
+      "source_type": "pattern"
+    },
+    {
+      "id": "62dd3ecc-fb33-46ef-aeae-1c8316cd33b9",
+      "title": "Feasibility Assessment: Challenging",
+      "description": "Implementing the Service Touch Map feature is challenging due to the large codebase size, lack of test coverage, and absence of CI/CD.",
+      "severity": "info",
+      "category": "high_complexity",
+      "confidence": 0.4,
+      "source_type": "llm"
+    },
+    {
+      "id": "ad3886dd-aa96-4501-85dc-866728a1516b",
+      "title": "Implementation Time Estimate",
+      "description": "Based on codebase analysis, estimated implementation time is 60-120 days (realistic: 90 days).",
+      "severity": "info",
+      "category": "high_complexity",
+      "confidence": 0.6,
+      "source_type": "llm"
+    },
+    {
+      "id": "62a9d69c-043f-4ba6-89af-949c7e58d700",
+      "title": "No Existing Service Discovery Mechanism",
+      "description": "The codebase lacks any mechanism for service discovery, which is essential for the Service Touch Map feature.",
+      "severity": "critical",
+      "category": "missing_tests",
+      "confidence": 0.9,
+      "source_type": "llm"
+    },
+    {
+      "id": "7f669523-f9a2-49ec-9a8d-4db813b32b9a",
+      "title": "Lack of CI/CD",
+      "description": "The absence of CI/CD will slow down development and integration testing.",
+      "severity": "high",
+      "category": "high_complexity",
+      "confidence": 0.8,
+      "source_type": "llm"
+    },
+    {
+      "id": "ffebb9c6-3706-47f5-8c1a-b3282657a7de",
+      "title": "No existing service discovery or dependency mapping infrastructure",
+      "description": "The codebase lacks any service discovery, dependency mapping, or service definition patterns.",
+      "severity": "high",
+      "category": "missing_tests",
+      "confidence": 0.9,
+      "source_type": "llm"
+    },
+    {
+      "id": "fc3f383e-92a4-466d-81aa-04d2f51f5898",
+      "title": "Zero test coverage requires comprehensive test creation",
+      "description": "The codebase has 0 test files and 0.0 test-to-code ratio.",
+      "severity": "high",
+      "category": "missing_tests",
+      "confidence": 1.0,
+      "source_type": "llm"
+    },
+    {
+      "id": "11850270-46f6-47c8-913f-9ac00bdd38a5",
+      "title": "AWS X-Ray integration adds significant complexity",
+      "description": "The PRD mentions AWS X-Ray integration for runtime traces, which requires understanding distributed tracing patterns.",
+      "severity": "medium",
+      "category": "tight_coupling",
+      "confidence": 0.7,
+      "source_type": "llm"
+    },
+    {
+      "id": "8c5726e6-c47c-4367-8176-ea52b56a013c",
+      "title": "Missing CI/CD pipeline increases testing overhead",
+      "description": "The codebase lacks CI/CD infrastructure, requiring manual testing and deployment processes.",
+      "severity": "medium",
+      "category": "high_complexity",
+      "confidence": 0.8,
+      "source_type": "llm"
+    },
+    {
+      "id": "e518e15a-55e0-4015-9b38-00b54ae756c0",
+      "title": "Need to establish service definition and identification patterns",
+      "description": "The system needs to automatically identify services across different codebases and architectures.",
+      "severity": "medium",
+      "category": "high_complexity",
+      "confidence": 0.8,
+      "source_type": "llm"
+    }
+  ],
+  "llm_analysis": {
+    "providers_used": ["openai", "anthropic"],
+    "total_tokens": 15901,
+    "total_latency_ms": 85022.63
+  },
+  "codebase_state_at_analysis": {
+    "analysis_method": "Current: Python AST + Regex patterns for TS/Kotlin",
+    "limitations": [
+      "TypeScript: Regex-only, misses complex patterns",
+      "Kotlin: Regex-only, no AST",
+      "No cross-file reference analysis",
+      "No type information",
+      "No call hierarchy / data flow tracing"
+    ]
+  }
+}

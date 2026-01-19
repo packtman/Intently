@@ -9,8 +9,14 @@ from context_graph.analyzers.json_analyzer import JSONAnalyzer
 from context_graph.analyzers.engineering_analyzer import EngineeringAnalyzer
 from context_graph.analyzers.infrastructure_analyzer import InfrastructureAnalyzer
 from context_graph.analyzers.architecture_analyzer import ArchitectureAnalyzer
+from context_graph.analyzers.graph_analyzer import (
+    GraphEnhancedAnalyzer,
+    GraphAnalysisResult,
+    analyze_codebase_sync,
+)
 
 __all__ = [
+    # Traditional analyzers
     "CodebaseAnalyzer",
     "MultiLanguageAnalyzer",
     "PythonAnalyzer",
@@ -21,5 +27,9 @@ __all__ = [
     "EngineeringAnalyzer",
     "InfrastructureAnalyzer",
     "ArchitectureAnalyzer",
+    # New graph-enhanced analyzer
+    "GraphEnhancedAnalyzer",
+    "GraphAnalysisResult",
+    "analyze_codebase_sync",
 ]
 

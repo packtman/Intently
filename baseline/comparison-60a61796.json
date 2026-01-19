@@ -1,0 +1,270 @@
+{
+  "timestamp": "2026-01-19T00:20:37.013547",
+  "traditional": {
+    "method": "traditional",
+    "timestamp": "2026-01-19T00:20:05.378750",
+    "elapsed_ms": 2697.6990699768066,
+    "files_analyzed": 68,
+    "lines_of_code": 28975,
+    "entities": 132,
+    "relationships": 0,
+    "api_endpoints": 84,
+    "data_models": 48,
+    "auth_patterns": 0,
+    "existing_controls": 9,
+    "details": {
+      "endpoints": [
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.routes.review_status",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.prd_history_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "/reviews/{review_id}/changes",
+          "method": "GET",
+          "file": "src/context_graph/api/pm_routes.py"
+        }
+      ],
+      "models": [
+        {
+          "name": "CodeEvidenceResponse",
+          "file": "src/context_graph/api/pm_routes.py"
+        },
+        {
+          "name": "PRDChangeResponse",
+          "file": "src/context_graph/api/pm_routes.py"
+        },
+        {
+          "name": "PRDChangesResponse",
+          "file": "src/context_graph/api/pm_routes.py"
+        },
+        {
+          "name": "AcceptChangeRequest",
+          "file": "src/context_graph/api/pm_routes.py"
+        },
+        {
+          "name": "BulkAcceptRequest",
+          "file": "src/context_graph/api/pm_routes.py"
+        },
+        {
+          "name": "ExpertAskRequest",
+          "file": "src/context_graph/api/pm_routes.py"
+        },
+        {
+          "name": "ExpertResponseRequest",
+          "file": "src/context_graph/api/pm_routes.py"
+        },
+        {
+          "name": "WordChangeResponse",
+          "file": "src/context_graph/api/pm_routes.py"
+        },
+        {
+          "name": "DiffLineResponse",
+          "file": "src/context_graph/api/pm_routes.py"
+        },
+        {
+          "name": "DiffStatsResponse",
+          "file": "src/context_graph/api/pm_routes.py"
+        }
+      ],
+      "controls": [
+        "rate_limiting",
+        "authorization",
+        "potential_hardcoded_secret",
+        "logging",
+        "encryption",
+        "input_validation",
+        "csrf_protection",
+        "cors",
+        "authentication"
+      ]
+    }
+  },
+  "graph_enhanced": {
+    "method": "graph_enhanced_lsp_True",
+    "timestamp": "2026-01-19T00:20:37.008155",
+    "elapsed_ms": 31628.42082977295,
+    "lsp_used": true,
+    "files_analyzed": 68,
+    "lines_of_code": 28975,
+    "graph_nodes": 1003,
+    "graph_edges": 1914,
+    "nodes_by_kind": {
+      "file": 68,
+      "function": 12,
+      "class": 210,
+      "method": 706,
+      "endpoint": 7
+    },
+    "nodes_by_language": {
+      "python": 1003
+    },
+    "entities": 1003,
+    "relationships": 1914,
+    "api_endpoints": 7,
+    "data_models": 5,
+    "auth_patterns": 0,
+    "coupling_metrics": {
+      "total_nodes": 1003,
+      "total_edges": 1914,
+      "avg_dependencies_per_node": 0.8713858424725822,
+      "highly_coupled_nodes": [
+        {
+          "id": "context_graph/__init__.py",
+          "dependencies": 4
+        },
+        {
+          "id": "context_graph/cli.py",
+          "dependencies": 27
+        },
+        {
+          "id": "context_graph/pm/quality_scorer.py",
+          "dependencies": 4
+        },
+        {
+          "id": "context_graph/pm/effort_estimator.py",
+          "dependencies": 7
+        },
+        {
+          "id": "context_graph/pm/prd_change_generator.py",
+          "dependencies": 17
+        },
+        {
+          "id": "context_graph/pm/__init__.py",
+          "dependencies": 6
+        },
+        {
+          "id": "context_graph/pm/pattern_learner.py",
+          "dependencies": 7
+        },
+        {
+          "id": "context_graph/pm/prd_generator.py",
+          "dependencies": 24
+        },
+        {
+          "id": "context_graph/pm/bulk_prd_analyzer.py",
+          "dependencies": 30
+        },
+        {
+          "id": "context_graph/pm/diff_generator.py",
+          "dependencies": 10
+        }
+      ]
+    },
+    "unused_exports_count": 0,
+    "findings_count": 17,
+    "details": {
+      "endpoints": [
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.routes.review_status",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.prd_history_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        },
+        {
+          "path": "context_graph.api.pm_routes.reviews_store",
+          "method": "PATCH",
+          "file": "src/context_graph/tests/test_pm_features.py"
+        }
+      ],
+      "findings_by_type": {
+        "architecture": 10,
+        "security": 7
+      },
+      "unused_exports": []
+    }
+  },
+  "baseline": null,
+  "improvements": [
+    {
+      "metric": "entities",
+      "traditional": 132,
+      "graph_enhanced": 1003,
+      "delta": 871
+    },
+    {
+      "metric": "relationships",
+      "traditional": 0,
+      "graph_enhanced": 1914,
+      "delta": 1914
+    }
+  ],
+  "regressions": [
+    {
+      "metric": "api_endpoints",
+      "traditional": 84,
+      "graph_enhanced": 7,
+      "delta": -77
+    },
+    {
+      "metric": "data_models",
+      "traditional": 48,
+      "graph_enhanced": 5,
+      "delta": -43
+    }
+  ]
+}

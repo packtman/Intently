@@ -39,6 +39,30 @@ codebase:
     - build
     - "*.pyc"
     - "*.egg-info"
+  
+  # Graph-Enhanced Analysis (optional LSP feature)
+  # Provides richer code understanding when LSP servers are installed
+  graph_analysis:
+    enabled: true  # Enable graph-based analysis
+    
+    # LSP Integration (OPTIONAL - works without it, enhanced with it)
+    # When enabled and LSP servers are installed, provides:
+    # - Cross-file reference tracking
+    # - Call hierarchy analysis
+    # - Type information
+    # - More accurate symbol detection
+    lsp:
+      enabled: true  # Try to use LSP if available
+      timeout_seconds: 30
+      # LSP servers (auto-detected, install separately if needed):
+      # - TypeScript: npm install -g typescript-language-server typescript
+      # - Python: pip install pyright
+      # - Kotlin: https://github.com/fwcd/kotlin-language-server
+    
+    # Analysis features
+    include_call_hierarchy: true  # Track who calls what
+    include_references: true      # Track symbol usage
+    detect_unused_exports: true   # Find dead code
 
 # Security Review Settings
 security:
