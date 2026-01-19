@@ -305,8 +305,19 @@ Intently/
 │   └── package.json       # Desktop dependencies
 ├── scripts/               # Server startup scripts
 ├── examples/              # Sample PRDs
+├── docs/                  # Documentation
 └── context-graph.yaml     # Configuration
 ```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Frontend Options](docs/FRONTEND_OPTIONS.md) | Compare Web Dashboard vs Desktop App |
+| [Desktop App](desktop/README.md) | Native Electron app setup & usage |
+| [Web Dashboard](frontend/README.md) | Browser-based dashboard setup |
+| [API Keys Setup](API_KEYS_SETUP.md) | Configure OpenAI & Anthropic keys |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues & solutions |
 
 ## License
 
