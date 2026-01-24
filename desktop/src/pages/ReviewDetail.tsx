@@ -16,8 +16,9 @@ import {
   Code2,
   Network,
   Link2,
+  RefreshCw,
 } from 'lucide-react'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Component, ReactNode } from 'react'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { api } from '../services/api'
 import { useBackend } from '../hooks/useBackend'
@@ -42,7 +43,71 @@ import {
 } from '../components/security'
 import type { ReviewStatus, DashboardData, Finding, CollaborationFeatures, CrossFunctionalFinding } from '../types'
 
+// Error Boundary to catch any React rendering errors
+interface ErrorBoundaryProps {
+  children: ReactNode
+  fallback?: ReactNode
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+}
+
+class ReviewDetailErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[ReviewDetail] Error caught by boundary:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <AlertTriangle className="w-20 h-20 text-red-400 mb-6" />
+          <h2 className="text-xl font-display font-semibold text-white mb-2">Something went wrong</h2>
+          <p className="text-void-400 text-center max-w-md mb-4">
+            An error occurred while displaying the review results.
+          </p>
+          <p className="text-red-400 text-sm font-mono mb-6 max-w-lg text-center">
+            {this.state.error?.message || 'Unknown error'}
+          </p>
+          <button 
+            onClick={() => {
+              this.setState({ hasError: false, error: null })
+              window.location.reload()
+            }} 
+            className="btn-primary flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Reload Page
+          </button>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
+// Wrapper component that adds error boundary
 export default function ReviewDetail() {
+  return (
+    <ReviewDetailErrorBoundary>
+      <ReviewDetailContent />
+    </ReviewDetailErrorBoundary>
+  )
+}
+
+function ReviewDetailContent() {
   const { id } = useParams()
   const { isConnected } = useBackend()
   const [expandedFindings, setExpandedFindings] = useState<Set<string>>(new Set())
@@ -51,12 +116,18 @@ export default function ReviewDetail() {
   const [selectedDimension, setSelectedDimension] = useState<string | 'all'>('all')
   const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool'>('findings')
   const [expertAskModal, setExpertAskModal] = useState<{ isOpen: boolean; predictionId: string; question: string } | null>(null)
+  
+  // Track if we've triggered a manual refetch to avoid infinite loops
+  const [manualRefetchTriggered, setManualRefetchTriggered] = useState(false)
 
   // Poll for status while pending/running
-  const { data: status } = useQuery<ReviewStatus>({
+  const { data: status, refetch: refetchStatus } = useQuery<ReviewStatus>({
     queryKey: ['review-status', id],
     queryFn: () => api.getReviewStatus(id!),
     enabled: isConnected && !!id,
+    // Override global staleTime - status should always be fresh during polling
+    staleTime: 0,
+    refetchOnMount: 'always',
     refetchInterval: (query) => {
       const data = query.state.data
       if (data?.status === 'completed' || data?.status === 'failed') {
@@ -66,14 +137,75 @@ export default function ReviewDetail() {
     },
   })
 
+  // Trigger immediate status check on mount
+  useEffect(() => {
+    if (isConnected && id) {
+      refetchStatus()
+    }
+  }, [isConnected, id, refetchStatus])
+
   // Fetch dashboard data when completed
-  const { data: dashboard, isLoading, error: dashboardError, refetch: refetchDashboard } = useQuery<DashboardData>({
+  // Use isPending to properly detect when we're waiting for data (React Query v5)
+  // isLoading = isPending && isFetching, but isPending alone tells us if there's no cached data
+  const { 
+    data: dashboard, 
+    isLoading, 
+    isPending: isDashboardPending,
+    isFetching: isDashboardFetching,
+    error: dashboardError, 
+    refetch: refetchDashboard,
+    status: dashboardQueryStatus,
+  } = useQuery<DashboardData>({
     queryKey: ['review-dashboard', id],
-    queryFn: () => api.getReviewDashboard(id!),
+    queryFn: async () => {
+      console.log('[ReviewDetail] Fetching dashboard data for review:', id)
+      const result = await api.getReviewDashboard(id!)
+      console.log('[ReviewDetail] Dashboard data received:', result ? 'data present' : 'no data')
+      return result
+    },
     enabled: isConnected && status?.status === 'completed',
     retry: 2,
     retryDelay: 1000,
+    // Override global config - always fetch fresh data for dashboard
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
+  
+  // Debug logging for state transitions
+  useEffect(() => {
+    console.log('[ReviewDetail] State:', {
+      id,
+      isConnected,
+      statusStatus: status?.status,
+      dashboardQueryStatus,
+      isDashboardPending,
+      isLoading,
+      isDashboardFetching,
+      hasDashboard: !!dashboard,
+      dashboardError: dashboardError?.message,
+    })
+  }, [id, isConnected, status?.status, dashboardQueryStatus, isDashboardPending, isLoading, isDashboardFetching, dashboard, dashboardError])
+
+  // Force refetch dashboard when status becomes completed
+  // This ensures fresh data is always fetched, working around any React Query caching issues
+  useEffect(() => {
+    if (isConnected && status?.status === 'completed' && !dashboard && !isDashboardFetching && !manualRefetchTriggered) {
+      console.log('[ReviewDetail] Status completed, forcing dashboard refetch')
+      setManualRefetchTriggered(true)
+      // Small delay to ensure React Query has processed the enabled state change
+      const timer = setTimeout(() => {
+        refetchDashboard()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [isConnected, status?.status, dashboard, isDashboardFetching, refetchDashboard, manualRefetchTriggered])
+
+  // Reset the manual refetch flag when dashboard data arrives
+  useEffect(() => {
+    if (dashboard && manualRefetchTriggered) {
+      setManualRefetchTriggered(false)
+    }
+  }, [dashboard, manualRefetchTriggered])
 
   // Fetch collaboration features (to know which features are enabled)
   const { data: collaborationFeatures } = useQuery<CollaborationFeatures>({
@@ -131,11 +263,30 @@ export default function ReviewDetail() {
   }
 
   if (!status || status?.status === 'pending' || status?.status === 'running') {
-    return <LoadingState status={status || { status: 'pending', progress: 0, message: 'Loading review...', review_id: id || '' }} />
+    return (
+      <LoadingState status={status || { status: 'pending', progress: 0, message: 'Loading review...', review_id: id || '' }} />
+    )
   }
 
   if (status?.status === 'failed') {
-    return <ErrorState message={status.message} />
+    return (
+      <ErrorState message={status.message} />
+    )
+  }
+
+  // Handle unexpected status values - this shouldn't happen but provides a safety net
+  if (status?.status !== 'completed') {
+    console.error('[ReviewDetail] Unexpected status value:', status?.status)
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <AlertTriangle className="w-16 h-16 text-ember-400 mb-4" />
+        <h2 className="text-xl font-display font-semibold text-white mb-2">Unexpected Status</h2>
+        <p className="text-void-400 mb-4">Review status: {status?.status || 'unknown'}</p>
+        <button onClick={() => window.location.reload()} className="btn-secondary">
+          Refresh Page
+        </button>
+      </div>
+    )
   }
 
   if (dashboardError) {
@@ -151,12 +302,36 @@ export default function ReviewDetail() {
     )
   }
 
-  if (isLoading || !dashboard) {
-    return <LoadingState status={{ status: 'pending', progress: 0, message: 'Loading...', review_id: id || '' }} />
+  // Use isDashboardPending to properly handle the transition from disabled to enabled query
+  // This catches the case where enabled just became true but fetch hasn't started yet
+  const isWaitingForDashboard = isDashboardPending || isLoading || !dashboard
+  
+  if (isWaitingForDashboard) {
+    return (
+      <LoadingState status={{ 
+        status: 'pending', 
+        progress: isDashboardFetching ? 0.9 : 0.85, 
+        message: isDashboardFetching ? 'Loading dashboard data...' : 'Preparing results...', 
+        review_id: id || '' 
+      }} />
+    )
   }
 
-  // Defensive check for required dashboard properties
-  if (!dashboard.overview || !dashboard.findings_table || !dashboard.risk_gauge) {
+  // Defensive check for required dashboard properties - verify both presence AND meaningful content
+  const hasDashboardOverview = dashboard.overview && 
+    typeof dashboard.overview === 'object' && 
+    ('title' in dashboard.overview || 'risk_rating' in dashboard.overview)
+  const hasFindingsTable = Array.isArray(dashboard.findings_table)
+  const hasRiskGauge = dashboard.risk_gauge && 
+    typeof dashboard.risk_gauge === 'object' && 
+    'value' in dashboard.risk_gauge
+
+  if (!hasDashboardOverview || !hasFindingsTable || !hasRiskGauge) {
+    console.error('Dashboard data incomplete:', {
+      overview: dashboard.overview,
+      findings_table: dashboard.findings_table,
+      risk_gauge: dashboard.risk_gauge,
+    })
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <AlertTriangle className="w-20 h-20 text-ember-400 mb-6" />
@@ -177,18 +352,33 @@ export default function ReviewDetail() {
       (selectedDimension === 'all' || f.dimension === selectedDimension)
   )
 
+  // Safe defaults for dashboard data (in case of partial data)
+  const overviewTitle = dashboard.overview.title || 'Untitled Review'
+  const reviewedAt = dashboard.overview.reviewed_at 
+    ? new Date(dashboard.overview.reviewed_at).toLocaleString() 
+    : 'Unknown date'
+  const riskRating = dashboard.overview.risk_rating || 'MEDIUM'
+  const riskScore = dashboard.risk_gauge.value ?? 0
+
+  // Log that we're about to render the dashboard
+  console.log('[ReviewDetail] Rendering dashboard with:', {
+    overviewTitle,
+    findingsCount: filteredFindings.length,
+    riskScore,
+  })
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-display text-3xl font-bold text-white">{dashboard.overview.title}</h1>
+          <h1 className="font-display text-3xl font-bold text-white">{overviewTitle}</h1>
           <p className="text-void-400 mt-2">
-            Reviewed {new Date(dashboard.overview.reviewed_at).toLocaleString()}
+            Reviewed {reviewedAt}
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <RiskBadge rating={dashboard.overview.risk_rating} />
+          <RiskBadge rating={riskRating} />
           <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
             <Download className="w-4 h-4" />
             Export
@@ -226,7 +416,7 @@ export default function ReviewDetail() {
         )}
         <StatCard
           label="Risk Score"
-          value={dashboard.risk_gauge.value}
+          value={riskScore}
           icon={Activity}
           color="yellow"
           suffix="/100"
