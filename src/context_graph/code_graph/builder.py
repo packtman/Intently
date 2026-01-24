@@ -57,6 +57,69 @@ class BuilderConfig:
     # Performance
     max_files: int = 1000
     parallel_files: int = 10
+    
+    # Tracing/debugging
+    trace_enabled: bool = False  # Enable detailed tracing
+
+
+@dataclass
+class AnalysisTrace:
+    """Trace information for a single file analysis."""
+    file_path: str
+    language: str
+    method_used: str  # "lsp", "ast", "regex"
+    symbols_found: int
+    edges_found: int
+    duration_ms: float
+    error: str = ""
+
+
+@dataclass
+class BuildTrace:
+    """Complete trace of a code graph build."""
+    started_at: str = ""
+    completed_at: str = ""
+    total_duration_ms: float = 0.0
+    
+    # LSP status
+    lsp_requested: bool = False
+    lsp_initialized: bool = False
+    lsp_clients: list[str] = field(default_factory=list)
+    
+    # File analysis traces
+    file_traces: list[AnalysisTrace] = field(default_factory=list)
+    
+    # Summary by method
+    files_by_method: dict[str, int] = field(default_factory=dict)
+    symbols_by_method: dict[str, int] = field(default_factory=dict)
+    
+    # Errors
+    errors: list[str] = field(default_factory=list)
+    
+    def summary(self) -> str:
+        """Generate human-readable summary."""
+        lines = [
+            "=" * 60,
+            "BUILD TRACE SUMMARY",
+            "=" * 60,
+            f"Duration: {self.total_duration_ms:.0f}ms",
+            f"LSP requested: {self.lsp_requested}",
+            f"LSP initialized: {self.lsp_initialized}",
+            f"LSP clients: {', '.join(self.lsp_clients) or 'none'}",
+            "",
+            "Files analyzed by method:",
+        ]
+        for method, count in self.files_by_method.items():
+            symbols = self.symbols_by_method.get(method, 0)
+            lines.append(f"  - {method}: {count} files, {symbols} symbols")
+        
+        if self.errors:
+            lines.append(f"\nErrors ({len(self.errors)}):")
+            for err in self.errors[:5]:
+                lines.append(f"  - {err}")
+        
+        lines.append("=" * 60)
+        return "\n".join(lines)
 
 
 class CodeGraphBuilder:
@@ -70,6 +133,11 @@ class CodeGraphBuilder:
         # Or with custom config
         config = BuilderConfig(use_lsp=True, include_call_hierarchy=True)
         graph = await builder.build(config)
+        
+        # Enable tracing to see what happened
+        config = BuilderConfig(trace_enabled=True)
+        graph = await builder.build(config)
+        print(builder.trace.summary())
     """
     
     def __init__(self, workspace_path: Path) -> None:
@@ -77,6 +145,7 @@ class CodeGraphBuilder:
         self._graph = CodeGraph()
         self._lsp_manager = None
         self._lsp_available = False
+        self.trace = BuildTrace()  # Trace information
     
     async def build(self, config: BuilderConfig | None = None) -> CodeGraph:
         """
@@ -84,47 +153,95 @@ class CodeGraphBuilder:
         
         Returns a fully populated CodeGraph with nodes and edges.
         """
+        import time
+        from datetime import datetime
+        
         config = config or BuilderConfig()
         self._graph = CodeGraph()
+        self._config = config  # Store for use in analysis methods
+        
+        # Initialize trace
+        self.trace = BuildTrace()
+        self.trace.started_at = datetime.now().isoformat()
+        self.trace.lsp_requested = config.use_lsp
+        start_time = time.time()
         
         # Try to initialize LSP if enabled
         if config.use_lsp:
             self._lsp_available = await self._init_lsp()
+            self.trace.lsp_initialized = self._lsp_available
+            if self._lsp_manager and self._lsp_manager._clients:
+                self.trace.lsp_clients = list(self._lsp_manager._clients.keys())
         
         try:
             # Discover files
             files = self._discover_files(config)
             logger.info(f"Discovered {len(files)} files to analyze")
             
-            # Analyze files in batches
-            for i in range(0, len(files), config.parallel_files):
-                batch = files[i:i + config.parallel_files]
-                await asyncio.gather(*[
-                    self._analyze_file(file_path, config)
-                    for file_path in batch
-                ])
+            # Analyze files - process sequentially when using LSP for stability
+            if self._lsp_available:
+                # LSP servers can be unstable with parallel requests
+                for file_path in files:
+                    try:
+                        await self._analyze_file(file_path, config)
+                    except Exception as e:
+                        logger.debug(f"Error analyzing {file_path}: {e}")
+                        self.trace.errors.append(f"{file_path}: {e}")
+            else:
+                # Batch processing for regex-only analysis
+                for i in range(0, len(files), config.parallel_files):
+                    batch = files[i:i + config.parallel_files]
+                    await asyncio.gather(*[
+                        self._analyze_file(file_path, config)
+                        for file_path in batch
+                    ], return_exceptions=True)
             
             # Build cross-file relationships if LSP available
             if self._lsp_available and config.include_references:
-                await self._build_references(config)
+                try:
+                    await self._build_references(config)
+                except Exception as e:
+                    logger.warning(f"Failed to build references: {e}")
+                    self.trace.errors.append(f"References: {e}")
             
             if self._lsp_available and config.include_call_hierarchy:
-                await self._build_call_hierarchy(config)
+                try:
+                    await self._build_call_hierarchy(config)
+                except Exception as e:
+                    logger.warning(f"Failed to build call hierarchy: {e}")
+                    self.trace.errors.append(f"Call hierarchy: {e}")
             
             # Calculate derived metrics
             self._calculate_metrics()
+            
+            # Finalize trace
+            self.trace.completed_at = datetime.now().isoformat()
+            self.trace.total_duration_ms = (time.time() - start_time) * 1000
+            
+            # Compute summary stats
+            for ft in self.trace.file_traces:
+                method = ft.method_used
+                self.trace.files_by_method[method] = self.trace.files_by_method.get(method, 0) + 1
+                self.trace.symbols_by_method[method] = self.trace.symbols_by_method.get(method, 0) + ft.symbols_found
             
             logger.info(
                 f"Code graph built: {self._graph.node_count} nodes, "
                 f"{self._graph.edge_count} edges"
             )
             
+            # Print trace if enabled
+            if config.trace_enabled:
+                print(self.trace.summary())
+            
             return self._graph
             
         finally:
             # Clean up LSP
             if self._lsp_manager:
-                await self._lsp_manager.stop()
+                try:
+                    await self._lsp_manager.stop()
+                except Exception:
+                    pass  # Ignore cleanup errors
     
     async def _init_lsp(self) -> bool:
         """Initialize LSP client manager."""
@@ -132,6 +249,11 @@ class CodeGraphBuilder:
             from context_graph.lsp import LSPClientManager
             self._lsp_manager = LSPClientManager(self.workspace_path)
             await self._lsp_manager.start()
+            # Check if we actually got any clients
+            if not self._lsp_manager._clients:
+                logger.warning("No LSP clients were started")
+                return False
+            logger.info(f"LSP initialized with clients: {list(self._lsp_manager._clients.keys())}")
             return True
         except ImportError:
             logger.warning("LSP module not available")
@@ -175,6 +297,36 @@ class CodeGraphBuilder:
                 return True
         return False
     
+    def _record_trace(
+        self,
+        file_path: Path,
+        language: str,
+        method: str,
+        symbols_found: int,
+        edges_found: int,
+        start_time: float,
+        error: str = "",
+    ) -> None:
+        """Record a trace entry for file analysis."""
+        import time
+        duration_ms = (time.time() - start_time) * 1000
+        
+        try:
+            rel_path = str(file_path.relative_to(self.workspace_path))
+        except ValueError:
+            rel_path = str(file_path)
+        
+        trace = AnalysisTrace(
+            file_path=rel_path,
+            language=language,
+            method_used=method,
+            symbols_found=symbols_found,
+            edges_found=edges_found,
+            duration_ms=duration_ms,
+            error=error,
+        )
+        self.trace.file_traces.append(trace)
+    
     async def _analyze_file(self, file_path: Path, config: BuilderConfig) -> None:
         """Analyze a single file and add to graph."""
         suffix = file_path.suffix.lower()
@@ -193,11 +345,17 @@ class CodeGraphBuilder:
     
     async def _analyze_python_file(self, file_path: Path, config: BuilderConfig) -> None:
         """Analyze a Python file using AST."""
+        import time
+        start_time = time.time()
+        symbols_before = self._graph.node_count
+        edges_before = self._graph.edge_count
+        
         try:
             content = file_path.read_text(encoding="utf-8")
             tree = ast.parse(content)
         except Exception as e:
             logger.debug(f"Failed to parse Python file {file_path}: {e}")
+            self._record_trace(file_path, "python", "ast", 0, 0, start_time, str(e))
             return
         
         # Add file node
@@ -224,6 +382,11 @@ class CodeGraphBuilder:
                 self._add_python_import(node, file_path, file_node.id)
             elif isinstance(node, ast.ImportFrom):
                 self._add_python_import_from(node, file_path, file_node.id)
+        
+        # Record trace
+        symbols_found = self._graph.node_count - symbols_before
+        edges_found = self._graph.edge_count - edges_before
+        self._record_trace(file_path, "python", "ast", symbols_found, edges_found, start_time)
     
     def _add_python_class(
         self,
@@ -451,10 +614,17 @@ class CodeGraphBuilder:
         config: BuilderConfig,
     ) -> None:
         """Analyze a TypeScript file using LSP or regex fallback."""
+        import time
+        start_time = time.time()
+        symbols_before = self._graph.node_count
+        edges_before = self._graph.edge_count
+        method_used = "regex"  # Default
+        
         # Add file node
         try:
             content = file_path.read_text(encoding="utf-8")
-        except Exception:
+        except Exception as e:
+            self._record_trace(file_path, "typescript", "error", 0, 0, start_time, str(e))
             return
         
         file_id = str(file_path.relative_to(self.workspace_path))
@@ -473,14 +643,28 @@ class CodeGraphBuilder:
         if self._lsp_available and self._lsp_manager:
             try:
                 symbols = await self._lsp_manager.get_document_symbols(file_path)
-                for symbol in symbols:
-                    self._add_lsp_symbol(symbol, file_path, file_id)
-                return
+                if symbols:  # Only use LSP result if we got symbols
+                    method_used = "lsp"
+                    for symbol in symbols:
+                        self._add_lsp_symbol(symbol, file_path, file_id)
+                    # Record trace and return
+                    symbols_found = self._graph.node_count - symbols_before
+                    edges_found = self._graph.edge_count - edges_before
+                    self._record_trace(file_path, "typescript", method_used, symbols_found, edges_found, start_time)
+                    return
             except Exception as e:
+                # Mark LSP as unavailable if connection lost
+                if "connection" in str(e).lower():
+                    self._lsp_available = False
                 logger.debug(f"LSP analysis failed for {file_path}, using regex: {e}")
         
         # Regex fallback
         await self._analyze_typescript_regex(content, file_path, file_id)
+        
+        # Record trace
+        symbols_found = self._graph.node_count - symbols_before
+        edges_found = self._graph.edge_count - edges_before
+        self._record_trace(file_path, "typescript", method_used, symbols_found, edges_found, start_time)
     
     def _add_lsp_symbol(
         self,
@@ -652,9 +836,16 @@ class CodeGraphBuilder:
         config: BuilderConfig,
     ) -> None:
         """Analyze a Kotlin file using LSP or regex fallback."""
+        import time
+        start_time = time.time()
+        symbols_before = self._graph.node_count
+        edges_before = self._graph.edge_count
+        method_used = "regex"  # Default
+        
         try:
             content = file_path.read_text(encoding="utf-8")
-        except Exception:
+        except Exception as e:
+            self._record_trace(file_path, "kotlin", "error", 0, 0, start_time, str(e))
             return
         
         file_id = str(file_path.relative_to(self.workspace_path))
@@ -673,14 +864,24 @@ class CodeGraphBuilder:
         if self._lsp_available and self._lsp_manager:
             try:
                 symbols = await self._lsp_manager.get_document_symbols(file_path)
-                for symbol in symbols:
-                    self._add_lsp_symbol(symbol, file_path, file_id)
-                return
+                if symbols:
+                    method_used = "lsp"
+                    for symbol in symbols:
+                        self._add_lsp_symbol(symbol, file_path, file_id)
+                    symbols_found = self._graph.node_count - symbols_before
+                    edges_found = self._graph.edge_count - edges_before
+                    self._record_trace(file_path, "kotlin", method_used, symbols_found, edges_found, start_time)
+                    return
             except Exception as e:
                 logger.debug(f"LSP analysis failed for {file_path}, using regex: {e}")
         
         # Regex fallback for Kotlin
         await self._analyze_kotlin_regex(content, file_path, file_id)
+        
+        # Record trace
+        symbols_found = self._graph.node_count - symbols_before
+        edges_found = self._graph.edge_count - edges_before
+        self._record_trace(file_path, "kotlin", method_used, symbols_found, edges_found, start_time)
     
     async def _analyze_kotlin_regex(
         self,

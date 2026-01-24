@@ -51,6 +51,15 @@ class GraphAnalysisResult:
     lsp_used: bool = False
     files_analyzed: int = 0
     analysis_time_ms: float = 0.0
+    
+    # Trace information (how the scan "thought")
+    trace: Any = None  # BuildTrace object
+    
+    def get_trace_summary(self) -> str:
+        """Get human-readable trace summary."""
+        if self.trace:
+            return self.trace.summary()
+        return "No trace available (enable with trace_enabled=True)"
 
 
 class GraphEnhancedAnalyzer:
@@ -80,10 +89,12 @@ class GraphEnhancedAnalyzer:
         use_lsp: bool = True,
         include_call_hierarchy: bool = True,
         include_references: bool = True,
+        trace_enabled: bool = False,
     ) -> None:
         self.use_lsp = use_lsp
         self.include_call_hierarchy = include_call_hierarchy
         self.include_references = include_references
+        self.trace_enabled = trace_enabled
     
     async def analyze(
         self,
@@ -111,6 +122,7 @@ class GraphEnhancedAnalyzer:
             use_lsp=self.use_lsp,
             include_call_hierarchy=self.include_call_hierarchy,
             include_references=self.include_references,
+            trace_enabled=self.trace_enabled,
         )
         
         # Build the code graph
@@ -118,6 +130,7 @@ class GraphEnhancedAnalyzer:
         try:
             result.graph = await builder.build(config)
             result.lsp_used = builder._lsp_available
+            result.trace = builder.trace  # Capture the trace
         except Exception as e:
             logger.error(f"Failed to build code graph: {e}")
             result.graph = CodeGraph()

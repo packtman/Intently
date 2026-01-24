@@ -95,7 +95,7 @@ def run_traditional_analysis(codebase_path: Path) -> dict:
     return result
 
 
-async def run_graph_analysis(codebase_path: Path, use_lsp: bool = True) -> dict:
+async def run_graph_analysis(codebase_path: Path, use_lsp: bool = True, trace: bool = False) -> dict:
     """Run the new graph-enhanced analysis."""
     print("\n" + "=" * 60)
     print(f"GRAPH-ENHANCED ANALYSIS (LSP={'enabled' if use_lsp else 'disabled'})")
@@ -108,6 +108,7 @@ async def run_graph_analysis(codebase_path: Path, use_lsp: bool = True) -> dict:
         use_lsp=use_lsp,
         include_call_hierarchy=use_lsp,
         include_references=use_lsp,
+        trace_enabled=trace,
     )
     
     # Run analysis
@@ -179,6 +180,17 @@ async def run_graph_analysis(codebase_path: Path, use_lsp: bool = True) -> dict:
         print(f"\n  Findings by type:")
         for ftype, count in result["details"]["findings_by_type"].items():
             print(f"    - {ftype}: {count}")
+    
+    # Show trace if available
+    if analysis_result.trace:
+        result["trace"] = {
+            "lsp_requested": analysis_result.trace.lsp_requested,
+            "lsp_initialized": analysis_result.trace.lsp_initialized,
+            "lsp_clients": analysis_result.trace.lsp_clients,
+            "files_by_method": analysis_result.trace.files_by_method,
+            "symbols_by_method": analysis_result.trace.symbols_by_method,
+            "errors_count": len(analysis_result.trace.errors),
+        }
     
     return result
 
@@ -287,6 +299,7 @@ async def main():
     parser.add_argument("--baseline", type=Path, help="Path to baseline JSON file for comparison")
     parser.add_argument("--output", type=Path, help="Output path for comparison JSON")
     parser.add_argument("--no-lsp", action="store_true", help="Disable LSP for graph analysis")
+    parser.add_argument("--trace", action="store_true", help="Enable detailed tracing to see how the scan thinks")
     
     args = parser.parse_args()
     
@@ -312,7 +325,7 @@ async def main():
     traditional_result = run_traditional_analysis(args.codebase_path)
     
     # Run graph-enhanced analysis
-    graph_result = await run_graph_analysis(args.codebase_path, use_lsp=not args.no_lsp)
+    graph_result = await run_graph_analysis(args.codebase_path, use_lsp=not args.no_lsp, trace=args.trace)
     
     # Compare results
     comparison = compare_results(traditional_result, graph_result, baseline)

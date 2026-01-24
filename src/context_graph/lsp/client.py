@@ -97,7 +97,7 @@ class LSPServerConfig:
 DEFAULT_SERVER_CONFIGS: dict[str, LSPServerConfig] = {
     "typescript": LSPServerConfig(
         language="typescript",
-        command=["npx", "typescript-language-server", "--stdio"],
+        command=["typescript-language-server", "--stdio"],
         file_extensions=[".ts", ".tsx", ".js", ".jsx"],
         supports_call_hierarchy=True,
         supports_references=True,
@@ -316,8 +316,11 @@ class LSPClient:
         content = json.dumps(message)
         header = f"Content-Length: {len(content)}\r\n\r\n"
         
-        self._stdin.write(header.encode() + content.encode())
-        await self._stdin.drain()
+        try:
+            self._stdin.write(header.encode() + content.encode())
+            await self._stdin.drain()
+        except (BrokenPipeError, ConnectionResetError):
+            raise LSPConnectionError("LSP server connection lost")
     
     async def _read_responses(self) -> None:
         """Read responses from the server."""
@@ -783,12 +786,14 @@ class LSPClientManager:
                 client = LSPClient(config, self.workspace_path)
                 await client.start()
                 self._clients[language] = client
+                logger.info(f"LSP server started for {language}")
             except LSPServerNotFoundError:
                 logger.warning(f"LSP server for {language} not available")
             except Exception as e:
-                logger.error(f"Failed to start LSP server for {language}: {e}")
+                logger.warning(f"Failed to start LSP server for {language}: {e}")
         
         self._started = True
+        logger.info(f"LSP clients started: {list(self._clients.keys())}")
     
     async def stop(self) -> None:
         """Stop all language servers."""

@@ -22,7 +22,18 @@ from context_graph.code_graph.graph import (
     CodeEdge,
     EdgeType,
 )
-from context_graph.code_graph.builder import CodeGraphBuilder
+from context_graph.code_graph.builder import (
+    CodeGraphBuilder,
+    BuilderConfig,
+    BuildTrace,
+    AnalysisTrace,
+)
+from context_graph.code_graph.hybrid_analyzer import (
+    HybridAnalyzer,
+    HybridResult,
+    ASTResult,
+    analyze_fast,
+)
 from context_graph.code_graph.config import (
     GraphAnalysisConfig,
     LSPConfig,
@@ -39,6 +50,15 @@ __all__ = [
     "CodeEdge",
     "EdgeType",
     "CodeGraphBuilder",
+    "BuilderConfig",
+    # Hybrid analyzer (AST-first, LSP on-demand)
+    "HybridAnalyzer",
+    "HybridResult",
+    "ASTResult",
+    "analyze_fast",
+    # Tracing
+    "BuildTrace",
+    "AnalysisTrace",
     # Configuration
     "GraphAnalysisConfig",
     "LSPConfig",
