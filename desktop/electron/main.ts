@@ -275,6 +275,7 @@ async function startBackend(): Promise<boolean> {
         FEATURE_PM_PATTERN_LEARNING: 'true',
         FEATURE_SIDE_BY_SIDE_DIFF: 'true',
         FEATURE_PRD_SAVE_TO_FILE: 'true',
+        FEATURE_BULK_PRD_ANALYSIS: 'true',
       },
       stdio: ['pipe', 'pipe', 'pipe'],
     })

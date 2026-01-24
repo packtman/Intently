@@ -7,8 +7,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build:main": "esbuild electron/main.ts --bundle --platform=node --outfile=dist-electron/main.js --external:electron --external:electron-store",
-    "build:preload": "esbuild electron/preload.ts --bundle --platform=node --outfile=dist-electron/preload.js --external:electron",
+    "build:main": "esbuild electron/main.ts --bundle --platform=node --format=cjs --outfile=dist-electron/main.js --external:electron --external:electron-store",
+    "build:preload": "esbuild electron/preload.ts --bundle --platform=node --format=cjs --outfile=dist-electron/preload.js --external:electron",
     "build:electron": "npm run build:main && npm run build:preload",
     "build": "npm run build:electron && vite build && electron-builder",
     "electron:dev": "npm run build:electron && concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",

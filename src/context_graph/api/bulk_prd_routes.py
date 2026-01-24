@@ -213,18 +213,19 @@ async def analyze_bulk_prds(
     
     result = await analyzer.analyze(internal_request)
     
-    # Store results for individual PRD access
+    # Store results for individual PRD access using the storage backend
+    from context_graph.storage.config import get_review_storage
+    storage = get_review_storage()
+    
     for prd_result in result.prd_results:
         if prd_result.success and prd_result.review_result:
-            # Import reviews store from main routes
-            from context_graph.api.routes import reviews_store, review_status
-            reviews_store[prd_result.review_id] = prd_result.review_result
-            review_status[prd_result.review_id] = {
-                "status": "completed",
-                "progress": 1.0,
-                "message": f"Review completed with {prd_result.total_findings} findings",
-                "dimensions": [d.value for d in dimensions],
-            }
+            await storage.save_review(prd_result.review_id, prd_result.review_result)
+            await storage.update_review_status(
+                review_id=prd_result.review_id,
+                status="completed",
+                progress=1.0,
+                message=f"Review completed with {prd_result.total_findings} findings",
+            )
     
     # Convert to response
     return BulkResultResponse(
@@ -469,17 +470,19 @@ async def _run_bulk_analysis_background(
             default_codebase=result.default_codebase,
         )
         
-        # Store individual reviews
+        # Store individual reviews using the storage backend
+        from context_graph.storage.config import get_review_storage
+        storage = get_review_storage()
+        
         for prd_result in result.prd_results:
             if prd_result.success and prd_result.review_result:
-                from context_graph.api.routes import reviews_store, review_status
-                reviews_store[prd_result.review_id] = prd_result.review_result
-                review_status[prd_result.review_id] = {
-                    "status": "completed",
-                    "progress": 1.0,
-                    "message": f"Review completed",
-                    "dimensions": [d.value for d in dimensions],
-                }
+                await storage.save_review(prd_result.review_id, prd_result.review_result)
+                await storage.update_review_status(
+                    review_id=prd_result.review_id,
+                    status="completed",
+                    progress=1.0,
+                    message=f"Review completed",
+                )
         
         bulk_status_store[bulk_id] = {
             "status": "completed",
