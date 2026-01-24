@@ -47,6 +47,10 @@ class LLMResponse:
     # For comparison between providers
     confidence: float = 0.0
     
+    # For iterative analysis
+    was_truncated: bool = False  # True if response was cut off due to token limits
+    stop_reason: str = ""  # Reason the generation stopped (e.g., "length", "stop", "end_turn")
+    
 
 @dataclass
 class AnalysisRequest:
@@ -188,6 +192,37 @@ class LLMProvider(ABC):
 
 # System prompts for different analysis types
 
+# Generation metadata prompt section for iterative analysis
+GENERATION_METADATA_PROMPT = """
+
+## OUTPUT COMPLETION SIGNALS
+
+To ensure comprehensive analysis without truncation, include these completion signals in your response:
+
+1. **If you have identified ALL findings** - Include in your response:
+   ```json
+   "generation_metadata": {
+       "analysis_complete": true,
+       "continuation_needed": false,
+       "total_findings_in_response": <number of findings in this response>,
+       "covered_categories": ["list of categories covered"]
+   }
+   ```
+
+2. **If you have MORE findings to identify but are running out of space** - Include:
+   ```json
+   "generation_metadata": {
+       "analysis_complete": false,
+       "continuation_needed": true,
+       "last_finding_id": "F<N>",
+       "remaining_categories_to_analyze": ["list of categories not yet covered"],
+       "total_findings_in_response": <number of findings in this response>
+   }
+   ```
+
+This allows the system to request continuation if your response was truncated. Always include the `generation_metadata` object at the end of your JSON response."""
+
+
 INTENT_EXTRACTION_PROMPT = """You are a security-focused product analyst. Your task is to extract structured information from Product Requirement Documents (PRDs) with a focus on security-relevant elements.
 
 IMPORTANT: You must respond with valid json only, no markdown or explanations.
@@ -315,7 +350,7 @@ ANALYSIS FRAMEWORK:
    - Are inputs validated and sanitized?
    - Are rate limits in place?
 
-Be comprehensive. It's better to flag potential issues than to miss real vulnerabilities."""
+Be comprehensive. It's better to flag potential issues than to miss real vulnerabilities.""" + GENERATION_METADATA_PROMPT
 
 
 THREAT_MODELING_PROMPT = """You are a threat modeling expert. Given a context graph of entities and relationships, identify potential threats and attack paths.
@@ -509,7 +544,7 @@ ANALYSIS FRAMEWORK:
    - Racial/ethnic origin, political opinions, religious beliefs
    - Trade union membership, sex life/orientation
 
-Be comprehensive. Privacy issues can have significant regulatory and reputational consequences."""
+Be comprehensive. Privacy issues can have significant regulatory and reputational consequences.""" + GENERATION_METADATA_PROMPT
 
 
 COMPLIANCE_REVIEW_PROMPT = """You are an expert compliance analyst performing a comprehensive compliance review. Analyze the PRD intent against industry compliance frameworks and identify ALL potential compliance gaps with DETAILED explanations.
@@ -639,7 +674,7 @@ FRAMEWORK DETAILS:
    - Improvement (10)
    - Annex A Controls
 
-Be comprehensive. Compliance gaps can result in significant fines, audit findings, and reputational damage."""
+Be comprehensive. Compliance gaps can result in significant fines, audit findings, and reputational damage.""" + GENERATION_METADATA_PROMPT
 
 
 ENGINEERING_REVIEW_PROMPT = """You are an expert software engineer performing a comprehensive engineering feasibility and effort assessment. Your PRIMARY goal is to analyze the CURRENT codebase context and assess how feasible the PRD requirements are to implement, along with detailed time estimates.
@@ -805,7 +840,7 @@ Adjust for:
 - Reusable components available: -10-30% time
 
 Be REALISTIC not optimistic. Development always takes longer than expected.
-Base your estimates on what the CURRENT codebase actually looks like, not ideal conditions."""
+Base your estimates on what the CURRENT codebase actually looks like, not ideal conditions.""" + GENERATION_METADATA_PROMPT
 
 
 ARCHITECTURE_REVIEW_PROMPT = """You are an expert software architect performing a comprehensive architecture review. Analyze the proposed changes for API design, service boundaries, dependency management, scalability, and architectural patterns.
@@ -956,5 +991,5 @@ ANALYSIS FRAMEWORK:
    - Resource pooling
    - Load balancing consideration
 
-Be comprehensive. Architectural decisions have long-lasting impact and are expensive to change later."""
+Be comprehensive. Architectural decisions have long-lasting impact and are expensive to change later.""" + GENERATION_METADATA_PROMPT
 

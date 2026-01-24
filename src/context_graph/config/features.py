@@ -38,6 +38,15 @@ Environment Variables:
     
     # PRD Generator
     FEATURE_PRD_GENERATOR=true
+    
+    # Iterative Analysis Features (Multi-round LLM analysis)
+    FEATURE_ITERATIVE_SECURITY_ANALYSIS=true
+    FEATURE_ITERATIVE_PRIVACY_ANALYSIS=true
+    FEATURE_ITERATIVE_COMPLIANCE_ANALYSIS=true
+    FEATURE_ITERATIVE_ENGINEERING_ANALYSIS=true
+    FEATURE_ITERATIVE_ARCHITECTURE_ANALYSIS=true
+    FEATURE_ITERATIVE_THREAT_MODEL=true
+    ITERATIVE_ANALYSIS_MAX_ROUNDS=5
 """
 
 from __future__ import annotations
@@ -154,6 +163,36 @@ class FeatureFlags:
     # Generates PRD documents from codebase analysis
     enable_prd_generator: bool = False
     
+    # ==================== Iterative Analysis Features ====================
+    # Multi-round LLM analysis for comprehensive coverage
+    
+    # Enable iterative security analysis
+    # Runs multiple rounds to cover all security categories (STRIDE, OWASP)
+    enable_iterative_security_analysis: bool = False
+    
+    # Enable iterative privacy analysis
+    # Runs multiple rounds to cover all LINDDUN categories
+    enable_iterative_privacy_analysis: bool = False
+    
+    # Enable iterative compliance analysis
+    # Runs multiple rounds to cover all compliance frameworks
+    enable_iterative_compliance_analysis: bool = False
+    
+    # Enable iterative engineering analysis
+    # Runs multiple rounds to cover all engineering concern categories
+    enable_iterative_engineering_analysis: bool = False
+    
+    # Enable iterative architecture analysis
+    # Runs multiple rounds to cover all architecture concern categories
+    enable_iterative_architecture_analysis: bool = False
+    
+    # Enable iterative threat modeling
+    # Runs multiple rounds to cover all threat categories
+    enable_iterative_threat_model: bool = False
+    
+    # Maximum rounds for iterative analysis (default: 5)
+    iterative_analysis_max_rounds: int = 5
+    
     # ==================== Utility Methods ====================
     
     @classmethod
@@ -189,6 +228,14 @@ class FeatureFlags:
             bulk_prd_codebase_auto_default_threshold=int(os.getenv("BULK_PRD_CODEBASE_AUTO_DEFAULT_THRESHOLD", "3")),
             # PRD generator
             enable_prd_generator=_env_bool("FEATURE_PRD_GENERATOR"),
+            # Iterative analysis features
+            enable_iterative_security_analysis=_env_bool("FEATURE_ITERATIVE_SECURITY_ANALYSIS"),
+            enable_iterative_privacy_analysis=_env_bool("FEATURE_ITERATIVE_PRIVACY_ANALYSIS"),
+            enable_iterative_compliance_analysis=_env_bool("FEATURE_ITERATIVE_COMPLIANCE_ANALYSIS"),
+            enable_iterative_engineering_analysis=_env_bool("FEATURE_ITERATIVE_ENGINEERING_ANALYSIS"),
+            enable_iterative_architecture_analysis=_env_bool("FEATURE_ITERATIVE_ARCHITECTURE_ANALYSIS"),
+            enable_iterative_threat_model=_env_bool("FEATURE_ITERATIVE_THREAT_MODEL"),
+            iterative_analysis_max_rounds=int(os.getenv("ITERATIVE_ANALYSIS_MAX_ROUNDS", "5")),
         )
     
     @classmethod
@@ -219,9 +266,17 @@ class FeatureFlags:
             bulk_prd_codebase_auto_default_threshold=3,
             # PRD generator
             enable_prd_generator=True,
+            # Iterative analysis features
+            enable_iterative_security_analysis=True,
+            enable_iterative_privacy_analysis=True,
+            enable_iterative_compliance_analysis=True,
+            enable_iterative_engineering_analysis=True,
+            enable_iterative_architecture_analysis=True,
+            enable_iterative_threat_model=True,
+            iterative_analysis_max_rounds=5,
         )
     
-    def to_dict(self) -> dict[str, bool]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API responses."""
         return {
             "validation": self.enable_finding_validation,
@@ -248,6 +303,14 @@ class FeatureFlags:
             "bulk_prd_codebase_auto_default_threshold": self.bulk_prd_codebase_auto_default_threshold,
             # PRD generator
             "prd_generator": self.enable_prd_generator,
+            # Iterative analysis features
+            "iterative_security_analysis": self.enable_iterative_security_analysis,
+            "iterative_privacy_analysis": self.enable_iterative_privacy_analysis,
+            "iterative_compliance_analysis": self.enable_iterative_compliance_analysis,
+            "iterative_engineering_analysis": self.enable_iterative_engineering_analysis,
+            "iterative_architecture_analysis": self.enable_iterative_architecture_analysis,
+            "iterative_threat_model": self.enable_iterative_threat_model,
+            "iterative_analysis_max_rounds": self.iterative_analysis_max_rounds,
         }
     
     def get_enabled_features(self) -> list[str]:
@@ -292,6 +355,19 @@ class FeatureFlags:
         # PRD generator
         if self.enable_prd_generator:
             enabled.append("prd_generator")
+        # Iterative analysis features
+        if self.enable_iterative_security_analysis:
+            enabled.append("iterative_security_analysis")
+        if self.enable_iterative_privacy_analysis:
+            enabled.append("iterative_privacy_analysis")
+        if self.enable_iterative_compliance_analysis:
+            enabled.append("iterative_compliance_analysis")
+        if self.enable_iterative_engineering_analysis:
+            enabled.append("iterative_engineering_analysis")
+        if self.enable_iterative_architecture_analysis:
+            enabled.append("iterative_architecture_analysis")
+        if self.enable_iterative_threat_model:
+            enabled.append("iterative_threat_model")
         return enabled
 
 

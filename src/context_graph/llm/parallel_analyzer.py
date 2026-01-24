@@ -2,17 +2,32 @@
 Parallel LLM Analyzer - Run analysis on multiple providers concurrently.
 
 Combines insights from OpenAI and Anthropic for more comprehensive analysis.
+Supports iterative multi-round analysis for comprehensive coverage.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
 from context_graph.llm.provider import LLMProvider, LLMResponse, AnalysisType
 from context_graph.llm.openai_provider import OpenAIProvider
 from context_graph.llm.anthropic_provider import AnthropicProvider
+from context_graph.llm.iterative_analyzer import (
+    IterativeAnalyzer,
+    IterativeAnalysisResult,
+    LLMCallResult,
+)
+from context_graph.llm.analysis_categories import (
+    AnalysisTypeCategories,
+    get_analysis_config,
+)
+from context_graph.config.features import get_features
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -691,4 +706,343 @@ class ParallelLLMAnalyzer:
         category = finding.get("category", "").lower()
         severity = finding.get("severity", "").lower()
         return f"{severity}:{category}:{title}"
+    
+    # ==================== Iterative Analysis Methods ====================
+    
+    async def security_review_iterative(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+    ) -> ParallelAnalysisResult:
+        """
+        Perform iterative security review using multiple rounds for comprehensive coverage.
+        
+        Uses the iterative analysis framework to ensure all security categories
+        (STRIDE, OWASP Top 10) are covered across multiple rounds.
+        """
+        features = get_features()
+        
+        if not features.enable_iterative_security_analysis:
+            # Fall back to single-pass analysis
+            return await self.security_review(intent, state, delta)
+        
+        return await self._run_iterative_review(
+            analysis_type=AnalysisTypeCategories.SECURITY,
+            intent=intent,
+            state=state,
+            delta=delta,
+            review_method=self._single_security_review,
+        )
+    
+    async def privacy_review_iterative(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+    ) -> ParallelAnalysisResult:
+        """
+        Perform iterative privacy review using multiple rounds for comprehensive LINDDUN coverage.
+        """
+        features = get_features()
+        
+        if not features.enable_iterative_privacy_analysis:
+            return await self.privacy_review(intent, state, delta)
+        
+        return await self._run_iterative_review(
+            analysis_type=AnalysisTypeCategories.PRIVACY,
+            intent=intent,
+            state=state,
+            delta=delta,
+            review_method=self._single_privacy_review,
+        )
+    
+    async def compliance_review_iterative(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+        frameworks: list[str] | None = None,
+    ) -> ParallelAnalysisResult:
+        """
+        Perform iterative compliance review using multiple rounds for comprehensive framework coverage.
+        """
+        features = get_features()
+        
+        if not features.enable_iterative_compliance_analysis:
+            return await self.compliance_review(intent, state, delta, frameworks)
+        
+        async def review_method(context: str, metadata: dict[str, Any]) -> LLMCallResult:
+            return await self._single_compliance_review(context, metadata, frameworks)
+        
+        return await self._run_iterative_review(
+            analysis_type=AnalysisTypeCategories.COMPLIANCE,
+            intent=intent,
+            state=state,
+            delta=delta,
+            review_method=review_method,
+        )
+    
+    async def engineering_review_iterative(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+        engineering_metrics: dict[str, Any] | None = None,
+    ) -> ParallelAnalysisResult:
+        """
+        Perform iterative engineering review using multiple rounds.
+        """
+        features = get_features()
+        
+        if not features.enable_iterative_engineering_analysis:
+            return await self.engineering_review(intent, state, delta, engineering_metrics)
+        
+        async def review_method(context: str, metadata: dict[str, Any]) -> LLMCallResult:
+            return await self._single_engineering_review(context, metadata, engineering_metrics)
+        
+        return await self._run_iterative_review(
+            analysis_type=AnalysisTypeCategories.ENGINEERING,
+            intent=intent,
+            state=state,
+            delta=delta,
+            review_method=review_method,
+        )
+    
+    async def architecture_review_iterative(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+    ) -> ParallelAnalysisResult:
+        """
+        Perform iterative architecture review using multiple rounds.
+        """
+        features = get_features()
+        
+        if not features.enable_iterative_architecture_analysis:
+            return await self.architecture_review(intent, state, delta)
+        
+        return await self._run_iterative_review(
+            analysis_type=AnalysisTypeCategories.ARCHITECTURE,
+            intent=intent,
+            state=state,
+            delta=delta,
+            review_method=self._single_architecture_review,
+        )
+    
+    async def _run_iterative_review(
+        self,
+        analysis_type: AnalysisTypeCategories,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+        review_method,
+    ) -> ParallelAnalysisResult:
+        """
+        Run iterative analysis across all providers and merge results.
+        """
+        features = get_features()
+        
+        # Build initial context
+        initial_context = self._build_review_context(intent, state, delta)
+        
+        # Get config with max rounds override
+        config = get_analysis_config(analysis_type)
+        if features.iterative_analysis_max_rounds != config.max_rounds:
+            # Create a modified config
+            from dataclasses import replace
+            config = replace(config, max_rounds=features.iterative_analysis_max_rounds)
+        
+        # Run iterative analysis for each provider
+        async def run_for_provider(provider: LLMProvider):
+            async def llm_call_fn(context: str, metadata: dict[str, Any]) -> LLMCallResult:
+                # Call the review method for this provider
+                response = await review_method(context, metadata)
+                return response
+            
+            analyzer = IterativeAnalyzer(
+                analysis_type=analysis_type,
+                llm_call_fn=lambda ctx, meta: self._provider_call_wrapper(
+                    provider, ctx, meta, analysis_type
+                ),
+                config_override=config,
+                verbose=True,
+            )
+            return await analyzer.analyze(initial_context)
+        
+        # Run for all providers in parallel
+        tasks = [run_for_provider(provider) for provider in self.providers]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Merge iterative results
+        return self._merge_iterative_results(results, analysis_type)
+    
+    async def _provider_call_wrapper(
+        self,
+        provider: LLMProvider,
+        context: str,
+        metadata: dict[str, Any],
+        analysis_type: AnalysisTypeCategories,
+    ) -> LLMCallResult:
+        """Wrapper to call a provider and convert response to LLMCallResult."""
+        from context_graph.llm.provider import AnalysisRequest, AnalysisType
+        
+        # Map analysis type categories to provider analysis types
+        type_mapping = {
+            AnalysisTypeCategories.SECURITY: AnalysisType.SECURITY_REVIEW,
+            AnalysisTypeCategories.PRIVACY: AnalysisType.PRIVACY_REVIEW,
+            AnalysisTypeCategories.COMPLIANCE: AnalysisType.COMPLIANCE_REVIEW,
+            AnalysisTypeCategories.ENGINEERING: AnalysisType.ENGINEERING_REVIEW,
+            AnalysisTypeCategories.ARCHITECTURE: AnalysisType.ARCHITECTURE_REVIEW,
+            AnalysisTypeCategories.THREAT_MODEL: AnalysisType.THREAT_MODELING,
+        }
+        
+        request = AnalysisRequest(
+            analysis_type=type_mapping.get(analysis_type, AnalysisType.SECURITY_REVIEW),
+            content=context,
+            context=metadata,
+        )
+        
+        try:
+            response = await provider.analyze(request)
+            return LLMCallResult(
+                structured_data=response.structured_data,
+                was_truncated=response.was_truncated,
+                stop_reason=response.stop_reason,
+                latency_ms=response.latency_ms,
+                tokens_used=response.tokens_used,
+            )
+        except Exception as e:
+            logger.error(f"Provider {provider.provider_name} failed: {e}")
+            return LLMCallResult(
+                structured_data={},
+                was_truncated=False,
+                stop_reason=f"error: {str(e)}",
+            )
+    
+    def _build_review_context(
+        self,
+        intent: dict[str, Any],
+        state: dict[str, Any],
+        delta: dict[str, Any],
+    ) -> str:
+        """Build context string for review."""
+        import json
+        return f"""## PRD Intent
+{json.dumps(intent, indent=2)}
+
+## Current Codebase State
+{json.dumps(state, indent=2)}
+
+## Delta (Changes)
+{json.dumps(delta, indent=2)}"""
+    
+    def _merge_iterative_results(
+        self,
+        results: list[IterativeAnalysisResult | Exception],
+        analysis_type: AnalysisTypeCategories,
+    ) -> ParallelAnalysisResult:
+        """Merge iterative results from multiple providers."""
+        parallel_result = ParallelAnalysisResult()
+        
+        # Collect all findings
+        finding_signatures: dict[str, dict[str, Any]] = {}
+        
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"Provider {i} failed: {result}")
+                continue
+            
+            if not isinstance(result, IterativeAnalysisResult):
+                continue
+            
+            parallel_result.total_tokens += result.total_tokens
+            parallel_result.total_latency_ms = max(
+                parallel_result.total_latency_ms, result.total_latency_ms
+            )
+            
+            # Merge findings
+            for finding in result.findings:
+                sig = self._finding_signature(finding)
+                
+                if sig in finding_signatures:
+                    existing = finding_signatures[sig]
+                    existing["providers"] = existing.get("providers", []) + [f"provider_{i}"]
+                    existing["confidence"] = min(
+                        existing.get("confidence", 0.5) + 0.2,
+                        1.0
+                    )
+                else:
+                    finding_signatures[sig] = {
+                        **finding,
+                        "providers": [f"provider_{i}"],
+                    }
+            
+            # Merge summary from first successful result
+            if not parallel_result.merged_findings and result.summary:
+                # Store summary in merged_findings temporarily
+                pass
+        
+        # Categorize findings
+        for sig, finding in finding_signatures.items():
+            if len(finding.get("providers", [])) > 1:
+                parallel_result.consensus_items.append(finding)
+            else:
+                parallel_result.divergent_items.append(finding)
+            parallel_result.merged_findings.append(finding)
+        
+        # Sort by severity
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+        parallel_result.merged_findings.sort(
+            key=lambda f: severity_order.get(f.get("severity", "info"), 5)
+        )
+        
+        return parallel_result
+    
+    # ==================== Single-call review methods for iteration ====================
+    
+    async def _single_security_review(
+        self,
+        context: str,
+        metadata: dict[str, Any],
+    ) -> LLMCallResult:
+        """Single security review call for one provider."""
+        # This will be called by the iterative analyzer
+        # The actual implementation depends on which provider is being used
+        pass
+    
+    async def _single_privacy_review(
+        self,
+        context: str,
+        metadata: dict[str, Any],
+    ) -> LLMCallResult:
+        """Single privacy review call for one provider."""
+        pass
+    
+    async def _single_compliance_review(
+        self,
+        context: str,
+        metadata: dict[str, Any],
+        frameworks: list[str] | None = None,
+    ) -> LLMCallResult:
+        """Single compliance review call for one provider."""
+        pass
+    
+    async def _single_engineering_review(
+        self,
+        context: str,
+        metadata: dict[str, Any],
+        engineering_metrics: dict[str, Any] | None = None,
+    ) -> LLMCallResult:
+        """Single engineering review call for one provider."""
+        pass
+    
+    async def _single_architecture_review(
+        self,
+        context: str,
+        metadata: dict[str, Any],
+    ) -> LLMCallResult:
+        """Single architecture review call for one provider."""
+        pass
 

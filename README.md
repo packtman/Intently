@@ -317,6 +317,7 @@ Intently/
 | [Desktop App](desktop/README.md) | Native Electron app setup & usage |
 | [Web Dashboard](frontend/README.md) | Browser-based dashboard setup |
 | [Storage Configuration](docs/STORAGE_CONFIGURATION.md) | Configure SQLite persistent storage |
+| [Iterative Analysis](docs/ITERATIVE_ANALYSIS.md) | Multi-round LLM analysis for comprehensive coverage |
 | [API Keys Setup](API_KEYS_SETUP.md) | Configure OpenAI & Anthropic keys |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues & solutions |
 
