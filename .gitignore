@@ -74,3 +74,5 @@ data/
 *.db-wal
 *.db-shm
 
+# Comparison/test output
+comparison-*.json
