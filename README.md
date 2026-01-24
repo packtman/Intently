@@ -316,6 +316,7 @@ Intently/
 | [Frontend Options](docs/FRONTEND_OPTIONS.md) | Compare Web Dashboard vs Desktop App |
 | [Desktop App](desktop/README.md) | Native Electron app setup & usage |
 | [Web Dashboard](frontend/README.md) | Browser-based dashboard setup |
+| [Storage Configuration](docs/STORAGE_CONFIGURATION.md) | Configure SQLite persistent storage |
 | [API Keys Setup](API_KEYS_SETUP.md) | Configure OpenAI & Anthropic keys |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues & solutions |
 

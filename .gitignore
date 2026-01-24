@@ -67,3 +67,10 @@ htmlcov/
 *.key
 secrets/
 
+# Database (SQLite storage)
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+

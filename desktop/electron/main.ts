@@ -14,8 +14,8 @@ let backendPort = 8000
 let isBackendStarting = false
 let lastBackendStatus = false
 
-// Check if we're in development
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
+// Check if we're in development (lazy evaluation to avoid accessing app before ready)
+const isDev = () => process.env.NODE_ENV === 'development' || !app.isPackaged
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -40,7 +40,7 @@ function createWindow() {
   })
 
   // Load the app
-  if (isDev) {
+  if (isDev()) {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
@@ -251,6 +251,12 @@ async function startBackend(): Promise<boolean> {
     
     console.log('Starting backend with:', pythonPath, scriptPath)
 
+    // Configure storage path for SQLite database
+    const storageDir = path.join(app.getPath('userData'), 'data')
+    if (!fs.existsSync(storageDir)) {
+      fs.mkdirSync(storageDir, { recursive: true })
+    }
+
     pythonProcess = spawn(pythonPath, [scriptPath, 'serve', '--host', '127.0.0.1', '--port', String(backendPort)], {
       cwd: contextGraphPath,
       env: { 
@@ -258,6 +264,9 @@ async function startBackend(): Promise<boolean> {
         // Pass Electron's userData path to Python for cloning repos
         // This ensures the Python process has write access (macOS sandboxing)
         CONTEXT_GRAPH_CACHE_DIR: path.join(app.getPath('userData'), 'repo-cache'),
+        // Enable persistent storage with SQLite
+        STORAGE_BACKEND: 'sqlite',
+        STORAGE_DB_PATH: path.join(storageDir, 'reviews.db'),
         // Enable PM Tool features (from UNIFIED_PM_TOOL_VISION.md)
         FEATURE_PRD_CHANGES: 'true',
         FEATURE_PRD_QUALITY_SCORING: 'true',

@@ -10,7 +10,7 @@ import asyncio
 import os
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
@@ -31,6 +31,7 @@ from context_graph.reports.json_report import JSONReportGenerator, DashboardData
 from context_graph.reports.markdown_report import MarkdownReportGenerator
 from context_graph.integrations.github import GitHubIntegration, ClonedRepo
 from context_graph.core.models import ReviewDimension, ComplianceFramework
+from context_graph.storage.config import get_review_storage
 
 
 def _normalize_github_url(path: str) -> str:
@@ -57,10 +58,6 @@ def _is_github_url(path: str) -> bool:
 
 router = APIRouter(tags=["security-review"])
 
-# In-memory store for reviews (use Redis/DB in production)
-reviews_store: dict[str, ReviewResult] = {}
-review_status: dict[str, dict[str, Any]] = {}
-
 
 # Request/Response Models
 
@@ -68,31 +65,32 @@ class PRDInput(BaseModel):
     """PRD content input."""
     content: str = Field(..., description="PRD content (markdown or plain text)")
     source_type: str = Field("markdown", description="Source type: markdown, notion, gdocs")
-    title: str | None = Field(None, description="Optional title override")
+    title: Optional[str] = Field(None, description="Optional title override")
 
 
 class CodebaseInput(BaseModel):
     """Codebase path input."""
     path: str = Field(..., description="Path to codebase directory or GitHub URL (e.g., owner/repo)")
-    languages: list[str] = Field(["python", "kotlin"], description="Languages to analyze")
-    branch: str | None = Field(None, description="GitHub branch to analyze")
-    pr: int | None = Field(None, description="GitHub PR number to analyze")
-    github_token: str | None = Field(None, description="GitHub token for private repos")
+    languages: List[str] = Field(["python", "kotlin"], description="Languages to analyze")
+    branch: Optional[str] = Field(None, description="GitHub branch to analyze")
+    pr: Optional[int] = Field(None, description="GitHub PR number to analyze")
+    github_token: Optional[str] = Field(None, description="GitHub token for private repos")
+    use_hybrid: bool = Field(True, description="Use hybrid analyzer (AST fast + LSP on-demand)")
 
 
 class ReviewConfigInput(BaseModel):
     """Review configuration options."""
     use_llm: bool = Field(True, description="Use LLM for analysis (requires API keys)")
-    dimensions: list[str] = Field(
+    dimensions: List[str] = Field(
         default=["security"], 
         description="Review dimensions: security, privacy, compliance, engineering, architecture"
     )
-    compliance_frameworks: list[str] = Field(
+    compliance_frameworks: List[str] = Field(
         default=["soc2", "hipaa", "pci_dss"],
         description="Compliance frameworks to check: soc2, hipaa, pci_dss, iso_27001, gdpr, ccpa"
     )
-    openai_api_key: str | None = Field(None, description="OpenAI API key (optional, uses env var if not provided)")
-    anthropic_api_key: str | None = Field(None, description="Anthropic API key (optional, uses env var if not provided)")
+    openai_api_key: Optional[str] = Field(None, description="OpenAI API key (optional, uses env var if not provided)")
+    anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key (optional, uses env var if not provided)")
 
 
 class ReviewRequest(BaseModel):
@@ -115,8 +113,8 @@ class ReviewStatusResponse(BaseModel):
     status: str
     progress: float
     message: str
-    dimensions: list[str] = Field(default_factory=list, description="Dimensions being analyzed")
-    result: dict[str, Any] | None = None
+    dimensions: List[str] = Field(default_factory=list, description="Dimensions being analyzed")
+    result: Optional[Dict[str, Any]] = None
 
 
 # Routes
@@ -132,13 +130,15 @@ async def create_review(
     Starts async analysis of PRD against codebase.
     """
     review_id = str(uuid4())
+    storage = get_review_storage()
     
     # Initialize status
-    review_status[review_id] = {
-        "status": "pending",
-        "progress": 0.0,
-        "message": "Review queued",
-    }
+    await storage.update_review_status(
+        review_id=review_id,
+        status="pending",
+        progress=0.0,
+        message="Review queued",
+    )
     
     # Run review in background
     background_tasks.add_task(
@@ -155,17 +155,21 @@ async def create_review(
 
 
 @router.get("/reviews/{review_id}/status", response_model=ReviewStatusResponse)
-async def get_review_status(review_id: str) -> ReviewStatusResponse:
+async def get_review_status_endpoint(review_id: str) -> ReviewStatusResponse:
     """Get the status of a review."""
-    if review_id not in review_status:
+    storage = get_review_storage()
+    status = await storage.get_review_status(review_id)
+    
+    if not status:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    status = review_status[review_id]
     result = None
     
-    if status["status"] == "completed" and review_id in reviews_store:
-        generator = JSONReportGenerator()
-        result = generator.generate(reviews_store[review_id])
+    if status["status"] == "completed":
+        review = await storage.get_review(review_id)
+        if review:
+            generator = JSONReportGenerator()
+            result = generator.generate(review)
     
     return ReviewStatusResponse(
         review_id=review_id,
@@ -178,38 +182,47 @@ async def get_review_status(review_id: str) -> ReviewStatusResponse:
 
 
 @router.get("/reviews/{review_id}")
-async def get_review(review_id: str) -> dict[str, Any]:
+async def get_review(review_id: str) -> Dict[str, Any]:
     """Get the complete review result."""
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    review = await storage.get_review(review_id)
+    
+    if not review:
         raise HTTPException(status_code=404, detail="Review not found")
     
     generator = JSONReportGenerator()
-    return generator.generate(reviews_store[review_id])
+    return generator.generate(review)
 
 
 @router.get("/reviews/{review_id}/dashboard")
-async def get_review_dashboard(review_id: str) -> dict[str, Any]:
+async def get_review_dashboard(review_id: str) -> Dict[str, Any]:
     """Get dashboard-formatted review data."""
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    review = await storage.get_review(review_id)
+    
+    if not review:
         raise HTTPException(status_code=404, detail="Review not found")
     
     generator = DashboardDataGenerator()
-    return generator.generate(reviews_store[review_id])
+    return generator.generate(review)
 
 
 @router.get("/reviews/{review_id}/markdown")
-async def get_review_markdown(review_id: str) -> dict[str, str]:
+async def get_review_markdown(review_id: str) -> Dict[str, str]:
     """Get markdown report."""
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    review = await storage.get_review(review_id)
+    
+    if not review:
         raise HTTPException(status_code=404, detail="Review not found")
     
     generator = MarkdownReportGenerator()
-    markdown = generator.generate(reviews_store[review_id])
+    markdown = generator.generate(review)
     return {"markdown": markdown}
 
 
 @router.post("/parse-prd")
-async def parse_prd(prd: PRDInput) -> dict[str, Any]:
+async def parse_prd(prd: PRDInput) -> Dict[str, Any]:
     """Parse a PRD and extract intent (without full review)."""
     parser = _get_parser(prd.source_type)
     intent = parser.parse(prd.content, prd.title or "API Upload")
@@ -234,7 +247,7 @@ async def parse_prd(prd: PRDInput) -> dict[str, Any]:
 
 
 @router.post("/analyze-codebase")
-async def analyze_codebase(codebase: CodebaseInput) -> dict[str, Any]:
+async def analyze_codebase(codebase: CodebaseInput) -> Dict[str, Any]:
     """Analyze a codebase and extract state (without full review)."""
     cloned_repo = None
     codebase_path = _normalize_github_url(codebase.path)
@@ -255,8 +268,18 @@ async def analyze_codebase(codebase: CodebaseInput) -> dict[str, Any]:
             if not path.exists():
                 raise HTTPException(status_code=400, detail=f"Path not found: {codebase_path}")
         
-        analyzer = _get_analyzer(codebase.languages)
-        state = analyzer.analyze_codebase(path)
+        # Use hybrid analyzer if requested (AST fast + LSP on-demand)
+        if codebase.use_hybrid:
+            print("🚀 Using HYBRID analyzer (AST fast + LSP on-demand)", flush=True)
+            state = _get_hybrid_state(path, codebase.languages)
+            if hasattr(state, '_hybrid_analysis'):
+                meta = state._hybrid_analysis
+                print(f"   AST analysis: {meta['ast_time_ms']:.0f}ms, {meta['files_analyzed']} files", flush=True)
+                print(f"   Pending LSP queries: {meta['pending_lsp_queries']}", flush=True)
+        else:
+            print("📊 Using TRADITIONAL analyzer (regex + Python AST)", flush=True)
+            analyzer = _get_analyzer(codebase.languages)
+            state = analyzer.analyze_codebase(path)
         
         return {
             "path": state.codebase_path,
@@ -273,23 +296,10 @@ async def analyze_codebase(codebase: CodebaseInput) -> dict[str, Any]:
 
 
 @router.get("/reviews")
-async def list_reviews() -> list[dict[str, Any]]:
+async def list_reviews() -> List[Dict[str, Any]]:
     """List all reviews."""
-    return [
-        {
-            "review_id": review_id,
-            "title": result.intent.title,
-            "status": review_status.get(review_id, {}).get("status", "unknown"),
-            "risk_rating": result.risk_rating,
-            "findings_count": len(result.all_findings),
-            "dimensions": [d.value for d in result.dimensions_analyzed],
-            "security_findings": len(result.security_findings),
-            "privacy_findings": len(result.privacy_findings),
-            "compliance_findings": len(result.compliance_findings),
-            "reviewed_at": result.reviewed_at.isoformat(),
-        }
-        for review_id, result in reviews_store.items()
-    ]
+    storage = get_review_storage()
+    return await storage.list_reviews()
 
 
 # Background task
@@ -298,6 +308,7 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
     """Run the multi-dimension security review in background."""
     import logging
     cloned_repo: ClonedRepo | None = None
+    storage = get_review_storage()
     
     try:
         # Parse dimensions from config
@@ -307,29 +318,37 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
         dimension_names = [d.value for d in requested_dimensions]
         logging.info(f"Parsed dimensions: {dimension_names}")
         
-        review_status[review_id] = {
-            "status": "running",
-            "progress": 0.1,
-            "message": "Parsing PRD...",
-            "dimensions": dimension_names,
-        }
+        await storage.update_review_status(
+            review_id=review_id,
+            status="running",
+            progress=0.1,
+            message="Parsing PRD...",
+            dimensions=dimension_names,
+        )
         
         # Parse PRD
         parser = _get_parser(request.prd.source_type)
         intent = parser.parse(request.prd.content, request.prd.title or "API Upload")
         
-        review_status[review_id] = {
-            "status": "running",
-            "progress": 0.3,
-            "message": "Analyzing codebase...",
-            "dimensions": dimension_names,
-        }
+        await storage.update_review_status(
+            review_id=review_id,
+            status="running",
+            progress=0.3,
+            message="Analyzing codebase...",
+            dimensions=dimension_names,
+        )
         
         # Resolve codebase path (local or GitHub)
         codebase_path = _normalize_github_url(request.codebase.path)
         
         if _is_github_url(codebase_path):
-            review_status[review_id]["message"] = "Cloning from GitHub..."
+            await storage.update_review_status(
+                review_id=review_id,
+                status="running",
+                progress=0.35,
+                message="Cloning from GitHub...",
+                dimensions=dimension_names,
+            )
             github = GitHubIntegration(
                 token=request.codebase.github_token or os.getenv("GITHUB_TOKEN")
             )
@@ -344,17 +363,34 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
             if not path.exists():
                 raise ValueError(f"Codebase path not found: {path}")
         
-        review_status[review_id]["message"] = "Analyzing codebase..."
+        await storage.update_review_status(
+            review_id=review_id,
+            status="running",
+            progress=0.4,
+            message="Analyzing codebase...",
+            dimensions=dimension_names,
+        )
         
-        analyzer = _get_analyzer(request.codebase.languages)
-        state = analyzer.analyze_codebase(path)
+        # Use hybrid analyzer if requested (AST fast + LSP on-demand)
+        if request.codebase.use_hybrid:
+            print(f"🚀 [Review {review_id}] Using HYBRID analyzer (AST fast + LSP on-demand)", flush=True)
+            state = _get_hybrid_state(path, request.codebase.languages)
+            if hasattr(state, '_hybrid_analysis'):
+                meta = state._hybrid_analysis
+                print(f"   AST analysis: {meta['ast_time_ms']:.0f}ms, {meta['files_analyzed']} files", flush=True)
+                print(f"   Pending LSP queries: {meta['pending_lsp_queries']}", flush=True)
+        else:
+            print(f"📊 [Review {review_id}] Using TRADITIONAL analyzer (regex + Python AST)", flush=True)
+            analyzer = _get_analyzer(request.codebase.languages)
+            state = analyzer.analyze_codebase(path)
         
-        review_status[review_id] = {
-            "status": "running",
-            "progress": 0.6,
-            "message": f"Running {', '.join(dimension_names)} analysis...",
-            "dimensions": dimension_names,
-        }
+        await storage.update_review_status(
+            review_id=review_id,
+            status="running",
+            progress=0.6,
+            message=f"Running {', '.join(dimension_names)} analysis...",
+            dimensions=dimension_names,
+        )
         
         # Configure review engine with multi-dimension support
         openai_key = request.config.openai_api_key or os.getenv("OPENAI_API_KEY")
@@ -384,18 +420,31 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
         
         # Log status for debugging
         if use_llm_requested and not has_api_keys:
-            review_status[review_id]["message"] = "Warning: LLM requested but no API keys found. Using pattern-based analysis only."
+            await storage.update_review_status(
+                review_id=review_id,
+                status="running",
+                progress=0.65,
+                message="Warning: LLM requested but no API keys found. Using pattern-based analysis only.",
+                dimensions=dimension_names,
+            )
         elif llm_enabled:
-            review_status[review_id]["message"] = f"Running AI-powered {', '.join(dimension_names)} analysis..."
+            await storage.update_review_status(
+                review_id=review_id,
+                status="running",
+                progress=0.65,
+                message=f"Running AI-powered {', '.join(dimension_names)} analysis...",
+                dimensions=dimension_names,
+            )
         
         engine = SecurityReviewEngine(config)
         
-        review_status[review_id] = {
-            "status": "running",
-            "progress": 0.8,
-            "message": "Generating findings across all dimensions...",
-            "dimensions": dimension_names,
-        }
+        await storage.update_review_status(
+            review_id=review_id,
+            status="running",
+            progress=0.8,
+            message="Generating findings across all dimensions...",
+            dimensions=dimension_names,
+        )
         
         # Run review
         result = await engine.review(intent, state)
@@ -404,8 +453,8 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
         result.config = config  # Preserve original config for re-analysis
         result.original_prd_content = intent.raw_content  # Preserve original PRD
         
-        # Store result
-        reviews_store[review_id] = result
+        # Store result in persistent storage
+        await storage.save_review(review_id, result)
         
         # Build completion message with dimension breakdown
         import logging
@@ -429,20 +478,22 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
             breakdowns.append(f"{len(result.architecture_findings)} architecture")
         findings_summary = f"{len(result.all_findings)} findings ({', '.join(breakdowns)})"
         
-        review_status[review_id] = {
-            "status": "completed",
-            "progress": 1.0,
-            "message": f"Review completed with {findings_summary}",
-            "dimensions": dimension_names,
-        }
+        await storage.update_review_status(
+            review_id=review_id,
+            status="completed",
+            progress=1.0,
+            message=f"Review completed with {findings_summary}",
+            dimensions=dimension_names,
+        )
         
     except Exception as e:
-        review_status[review_id] = {
-            "status": "failed",
-            "progress": 0.0,
-            "message": f"Review failed: {str(e)}",
-            "dimensions": [],
-        }
+        await storage.update_review_status(
+            review_id=review_id,
+            status="failed",
+            progress=0.0,
+            message=f"Review failed: {str(e)}",
+            dimensions=[],
+        )
     
     finally:
         # Cleanup cloned repo if any
@@ -463,8 +514,13 @@ def _get_parser(source_type: str):
     return parser_class()
 
 
-def _get_analyzer(languages: list[str]) -> MultiLanguageAnalyzer:
-    """Get multi-language analyzer."""
+def _get_analyzer(languages: list[str], use_hybrid: bool = False) -> MultiLanguageAnalyzer:
+    """Get multi-language analyzer.
+    
+    Args:
+        languages: List of languages to analyze
+        use_hybrid: If True, uses HybridAnalyzer (AST fast + LSP on-demand)
+    """
     analyzer = MultiLanguageAnalyzer()
     
     # Auto-detect all languages
@@ -481,7 +537,77 @@ def _get_analyzer(languages: list[str]) -> MultiLanguageAnalyzer:
     if use_all or "json" in languages:
         analyzer.add_analyzer(JSONAnalyzer())
     
+    # Set hybrid mode flag (used by enhanced analysis)
+    analyzer._use_hybrid = use_hybrid
+    
     return analyzer
+
+
+def _get_hybrid_state(path: Path, languages: list[str]) -> State:
+    """Get state using HybridAnalyzer (AST fast + LSP on-demand).
+    
+    This gives you:
+    - Fast AST analysis (80%) - classes, functions, imports
+    - LSP on-demand (20%) - cross-file refs, types, diagnostics
+    """
+    from context_graph.code_graph import HybridAnalyzer
+    from context_graph.core.models import State, Entity, EntityType
+    
+    analyzer = HybridAnalyzer(path)
+    result = analyzer.analyze_fast(languages=languages)
+    
+    # Convert HybridResult to State
+    state = State(codebase_path=str(path))
+    
+    for rel_path, ast_result in result.ast_results.items():
+        file_path = path / rel_path
+        
+        # Add classes as entities
+        for cls in ast_result.classes:
+            entity = Entity(
+                name=cls["name"],
+                entity_type=EntityType.DATA if "model" in cls["name"].lower() else EntityType.CLASS,
+                source=str(file_path),
+            )
+            state.entities.append(entity)
+            
+            # Check if it looks like a data model
+            if any(base in ["BaseModel", "Model", "Entity"] for base in cls.get("bases", [])):
+                state.data_models.append({
+                    "name": cls["name"],
+                    "file": str(file_path),
+                    "line": cls.get("line", 0),
+                })
+        
+        # Add functions as entities
+        for func in ast_result.functions:
+            entity = Entity(
+                name=func["name"],
+                entity_type=EntityType.FUNCTION,
+                source=str(file_path),
+            )
+            state.entities.append(entity)
+            
+            # Check for endpoint decorators
+            decorators = func.get("decorators", [])
+            if any(d in ["get", "post", "put", "delete", "patch", "route", "Get", "Post", "Put", "Delete"] for d in decorators):
+                state.api_endpoints.append({
+                    "path": func["name"],
+                    "method": next((d.upper() for d in decorators if d.lower() in ["get", "post", "put", "delete", "patch"]), "GET"),
+                    "file": str(file_path),
+                    "line": func.get("line", 0),
+                })
+        
+        state.files_analyzed += 1
+    
+    # Store hybrid metadata for tracing
+    state._hybrid_analysis = {
+        "ast_time_ms": result.ast_time_ms,
+        "files_analyzed": result.files_analyzed,
+        "pending_lsp_queries": len(result.pending_queries),
+    }
+    
+    return state
 
 
 def _parse_dimensions(dimension_strings: list[str]) -> list[ReviewDimension]:

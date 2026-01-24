@@ -16,23 +16,13 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from context_graph.config.features import get_features, requires_feature
-from context_graph.storage.memory import InMemoryCollaborationStorage
+from context_graph.storage.base import CollaborationStorage
+from context_graph.storage.config import get_collaboration_storage
 
 
 # ==================== Router Setup ====================
 
 router = APIRouter(prefix="/collaboration", tags=["collaboration"])
-
-# Singleton storage instance (will be replaced with DI in production)
-_collaboration_storage: InMemoryCollaborationStorage | None = None
-
-
-def get_collaboration_storage() -> InMemoryCollaborationStorage:
-    """Get or create the collaboration storage instance."""
-    global _collaboration_storage
-    if _collaboration_storage is None:
-        _collaboration_storage = InMemoryCollaborationStorage()
-    return _collaboration_storage
 
 
 # ==================== Request/Response Models ====================
@@ -176,7 +166,7 @@ async def validate_finding(
     review_id: str,
     finding_id: str,
     request: ValidateFindingRequest,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> ValidateFindingResponse:
     """
     Validate a finding with a status and optional notes.
@@ -228,7 +218,7 @@ async def validate_finding(
 async def get_finding_validation(
     review_id: str,
     finding_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> dict[str, Any]:
     """
     Get the current validation status for a finding.
@@ -255,7 +245,7 @@ async def get_finding_validation(
 @requires_feature("finding_validation")
 async def get_review_validations(
     review_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> dict[str, Any]:
     """
     Get all validations for a review.
@@ -301,7 +291,7 @@ async def add_comment(
     review_id: str,
     finding_id: str,
     request: AddCommentRequest,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> CommentResponse:
     """
     Add a comment to a finding.
@@ -338,7 +328,7 @@ async def add_comment(
 async def get_comments(
     review_id: str,
     finding_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> list[dict[str, Any]]:
     """
     Get all comments for a finding.
@@ -355,7 +345,7 @@ async def get_comments(
 @requires_feature("comments")
 async def get_comment_counts(
     review_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> dict[str, int]:
     """
     Get comment counts for all findings in a review.
@@ -371,7 +361,7 @@ async def get_comment_counts(
 @requires_feature("comments")
 async def delete_comment(
     comment_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> dict[str, Any]:
     """
     Soft-delete a comment.
@@ -398,7 +388,7 @@ async def assign_finding(
     review_id: str,
     finding_id: str,
     request: AssignFindingRequest,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> AssignmentResponse:
     """
     Assign a finding to a team or user.
@@ -428,7 +418,7 @@ async def assign_finding(
 @requires_feature("team_assignment")
 async def get_review_assignments(
     review_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> dict[str, Any]:
     """
     Get all assignments for a review.
@@ -456,7 +446,7 @@ async def get_review_assignments(
 @requires_feature("team_assignment")
 async def get_team_queue(
     team: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> list[dict[str, Any]]:
     """
     Get all findings assigned to a team across all reviews.
@@ -478,7 +468,7 @@ async def submit_expert_feedback(
     review_id: str,
     finding_id: str,
     request: ExpertFeedbackRequest,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> FeedbackResponse:
     """
     Submit expert feedback on a finding.
@@ -528,7 +518,7 @@ async def submit_expert_feedback(
 async def get_finding_feedback(
     review_id: str,
     finding_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> list[dict[str, Any]]:
     """
     Get all expert feedback for a finding.
@@ -541,7 +531,7 @@ async def get_finding_feedback(
 @router.get("/feedback/stats")
 @requires_feature("pattern_learning")
 async def get_feedback_stats(
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> dict[str, Any]:
     """
     Get aggregated feedback statistics for pattern learning.
@@ -581,7 +571,7 @@ class LifecycleResponse(BaseModel):
 async def update_review_lifecycle(
     review_id: str,
     request: UpdateLifecycleRequest,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> LifecycleResponse:
     """
     Update the lifecycle state of a review.
@@ -623,7 +613,7 @@ async def update_review_lifecycle(
 @requires_feature("review_lifecycle")
 async def get_review_lifecycle(
     review_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> dict[str, Any]:
     """
     Get the current lifecycle state of a review.
@@ -649,7 +639,7 @@ async def get_review_lifecycle(
 @requires_feature("review_lifecycle")
 async def get_lifecycle_history(
     review_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> list[dict[str, Any]]:
     """
     Get lifecycle state history for a review.
@@ -697,7 +687,7 @@ class ReviewRequestResponse(BaseModel):
 async def create_review_request(
     review_id: str,
     request: CreateReviewRequestRequest,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> ReviewRequestResponse:
     """
     Create a cross-team review request.
@@ -723,7 +713,7 @@ async def create_review_request(
 @requires_feature("cross_team_requests")
 async def get_review_requests_for_review(
     review_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> list[ReviewRequestResponse]:
     """
     Get all cross-team requests for a review.
@@ -738,7 +728,7 @@ async def get_review_requests_for_review(
 @requires_feature("cross_team_requests")
 async def get_team_requests(
     team: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> list[ReviewRequestResponse]:
     """
     Get all cross-team requests targeting a specific team.
@@ -760,7 +750,7 @@ class RespondToRequestRequest(BaseModel):
 async def respond_to_request(
     request_id: str,
     request: RespondToRequestRequest,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> ReviewRequestResponse:
     """
     Respond to a cross-team review request.
@@ -810,7 +800,7 @@ async def add_consensus_vote(
     review_id: str,
     finding_id: str,
     request: AddConsensusVoteRequest,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> ConsensusVoteResponse:
     """
     Add a consensus vote for a finding.
@@ -843,7 +833,7 @@ async def add_consensus_vote(
 async def get_consensus_status(
     review_id: str,
     finding_id: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> dict[str, Any]:
     """
     Get consensus voting status for a finding.
@@ -883,7 +873,7 @@ class PatternResponse(BaseModel):
 @requires_feature("pattern_learning")
 async def save_pattern(
     request: SavePatternRequest,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> PatternResponse:
     """
     Save a learned pattern from expert feedback.
@@ -910,7 +900,7 @@ async def save_pattern(
 async def get_similar_patterns(
     pattern_type: str,
     pattern_signature: str,
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> list[dict[str, Any]]:
     """
     Find similar patterns for a given finding.
@@ -926,7 +916,7 @@ async def get_similar_patterns(
 @router.get("/patterns/insights")
 @requires_feature("pattern_learning")
 async def get_pattern_insights(
-    storage: InMemoryCollaborationStorage = Depends(get_collaboration_storage),
+    storage: CollaborationStorage = Depends(get_collaboration_storage),
 ) -> dict[str, Any]:
     """
     Get aggregated pattern learning insights.

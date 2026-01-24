@@ -56,6 +56,11 @@ source .venv/bin/activate
 PYTHON_VERSION=$(python --version 2>&1)
 echo "  Using: $PYTHON_VERSION"
 
+# Persistent Storage (SQLite)
+export STORAGE_BACKEND=sqlite
+export STORAGE_DB_PATH="$CONTEXT_GRAPH_DIR/data/reviews.db"
+mkdir -p "$CONTEXT_GRAPH_DIR/data"
+
 # PM Tool features only (from UNIFIED_PM_TOOL_VISION.md)
 export FEATURE_PRD_CHANGES=true
 export FEATURE_PRD_QUALITY_SCORING=true
@@ -76,6 +81,8 @@ export FEATURE_BULK_PRD_SMART_CODEBASE_DEFAULT=true
 export FEATURE_PRD_GENERATOR=true
 export PRD_GENERATOR_MAX_FILES=5000
 
+echo "  Storage: SQLite ($STORAGE_DB_PATH)"
+echo ""
 echo "  Feature flags enabled:"
 echo "    - PRD Changes"
 echo "    - PRD Quality Scoring"

@@ -21,7 +21,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from context_graph.config.features import get_features, requires_feature
-from context_graph.api.routes import reviews_store, review_status
+from context_graph.storage.config import get_review_storage
 
 
 router = APIRouter(tags=["pm-tool"])
@@ -155,10 +155,10 @@ async def get_prd_changes(review_id: str) -> PRDChangesResponse:
             detail="PRD changes feature is not enabled. Set FEATURE_PRD_CHANGES=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
-    
-    result = reviews_store[review_id]
     
     # Get predicted questions with changes
     predicted_questions = result.predicted_questions if hasattr(result, 'predicted_questions') else []
@@ -238,10 +238,11 @@ async def accept_prd_change(
             detail="PRD changes feature is not enabled. Set FEATURE_PRD_CHANGES=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    result = reviews_store[review_id]
     predicted_questions = result.predicted_questions if hasattr(result, 'predicted_questions') else []
     
     # Find the change and its parent question
@@ -302,10 +303,11 @@ async def reject_prd_change(
             detail="PRD changes feature is not enabled. Set FEATURE_PRD_CHANGES=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    result = reviews_store[review_id]
     predicted_questions = result.predicted_questions if hasattr(result, 'predicted_questions') else []
     
     # Find and reject the change (and update question status)
@@ -335,10 +337,11 @@ async def bulk_accept_changes(
             detail="PRD changes feature is not enabled. Set FEATURE_PRD_CHANGES=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    result = reviews_store[review_id]
     predicted_questions = result.predicted_questions if hasattr(result, 'predicted_questions') else []
     
     # Filter changes based on request - track both question and change
@@ -421,10 +424,10 @@ async def get_prd_quality(review_id: str) -> dict[str, Any]:
             detail="PRD quality scoring feature is not enabled. Set FEATURE_PRD_QUALITY_SCORING=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
-    
-    result = reviews_store[review_id]
     
     if not hasattr(result, 'prd_quality_score') or result.prd_quality_score is None:
         raise HTTPException(status_code=404, detail="Quality score not available for this review")
@@ -456,10 +459,10 @@ async def get_effort_estimate(review_id: str) -> dict[str, Any]:
             detail="Effort estimation feature is not enabled. Set FEATURE_EFFORT_ESTIMATION=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
-    
-    result = reviews_store[review_id]
     
     if not hasattr(result, 'effort_estimation') or result.effort_estimation is None:
         raise HTTPException(status_code=404, detail="Effort estimation not available for this review")
@@ -567,7 +570,9 @@ async def undo_last_change(review_id: str) -> dict[str, Any]:
             detail="PRD changes feature is not enabled. Set FEATURE_PRD_CHANGES=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
     
     if review_id not in prd_history_store or len(prd_history_store[review_id]) < 2:
@@ -581,8 +586,7 @@ async def undo_last_change(review_id: str) -> dict[str, Any]:
     if review_id in applied_changes_store and applied_changes_store[review_id]:
         last_change_id = applied_changes_store[review_id].pop()
         
-        # Mark change and question as open again
-        result = reviews_store[review_id]
+        # Mark change and question as open again (result already loaded above)
         predicted_questions = result.predicted_questions if hasattr(result, 'predicted_questions') else []
         for question in predicted_questions:
             if question.suggested_change and str(question.suggested_change.id) == last_change_id:
@@ -611,10 +615,10 @@ async def download_updated_prd(review_id: str) -> dict[str, Any]:
             detail="PRD changes feature is not enabled. Set FEATURE_PRD_CHANGES=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
-    
-    result = reviews_store[review_id]
     
     # Get current PRD (either from history or original)
     if review_id in prd_history_store and prd_history_store[review_id]:
@@ -652,10 +656,11 @@ async def get_side_by_side_diff(review_id: str, change_id: str) -> SideBySideDif
             detail="Side-by-side diff feature is not enabled. Set FEATURE_SIDE_BY_SIDE_DIFF=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    result = reviews_store[review_id]
     predicted_questions = result.predicted_questions if hasattr(result, 'predicted_questions') else []
     
     # Find the change
@@ -734,7 +739,9 @@ async def set_prd_file_path(review_id: str, request: SetPRDFilePathRequest) -> d
             detail="PRD save-to-file feature is not enabled. Set FEATURE_PRD_SAVE_TO_FILE=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
     
     import os
@@ -769,7 +776,9 @@ async def get_prd_file_info(review_id: str) -> dict[str, Any]:
             detail="PRD save-to-file feature is not enabled. Set FEATURE_PRD_SAVE_TO_FILE=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
     
     if review_id not in prd_file_info_store:
@@ -808,7 +817,9 @@ async def save_prd_to_file(review_id: str) -> SavePRDToFileResponse:
             detail="PRD save-to-file feature is not enabled. Set FEATURE_PRD_SAVE_TO_FILE=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
     
     if review_id not in prd_file_info_store:
@@ -823,8 +834,7 @@ async def save_prd_to_file(review_id: str) -> SavePRDToFileResponse:
     if not file_path:
         raise HTTPException(status_code=400, detail="File path is empty")
     
-    # Get current PRD content
-    result = reviews_store[review_id]
+    # Get current PRD content (result already loaded above)
     if review_id in prd_history_store and prd_history_store[review_id]:
         current_prd = prd_history_store[review_id][-1]
     else:
@@ -887,10 +897,11 @@ async def re_analyze_prd(review_id: str) -> dict[str, Any]:
             detail="PRD changes feature is not enabled. Set FEATURE_PRD_CHANGES=true to enable."
         )
     
-    if review_id not in reviews_store:
+    storage = get_review_storage()
+    result = await storage.get_review(review_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    result = reviews_store[review_id]
     original_findings_count = len(result.all_findings)
     
     # Get current PRD (with accepted changes)
