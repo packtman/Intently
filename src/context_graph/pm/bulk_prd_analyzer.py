@@ -490,10 +490,15 @@ class BulkPRDAnalyzer:
             # Configure review engine
             from context_graph.security.review_engine import SecurityReviewEngine, ReviewConfig
             
+            # Determine if LLM analysis is available
+            llm_enabled = request.use_llm and bool(self.openai_api_key or self.anthropic_api_key)
+            
             config = ReviewConfig(
                 dimensions=prd.dimensions,
-                use_llm=request.use_llm and bool(self.openai_api_key or self.anthropic_api_key),
-                use_pattern_matching=request.use_pattern_matching,
+                use_llm=llm_enabled,
+                llm_only=llm_enabled,  # When LLM is enabled, only use LLM findings (consistent with regular review)
+                use_pattern_matching=not llm_enabled,  # Disable pattern matching when using LLM
+                use_graph_analysis=not llm_enabled,    # Disable graph analysis when using LLM
                 openai_api_key=self.openai_api_key,
                 anthropic_api_key=self.anthropic_api_key,
             )

@@ -59,7 +59,7 @@ export default function BulkAnalysis() {
   const navigate = useNavigate()
   const [prdFiles, setPrdFiles] = useState<PRDFile[]>([])
   const [defaultCodebasePath, setDefaultCodebasePath] = useState('')
-  const [dimensions, setDimensions] = useState<string[]>(['security', 'engineering'])
+  const [dimensions, setDimensions] = useState<string[]>(['security', 'privacy', 'compliance', 'engineering', 'architecture'])
   const [useLLM, setUseLLM] = useState(true)
   const [openaiKey, setOpenaiKey] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')

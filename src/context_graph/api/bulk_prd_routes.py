@@ -40,7 +40,7 @@ class BulkAnalysisRequest(BaseModel):
     prds: list[PRDFileInput] = Field(..., description="List of PRD files to analyze")
     default_codebase_path: str | None = Field(None, description="Default codebase path")
     dimensions: list[str] = Field(
-        default=["security", "engineering"],
+        default=["security", "privacy", "compliance", "engineering", "architecture"],
         description="Review dimensions to analyze"
     )
     use_llm: bool = Field(True, description="Use LLM for analysis")
@@ -75,12 +75,18 @@ class BulkResultResponse(BaseModel):
     total_prds: int
     successful_prds: int
     failed_prds: int
+    success_rate: float
     total_findings: int
     findings_by_severity: dict[str, int]
     findings_by_dimension: dict[str, int]
     prd_results: list[dict[str, Any]]
-    total_duration_ms: float
+    codebases_analyzed: list[str]
     default_codebase: str | None
+    codebase_selection_counts: dict[str, int]
+    parallel_workers_used: int
+    total_duration_ms: float
+    started_at: str | None
+    completed_at: str | None
 
 
 # Routes
@@ -233,6 +239,7 @@ async def analyze_bulk_prds(
         total_prds=result.total_prds,
         successful_prds=result.successful_prds,
         failed_prds=result.failed_prds,
+        success_rate=result.success_rate,
         total_findings=result.total_findings,
         findings_by_severity=result.findings_by_severity,
         findings_by_dimension=result.findings_by_dimension,
@@ -251,8 +258,13 @@ async def analyze_bulk_prds(
             }
             for pr in result.prd_results
         ],
-        total_duration_ms=result.total_duration_ms,
+        codebases_analyzed=result.codebases_analyzed,
         default_codebase=result.default_codebase,
+        codebase_selection_counts=result.codebase_selection_counts,
+        parallel_workers_used=result.parallel_workers_used,
+        total_duration_ms=result.total_duration_ms,
+        started_at=result.started_at.isoformat() if result.started_at else None,
+        completed_at=result.completed_at.isoformat() if result.completed_at else None,
     )
 
 
@@ -451,6 +463,7 @@ async def _run_bulk_analysis_background(
             total_prds=result.total_prds,
             successful_prds=result.successful_prds,
             failed_prds=result.failed_prds,
+            success_rate=result.success_rate,
             total_findings=result.total_findings,
             findings_by_severity=result.findings_by_severity,
             findings_by_dimension=result.findings_by_dimension,
@@ -458,16 +471,24 @@ async def _run_bulk_analysis_background(
                 {
                     "prd_id": str(pr.prd_id),
                     "prd_file_name": pr.prd_file_name,
+                    "codebase_path": pr.codebase_path,
                     "success": pr.success,
                     "error_message": pr.error_message,
                     "total_findings": pr.total_findings,
+                    "findings_by_severity": pr.findings_by_severity,
+                    "findings_by_dimension": pr.findings_by_dimension,
                     "review_id": pr.review_id,
                     "duration_ms": pr.duration_ms,
                 }
                 for pr in result.prd_results
             ],
-            total_duration_ms=result.total_duration_ms,
+            codebases_analyzed=result.codebases_analyzed,
             default_codebase=result.default_codebase,
+            codebase_selection_counts=result.codebase_selection_counts,
+            parallel_workers_used=result.parallel_workers_used,
+            total_duration_ms=result.total_duration_ms,
+            started_at=result.started_at.isoformat() if result.started_at else None,
+            completed_at=result.completed_at.isoformat() if result.completed_at else None,
         )
         
         # Store individual reviews using the storage backend

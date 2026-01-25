@@ -154,6 +154,11 @@ export default function BulkAnalysis() {
   const readyFiles = files.filter(f => f.status === 'ready')
   const canAnalyze = readyFiles.length > 0 && !analyzeMutation.isPending
 
+  // Show results if available - check this FIRST to prevent blank screen during config refetch
+  if (result) {
+    return <BulkAnalysisResults result={result} onBack={() => setResult(null)} />
+  }
+
   // Feature not enabled
   if (configError || (config && !config.enabled)) {
     return (
@@ -181,11 +186,6 @@ export default function BulkAnalysis() {
         <Loader2 className="w-8 h-8 text-neon-400 animate-spin" />
       </div>
     )
-  }
-
-  // Show results if available
-  if (result) {
-    return <BulkAnalysisResults result={result} onBack={() => setResult(null)} />
   }
 
   return (
@@ -524,7 +524,7 @@ function BulkAnalysisResults({ result, onBack }: { result: BulkAnalysisResult; o
             Bulk Analysis Results
           </h1>
           <p className="text-void-400 mt-1">
-            Analyzed {result.total_prds} PRD files in {(result.total_duration_ms / 1000).toFixed(1)}s
+            Analyzed {result.total_prds ?? 0} PRD files in {((result.total_duration_ms ?? 0) / 1000).toFixed(1)}s
           </p>
         </div>
         <button
@@ -538,23 +538,23 @@ function BulkAnalysisResults({ result, onBack }: { result: BulkAnalysisResult; o
       {/* Summary Stats */}
       <div className="grid grid-cols-5 gap-4">
         <div className="bg-void-900/50 border border-void-800 rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-white">{result.total_prds}</p>
+          <p className="text-3xl font-bold text-white">{result.total_prds ?? 0}</p>
           <p className="text-xs text-void-400">Total PRDs</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-green-400">{result.successful_prds}</p>
+          <p className="text-3xl font-bold text-green-400">{result.successful_prds ?? 0}</p>
           <p className="text-xs text-green-400/80">Successful</p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-red-400">{result.failed_prds}</p>
+          <p className="text-3xl font-bold text-red-400">{result.failed_prds ?? 0}</p>
           <p className="text-xs text-red-400/80">Failed</p>
         </div>
         <div className="bg-neon-500/10 border border-neon-500/30 rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-neon-400">{result.total_findings}</p>
+          <p className="text-3xl font-bold text-neon-400">{result.total_findings ?? 0}</p>
           <p className="text-xs text-neon-400/80">Total Findings</p>
         </div>
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-amber-400">{result.success_rate.toFixed(0)}%</p>
+          <p className="text-3xl font-bold text-amber-400">{(result.success_rate ?? 0).toFixed(0)}%</p>
           <p className="text-xs text-amber-400/80">Success Rate</p>
         </div>
       </div>
@@ -568,7 +568,7 @@ function BulkAnalysisResults({ result, onBack }: { result: BulkAnalysisResult; o
             Findings by Severity
           </h3>
           <div className="space-y-3">
-            {Object.entries(result.findings_by_severity).map(([severity, count]) => (
+            {Object.entries(result.findings_by_severity ?? {}).map(([severity, count]) => (
               <div key={severity} className="flex items-center justify-between">
                 <span className={`capitalize ${severityColors[severity] || 'text-void-400'}`}>
                   {severity}
@@ -576,7 +576,7 @@ function BulkAnalysisResults({ result, onBack }: { result: BulkAnalysisResult; o
                 <span className="text-white font-medium">{count}</span>
               </div>
             ))}
-            {Object.keys(result.findings_by_severity).length === 0 && (
+            {Object.keys(result.findings_by_severity ?? {}).length === 0 && (
               <p className="text-void-500 text-sm">No findings</p>
             )}
           </div>
@@ -589,7 +589,7 @@ function BulkAnalysisResults({ result, onBack }: { result: BulkAnalysisResult; o
             Findings by Dimension
           </h3>
           <div className="space-y-3">
-            {Object.entries(result.findings_by_dimension).map(([dimension, count]) => (
+            {Object.entries(result.findings_by_dimension ?? {}).map(([dimension, count]) => (
               <div key={dimension} className="flex items-center justify-between">
                 <span className={`capitalize ${dimensionColors[dimension] || 'text-void-400'}`}>
                   {dimension}
@@ -597,7 +597,7 @@ function BulkAnalysisResults({ result, onBack }: { result: BulkAnalysisResult; o
                 <span className="text-white font-medium">{count}</span>
               </div>
             ))}
-            {Object.keys(result.findings_by_dimension).length === 0 && (
+            {Object.keys(result.findings_by_dimension ?? {}).length === 0 && (
               <p className="text-void-500 text-sm">No findings</p>
             )}
           </div>
@@ -611,7 +611,7 @@ function BulkAnalysisResults({ result, onBack }: { result: BulkAnalysisResult; o
           Individual PRD Results
         </h3>
         <div className="space-y-3">
-          {result.prd_results.map((prdResult) => (
+          {(result.prd_results ?? []).map((prdResult) => (
             <PRDResultCard
               key={prdResult.prd_id}
               result={prdResult}
@@ -629,11 +629,11 @@ function BulkAnalysisResults({ result, onBack }: { result: BulkAnalysisResult; o
       <div className="text-xs text-void-500 flex items-center gap-4">
         <span className="flex items-center gap-1">
           <Clock className="w-3 h-3" />
-          {(result.total_duration_ms / 1000).toFixed(2)}s total
+          {((result.total_duration_ms ?? 0) / 1000).toFixed(2)}s total
         </span>
         <span className="flex items-center gap-1">
           <Sparkles className="w-3 h-3" />
-          {result.parallel_workers_used} parallel workers
+          {result.parallel_workers_used ?? 1} parallel workers
         </span>
         {result.default_codebase && (
           <span className="flex items-center gap-1">
