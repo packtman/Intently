@@ -1,8 +1,8 @@
 # Intently Desktop
 
-> **Native desktop application for AI-powered product security analysis**
+> **Native desktop application for multi-dimensional product analysis**
 
-A cross-platform Electron application that brings the full power of Intently's security analysis pipeline to your desktop. Analyze PRDs against codebases with native file system integration, automatic backend management, and offline capability.
+A cross-platform Electron application that brings the full power of Intently's analysis pipeline to your desktop. Analyze PRDs against codebases across security, privacy, compliance, engineering, and architecture dimensions with native file system integration, automatic backend management, and offline capability.
 
 ---
 
@@ -143,8 +143,8 @@ For AI-powered analysis, you need at least one:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/intently.git
-cd intently
+git clone https://github.com/packtman/Intently.git
+cd Intently
 ```
 
 ### 2. Install Python Backend
@@ -369,5 +369,5 @@ MIT License - see [LICENSE](../LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Intently</strong> - Proactive Security for Product Development
+  <strong>Intently</strong> — Multi-Dimensional Product Analysis
 </p>

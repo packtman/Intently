@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "context-graph"
 version = "0.1.0"
-description = "Context Graph for Security Reviews - Semantic security analysis bridging PRDs to code impact"
+description = "Intently - Multi-dimensional product analysis bridging PRDs to code across security, privacy, compliance, engineering, and architecture"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
     {name = "Security Team"}
 ]
-keywords = ["security", "code-analysis", "threat-modeling", "prd", "context-graph"]
+keywords = ["security", "privacy", "compliance", "code-analysis", "threat-modeling", "prd", "architecture", "engineering"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -61,9 +61,9 @@ lsp = [
 context-graph = "context_graph.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/security-team/context-graph"
-Documentation = "https://github.com/security-team/context-graph#readme"
-Issues = "https://github.com/security-team/context-graph/issues"
+Homepage = "https://github.com/packtman/Intently"
+Documentation = "https://github.com/packtman/Intently#readme"
+Issues = "https://github.com/packtman/Intently/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

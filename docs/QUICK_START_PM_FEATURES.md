@@ -159,7 +159,6 @@ curl http://localhost:8000/api/reviews/{review_id}/changes
 
 ## Full Documentation
 
-- [PM Features Feature Flags](./PM_FEATURES_FEATURE_FLAGS.md)
 - [Pattern Learning Guide](./PATTERN_LEARNING_GUIDE.md) - Learn how pattern learning works
-- [Complete Implementation Summary](./COMPLETE_IMPLEMENTATION_SUMMARY.md)
-- [Frontend Testing Summary](./FRONTEND_TESTING_SUMMARY.md)
+- [Enable All PM Features](./ENABLE_ALL_PM_FEATURES.md) - Complete setup guide
+- [Collaboration Features](./COLLABORATION_FEATURES.md) - Team collaboration documentation

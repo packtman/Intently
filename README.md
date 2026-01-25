@@ -1,57 +1,106 @@
-# Context Graph for Security Reviews
+# Intently
 
-A semantic security analysis pipeline that bridges Product Requirement Documents (PRDs) to code impact analysis, enabling proactive security reviews before implementation.
+> **Multi-Dimensional Product Analysis** — Bridge PRDs to code with comprehensive review across security, privacy, compliance, engineering, and architecture dimensions. Enable proactive analysis before implementation.
+
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Key Concepts](#key-concepts)
+- [Analysis Dimensions](#analysis-dimensions)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Architecture](#architecture)
+- [Configuration](#configuration)
+- [CLI Commands](#cli-commands)
+- [Supported Languages](#supported-languages)
+- [GitHub Integration](#github-integration)
+- [API Endpoints](#api-endpoints)
+- [Project Structure](#project-structure)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Overview
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   PRD Parser    │────▶│  Context Graph   │────▶│ Security Review │
-│ (Intent Extract)│     │   (Knowledge)    │     │    Engine       │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-                               ▲
-                               │
-                        ┌──────────────┐
-                        │  Codebase    │
-                        │  Analyzer    │
-                        │ (State)      │
-                        └──────────────┘
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────────────────────┐
+│   PRD Parser    │────▶│  Context Graph   │────▶│    Multi-Dimensional Review     │
+│ (Intent Extract)│     │   (Knowledge)    │     ├─────────────────────────────────┤
+└─────────────────┘     └──────────────────┘     │ Security │ Privacy │ Compliance │
+                               ▲                 │ Engineering │ Architecture      │
+                               │                 └─────────────────────────────────┘
+                        ┌──────────────┐                        │
+                        │  Codebase    │                        ▼
+                        │  Analyzer    │              ┌─────────────────┐
+                        │  (State)     │              │   PM Tools      │
+                        └──────────────┘              │ PRD Generation  │
+                                                      │ Quality Scoring │
+                                                      └─────────────────┘
 ```
 
 ## Key Concepts
 
 - **Intent**: What the PRD wants to achieve (features, data flows, user interactions)
-- **State**: Current codebase reality (APIs, data models, auth patterns, trust boundaries)
+- **State**: Current codebase reality (APIs, data models, patterns, dependencies)
 - **Delta**: The gap between intent and state that requires implementation
-- **Security Surface**: Attack vectors, trust boundaries, and risk areas in the delta
+- **Dimensions**: Five analysis perspectives (Security, Privacy, Compliance, Engineering, Architecture)
+- **Findings**: Issues discovered across any dimension with severity and remediation guidance
+
+## Analysis Dimensions
+
+Intently runs parallel analysis across five dimensions:
+
+| Dimension | Frameworks | What's Analyzed |
+|-----------|------------|-----------------|
+| **Security** | STRIDE, OWASP Top 10 | Threats, vulnerabilities, trust boundaries, attack vectors |
+| **Privacy** | LINDDUN, GDPR/CCPA | Data flows, PII handling, consent, data retention |
+| **Compliance** | SOC 2, HIPAA, PCI-DSS | Regulatory requirements, audit controls, certifications |
+| **Engineering** | Best practices | Code quality, testing gaps, error handling, maintainability |
+| **Architecture** | Design patterns | API design, dependencies, scalability, integration points |
 
 ## Features
 
+### Core Analysis
 - 📄 **PRD Parsing**: Extract structured intent from product requirements
-- 🔍 **Codebase Analysis**: Map existing security-relevant patterns
+- 🔍 **Codebase Analysis**: Map code patterns across multiple languages
 - 🕸️ **Context Graph**: Build knowledge graph of entities and relationships
-- ⚡ **Impact Analysis**: Understand how changes affect security posture
-- 🛡️ **Security Review**: Automated threat modeling on proposed changes
+- ⚡ **Impact Analysis**: Understand how changes affect system posture
+- 🎯 **Multi-Dimensional Review**: Parallel analysis across all five dimensions
 
-## Installation
+### PM Tools
+- 📝 **PRD Generator**: Generate PRDs from existing codebases
+- ✏️ **PRD Change Suggestions**: Diff-style recommendations for PRD improvements
+- 📊 **Quality Scoring**: Assess PRD completeness and readiness
+- ⏱️ **Effort Estimation**: Time and complexity estimates for implementation
+- 📚 **Bulk Analysis**: Analyze multiple PRDs at once
+- 🧠 **Pattern Learning**: System improves from expert feedback over time
 
-```bash
-cd "Context graph"
-pip install -e .
-```
+### Collaboration
+- 👥 **Team Queue**: Assign findings to teams for remediation
+- 💬 **Comments**: Threaded discussions on findings
+- ✅ **Validation**: Expert review and approval workflows
 
 ## Quick Start
 
 ```bash
-# Analyze a PRD against a codebase
-context-graph review --prd ./docs/feature.md --codebase ./src
+# 1. Install
+pip install -e .
 
-# Generate security report
-context-graph report --format markdown --output security-review.md
+# 2. Set API key (OpenAI or Anthropic)
+export OPENAI_API_KEY="sk-..."
 
-# Interactive mode
-context-graph interactive
+# 3. Run a multi-dimensional review
+context-graph review examples/sample-prd.md /path/to/codebase --llm
+
+# 4. Or start the web UI
+./scripts/start-servers.sh   # Opens at http://localhost:3000
 ```
+
+For detailed setup including the Desktop app, see [Installation](#installation).
 
 ## Architecture
 
@@ -63,43 +112,57 @@ Extracts structured intent from various document formats:
 - Confluence (via API)
 
 ### 2. Codebase Analyzer (`src/analyzers/`)
-Maps the current state of security-relevant code:
+Maps the current state of the codebase:
 - API endpoints and their auth requirements
 - Data models and sensitive fields
-- Trust boundaries
-- Existing security controls
+- Dependencies and integration points
+- Code patterns and architecture
 
-### 3. Context Graph (`src/graph/`)
-Neo4j-inspired knowledge graph storing:
+### 3. Context Graph (`src/code_graph/`)
+Knowledge graph storing:
 - Entities (Users, Data, APIs, Components)
 - Relationships (accesses, owns, trusts, flows_to)
-- Security properties (auth_required, encryption, pii)
+- Properties (auth_required, encryption, pii, public)
 
-### 4. Security Review Engine (`src/security/`)
-Applies security analysis frameworks:
-- STRIDE threat modeling
-- OWASP Top 10 pattern matching
-- Custom security rules
-- Trust boundary analysis
+### 4. Review Engine (`src/security/`)
+Multi-dimensional analysis engine:
+- **Security**: STRIDE, OWASP Top 10, threat modeling
+- **Privacy**: LINDDUN, data flow analysis, PII detection
+- **Compliance**: SOC 2, HIPAA, PCI-DSS mapping
+- **Engineering**: Code quality, testing coverage, error handling
+- **Architecture**: Design patterns, scalability, dependencies
+
+### 5. PM Tools (`src/pm/`)
+Product management utilities:
+- PRD generation from codebases
+- Quality scoring and readiness assessment
+- Effort estimation
+- Change suggestions with diff view
 
 ## Configuration
 
 ```yaml
 # context-graph.yaml
 llm:
-  provider: anthropic  # or openai, local
+  provider: anthropic  # or openai
   model: claude-sonnet-4-20250514
 
 codebase:
-  languages: [python, typescript]
+  languages: [python, typescript, kotlin]
   exclude: [node_modules, __pycache__, .git]
 
-security:
-  frameworks: [stride, owasp]
-  severity_threshold: medium
+# Analysis dimensions to run
+dimensions:
+  security: true      # STRIDE, OWASP Top 10
+  privacy: true       # LINDDUN, GDPR/CCPA
+  compliance: true    # SOC 2, HIPAA, PCI-DSS
+  engineering: true   # Code quality, testing
+  architecture: true  # Design patterns, dependencies
+
+severity_threshold: medium  # low, medium, high, critical
 ```
 
-## Quick Start
+## Installation
 
 ### 1. Install Python Package
 
@@ -321,7 +384,54 @@ Intently/
 | [API Keys Setup](API_KEYS_SETUP.md) | Configure OpenAI & Anthropic keys |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues & solutions |
 
+## Contributing
+
+We welcome contributions! Here's how to get started:
+
+1. **Fork the repository** and clone locally
+2. **Create a virtual environment**: `python3 -m venv .venv && source .venv/bin/activate`
+3. **Install in development mode**: `pip install -e ".[dev]"`
+4. **Run tests**: `pytest`
+5. **Submit a pull request**
+
+### Development Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/packtman/Intently.git
+cd Intently
+
+# Python backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Frontend (web dashboard)
+cd frontend && npm install
+
+# Desktop app
+cd desktop && npm install
+```
+
+### Code Quality
+
+```bash
+# Format code
+black src/
+
+# Lint
+ruff check src/
+
+# Type checking
+mypy src/
+```
+
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) for details.
 
+---
+
+<p align="center">
+  <strong>Intently</strong> — Multi-Dimensional Product Analysis
+</p>

@@ -1,8 +1,8 @@
 # Intently Web Dashboard
 
-> **Browser-based interface for AI-powered product security analysis**
+> **Browser-based interface for multi-dimensional product analysis**
 
-A React-based web dashboard for running Intently security reviews. Lightweight, deployable, and perfect for team access via browser.
+A React-based web dashboard for running Intently reviews across security, privacy, compliance, engineering, and architecture dimensions. Lightweight, deployable, and perfect for team access via browser.
 
 ---
 
@@ -338,5 +338,5 @@ MIT License - see [LICENSE](../LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Intently</strong> - Proactive Security for Product Development
+  <strong>Intently</strong> — Multi-Dimensional Product Analysis
 </p>
