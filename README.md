@@ -269,29 +269,46 @@ export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-**Where to set these:**
+**Option A: Temporary (current terminal session only)**
 
-1. **For terminal/CLI usage:**
-   ```bash
-   # In your current terminal session
-   export OPENAI_API_KEY="sk-your-key-here"
-   
-   # Or add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
-   echo 'export OPENAI_API_KEY="sk-your-key-here"' >> ~/.zshrc
-   source ~/.zshrc
-   ```
+This works immediately but is lost when you close the terminal:
+```bash
+export OPENAI_API_KEY="sk-your-key-here"
 
-2. **For web server (context-graph serve):**
-   ```bash
-   # Set before starting the server
-   export OPENAI_API_KEY="sk-your-key-here"
-   context-graph serve
-   ```
+# Verify it's set
+echo $OPENAI_API_KEY
+```
 
-3. **For development (VS Code/Cursor):**
-   - Create a `.env` file in the project root (not committed to git)
-   - Add: `OPENAI_API_KEY=sk-your-key-here`
-   - Or set in your IDE's environment variables
+**Option B: Permanent (persists across terminal sessions)**
+
+Add to your shell profile so it's always available:
+
+```bash
+# For zsh (default on macOS)
+nano ~/.zshrc
+
+# Add this line at the bottom:
+export OPENAI_API_KEY="sk-your-key-here"
+
+# Save (Ctrl+O, Enter) and exit (Ctrl+X), then reload:
+source ~/.zshrc
+
+# Verify it's set
+echo $OPENAI_API_KEY
+```
+
+For bash users, use `~/.bashrc` instead of `~/.zshrc`.
+
+**Option C: For Desktop App**
+
+Go to **Settings** in the app and enter your API keys there. They are saved locally and persist automatically.
+
+**Option D: For development (VS Code/Cursor)**
+
+Create a `.env` file in the project root (not committed to git):
+```
+OPENAI_API_KEY=sk-your-key-here
+```
 
 **Get API Keys:**
 - OpenAI: https://platform.openai.com/api-keys
