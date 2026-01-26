@@ -108,7 +108,8 @@ export OPENAI_API_KEY="sk-..."
 # 6. Run a multi-dimensional review
 context-graph review examples/sample-prd.md /path/to/codebase --llm
 
-# 7. Or start the web UI
+# 7. Or start the web UI (requires Node.js 18+)
+# Install Node.js first: brew install node (macOS) or see https://nodejs.org
 ./scripts/start-servers.sh   # Opens at http://localhost:3000
 ```
 
@@ -190,7 +191,11 @@ severity_threshold: medium  # low, medium, high, critical
   - **Windows:** Download from https://python.org/downloads/
   
 - **pip** - Usually included with Python
-- **Node.js 18+** (optional) - Only needed for web UI or desktop app
+- **Node.js 18+** (required for web UI or desktop app)
+  ```bash
+  node --version   # Must be 18+ for web UI
+  ```
+  If not installed: **macOS:** `brew install node` | **Windows/Linux:** https://nodejs.org
 
 ### 1. Clone the Repository
 
@@ -328,6 +333,17 @@ context-graph review examples/sample-prd.md /path/to/codebase --llm -o report.md
 
 ### 6. Start Web UI (Optional)
 
+**Prerequisites:** Node.js 18+ is required for the web UI. Check if it's installed:
+```bash
+node --version   # Should show v18.x.x or higher
+npm --version    # Should show 8.x.x or higher
+```
+
+If not installed:
+- **macOS:** `brew install node`
+- **Ubuntu:** `curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs`
+- **Windows:** Download from https://nodejs.org/
+
 **Option A: Quick Start (using start script)**
 
 ```bash
@@ -343,11 +359,18 @@ Open http://localhost:3000 to access the dashboard.
 # Terminal 1: Start backend
 context-graph serve
 
-# Terminal 2: Start frontend
+# Terminal 2: Start frontend (from repo root)
+# First verify you're in the right directory:
+ls frontend/package.json   # Should show the file, not "No such file"
+
 cd frontend
 npm install
 npm run dev
 ```
+
+**Common errors:**
+- `npm: command not found` - Node.js is not installed. See prerequisites above.
+- `No such file or directory: frontend/package.json` - You're in the wrong directory. Run `ls pyproject.toml` to verify you're in the repo root.
 
 ### 7. Desktop App (Optional)
 

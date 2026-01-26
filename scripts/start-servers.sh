@@ -3,8 +3,27 @@
 # Start Context Graph servers
 # This script ensures clean startup by killing existing processes first
 
-CONTEXT_GRAPH_DIR="/Users/dipenshah/Documents/Context Graph/Context graph"
+# Get the directory where this script is located, then go up one level to repo root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONTEXT_GRAPH_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 FRONTEND_DIR="$CONTEXT_GRAPH_DIR/frontend"
+
+# Verify frontend directory exists
+if [ ! -d "$FRONTEND_DIR" ]; then
+    echo "ERROR: Frontend directory not found at: $FRONTEND_DIR"
+    echo "Make sure you're running this script from the Intently repository."
+    exit 1
+fi
+
+# Verify Node.js is installed
+if ! command -v npm &> /dev/null; then
+    echo "ERROR: npm is not installed."
+    echo "Please install Node.js 18+ first:"
+    echo "  macOS:   brew install node"
+    echo "  Ubuntu:  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs"
+    echo "  Windows: Download from https://nodejs.org/"
+    exit 1
+fi
 
 # Function to kill processes on a port
 kill_port() {
@@ -50,6 +69,17 @@ echo ""
 
 echo "Step 3: Starting Backend on port 8000..."
 cd "$CONTEXT_GRAPH_DIR"
+
+# Check if virtual environment exists
+if [ ! -f ".venv/bin/activate" ]; then
+    echo "ERROR: Python virtual environment not found at .venv/"
+    echo "Please set up the Python environment first:"
+    echo "  python3 -m venv .venv"
+    echo "  source .venv/bin/activate"
+    echo "  pip install -e ."
+    exit 1
+fi
+
 source .venv/bin/activate
 
 # Verify Python version
@@ -114,6 +144,19 @@ done
 echo ""
 echo "Step 4: Starting Frontend on port 3000..."
 cd "$FRONTEND_DIR"
+
+# Check if node_modules exists, if not run npm install
+if [ ! -d "node_modules" ]; then
+    echo "  Installing frontend dependencies (first-time setup)..."
+    npm install
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to install frontend dependencies."
+        echo "Try running manually: cd frontend && npm install"
+        kill $BACKEND_PID 2>/dev/null
+        exit 1
+    fi
+fi
+
 npm run dev -- --port 3000 &
 FRONTEND_PID=$!
 
