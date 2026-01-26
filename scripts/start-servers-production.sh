@@ -3,7 +3,9 @@
 # Start Context Graph servers - PRODUCTION MODE
 # This script is optimized for performance (no file watching, no auto-reload)
 
-CONTEXT_GRAPH_DIR="/Users/dipenshah/Documents/Context Graph/Context graph"
+# Get the directory where this script is located, then go up one level to repo root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONTEXT_GRAPH_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 FRONTEND_DIR="$CONTEXT_GRAPH_DIR/frontend"
 
 echo "=== Starting Context Graph (Production Mode) ==="
@@ -16,6 +18,17 @@ sleep 1
 
 echo "Starting Backend on port 8000 (Production Mode - no hot reload)..."
 cd "$CONTEXT_GRAPH_DIR"
+
+# Check if virtual environment exists
+if [ ! -f ".venv/bin/activate" ]; then
+    echo "ERROR: Python virtual environment not found at .venv/"
+    echo "Please set up the Python environment first:"
+    echo "  python3 -m venv .venv"
+    echo "  source .venv/bin/activate"
+    echo "  pip install -e ."
+    exit 1
+fi
+
 source .venv/bin/activate
 
 # Verify Python version

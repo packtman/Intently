@@ -61,12 +61,20 @@ export default function BulkAnalysis() {
           dimensions: dimensions,
         }))
 
+      // Get API keys from Electron store (trim whitespace to avoid invalid key errors)
+      const rawOpenai = await window.electronAPI?.getStore('openaiApiKey') as string
+      const rawAnthropic = await window.electronAPI?.getStore('anthropicApiKey') as string
+      const openaiApiKey = rawOpenai?.trim() || undefined
+      const anthropicApiKey = rawAnthropic?.trim() || undefined
+
       return api.analyzeBulkPRDs({
         prds,
         default_codebase_path: codebasePath || null,
         default_dimensions: dimensions,
         use_llm: useLLM,
         use_pattern_matching: true,
+        openai_api_key: openaiApiKey,
+        anthropic_api_key: anthropicApiKey,
       })
     },
     onSuccess: (data) => {

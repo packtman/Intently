@@ -64,8 +64,9 @@ export default function NewReview() {
     const loadKeys = async () => {
       const savedOpenai = await window.electronAPI?.getStore('openaiApiKey')
       const savedAnthropic = await window.electronAPI?.getStore('anthropicApiKey')
-      if (savedOpenai) setOpenaiKey(savedOpenai as string)
-      if (savedAnthropic) setAnthropicKey(savedAnthropic as string)
+      // Trim whitespace from keys to avoid invalid key errors
+      if (savedOpenai) setOpenaiKey((savedOpenai as string).trim())
+      if (savedAnthropic) setAnthropicKey((savedAnthropic as string).trim())
     }
     loadKeys()
   }, [])

@@ -56,10 +56,11 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     try {
-      await window.electronAPI?.setStore('contextGraphPath', settings.contextGraphPath)
-      await window.electronAPI?.setStore('pythonPath', settings.pythonPath)
-      await window.electronAPI?.setStore('openaiApiKey', settings.openaiApiKey)
-      await window.electronAPI?.setStore('anthropicApiKey', settings.anthropicApiKey)
+      await window.electronAPI?.setStore('contextGraphPath', settings.contextGraphPath.trim())
+      await window.electronAPI?.setStore('pythonPath', settings.pythonPath.trim())
+      // Trim API keys to avoid invalid key errors from whitespace
+      await window.electronAPI?.setStore('openaiApiKey', settings.openaiApiKey.trim())
+      await window.electronAPI?.setStore('anthropicApiKey', settings.anthropicApiKey.trim())
       await window.electronAPI?.setStore('autoStartBackend', settings.autoStartBackend)
 
       setSaved(true)

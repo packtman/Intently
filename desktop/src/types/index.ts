@@ -630,6 +630,8 @@ export interface BulkAnalysisRequest {
   max_parallel_reviews?: number
   use_llm: boolean
   use_pattern_matching: boolean
+  openai_api_key?: string
+  anthropic_api_key?: string
 }
 
 export interface SinglePRDResult {
