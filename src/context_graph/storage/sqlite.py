@@ -70,6 +70,26 @@ def _uuid_to_str(obj: Any) -> Any:
     return obj
 
 
+def _safe_uuid_parse(uuid_str: str | None) -> UUID:
+    """
+    Safely parse a UUID string, returning a new UUID if the string is invalid or empty.
+    
+    Args:
+        uuid_str: UUID string to parse, or None/empty string
+        
+    Returns:
+        UUID object, either parsed from string or newly generated
+    """
+    if not uuid_str or not isinstance(uuid_str, str) or not uuid_str.strip():
+        return uuid4()
+    
+    try:
+        return UUID(uuid_str)
+    except (ValueError, TypeError, AttributeError):
+        # If UUID parsing fails, generate a new one
+        return uuid4()
+
+
 def _serialize_intent(intent: Intent) -> str:
     """Serialize Intent to JSON."""
     data = {
@@ -96,7 +116,7 @@ def _deserialize_intent(json_str: str) -> Intent:
     entities = []
     for e_data in data.get("data_entities", []):
         entity = Entity(
-            id=UUID(e_data["id"]) if e_data.get("id") else uuid4(),
+            id=_safe_uuid_parse(e_data.get("id")),
             name=e_data.get("name", ""),
             entity_type=e_data.get("entity_type", "data"),
             description=e_data.get("description", ""),
@@ -109,7 +129,7 @@ def _deserialize_intent(json_str: str) -> Intent:
         entities.append(entity)
     
     return Intent(
-        id=UUID(data["id"]) if data.get("id") else uuid4(),
+        id=_safe_uuid_parse(data.get("id")),
         title=data.get("title", ""),
         summary=data.get("summary", ""),
         features=data.get("features", []),
@@ -152,7 +172,7 @@ def _deserialize_state(json_str: str) -> State:
     for e_data in data.get("entities", []):
         from context_graph.core.models import EntityType
         entity = Entity(
-            id=UUID(e_data["id"]) if e_data.get("id") else uuid4(),
+            id=_safe_uuid_parse(e_data.get("id")),
             name=e_data.get("name", ""),
             entity_type=EntityType(e_data["entity_type"]) if e_data.get("entity_type") else EntityType.DATA,
             description=e_data.get("description", ""),
@@ -168,9 +188,9 @@ def _deserialize_state(json_str: str) -> State:
     for r_data in data.get("relationships", []):
         from context_graph.core.models import RelationshipType
         rel = Relationship(
-            id=UUID(r_data["id"]) if r_data.get("id") else uuid4(),
-            source_id=UUID(r_data["source_id"]) if r_data.get("source_id") else uuid4(),
-            target_id=UUID(r_data["target_id"]) if r_data.get("target_id") else uuid4(),
+            id=_safe_uuid_parse(r_data.get("id")),
+            source_id=_safe_uuid_parse(r_data.get("source_id")),
+            target_id=_safe_uuid_parse(r_data.get("target_id")),
             relationship_type=RelationshipType(r_data["relationship_type"]) if r_data.get("relationship_type") else RelationshipType.FLOWS_TO,
             properties=r_data.get("properties", {}),
             crosses_trust_boundary=r_data.get("crosses_trust_boundary", False),
@@ -179,7 +199,7 @@ def _deserialize_state(json_str: str) -> State:
         relationships.append(rel)
     
     return State(
-        id=UUID(data["id"]) if data.get("id") else uuid4(),
+        id=_safe_uuid_parse(data.get("id")),
         codebase_path=data.get("codebase_path", ""),
         analyzed_at=datetime.fromisoformat(data["analyzed_at"]) if data.get("analyzed_at") else datetime.now(),
         entities=entities,
@@ -205,14 +225,14 @@ def _deserialize_security_findings(json_str: str) -> list[SecurityFinding]:
     findings = []
     for f_data in data:
         finding = SecurityFinding(
-            id=UUID(f_data["id"]) if f_data.get("id") else uuid4(),
+            id=_safe_uuid_parse(f_data.get("id")),
             title=f_data.get("title", ""),
             description=f_data.get("description", ""),
             severity=Severity(f_data["severity"]) if f_data.get("severity") else Severity.MEDIUM,
             category=ThreatCategory(f_data["category"]) if f_data.get("category") else ThreatCategory.INFO_DISCLOSURE,
             dimension=ReviewDimension(f_data["dimension"]) if f_data.get("dimension") else ReviewDimension.SECURITY,
-            affected_entities=[UUID(e) for e in f_data.get("affected_entities", [])],
-            affected_relationships=[UUID(r) for r in f_data.get("affected_relationships", [])],
+            affected_entities=[_safe_uuid_parse(e) for e in f_data.get("affected_entities", [])],
+            affected_relationships=[_safe_uuid_parse(r) for r in f_data.get("affected_relationships", [])],
             source_type=f_data.get("source_type", ""),
             source_reference=f_data.get("source_reference", ""),
             recommendation=f_data.get("recommendation", ""),
@@ -237,7 +257,7 @@ def _deserialize_privacy_findings(json_str: str) -> list[PrivacyFinding]:
     findings = []
     for f_data in data:
         finding = PrivacyFinding(
-            id=UUID(f_data["id"]) if f_data.get("id") else uuid4(),
+            id=_safe_uuid_parse(f_data.get("id")),
             title=f_data.get("title", ""),
             description=f_data.get("description", ""),
             severity=Severity(f_data["severity"]) if f_data.get("severity") else Severity.MEDIUM,
@@ -246,8 +266,8 @@ def _deserialize_privacy_findings(json_str: str) -> list[PrivacyFinding]:
             data_subjects=f_data.get("data_subjects", []),
             personal_data_types=f_data.get("personal_data_types", []),
             processing_activities=f_data.get("processing_activities", []),
-            affected_entities=[UUID(e) for e in f_data.get("affected_entities", [])],
-            affected_relationships=[UUID(r) for r in f_data.get("affected_relationships", [])],
+            affected_entities=[_safe_uuid_parse(e) for e in f_data.get("affected_entities", [])],
+            affected_relationships=[_safe_uuid_parse(r) for r in f_data.get("affected_relationships", [])],
             source_type=f_data.get("source_type", ""),
             source_reference=f_data.get("source_reference", ""),
             applicable_regulations=f_data.get("applicable_regulations", []),
@@ -268,7 +288,7 @@ def _deserialize_compliance_findings(json_str: str) -> list[ComplianceFinding]:
     findings = []
     for f_data in data:
         finding = ComplianceFinding(
-            id=UUID(f_data["id"]) if f_data.get("id") else uuid4(),
+            id=_safe_uuid_parse(f_data.get("id")),
             title=f_data.get("title", ""),
             description=f_data.get("description", ""),
             severity=Severity(f_data["severity"]) if f_data.get("severity") else Severity.MEDIUM,
@@ -278,8 +298,8 @@ def _deserialize_compliance_findings(json_str: str) -> list[ComplianceFinding]:
             control_id=f_data.get("control_id", ""),
             control_description=f_data.get("control_description", ""),
             requirement_text=f_data.get("requirement_text", ""),
-            affected_entities=[UUID(e) for e in f_data.get("affected_entities", [])],
-            affected_relationships=[UUID(r) for r in f_data.get("affected_relationships", [])],
+            affected_entities=[_safe_uuid_parse(e) for e in f_data.get("affected_entities", [])],
+            affected_relationships=[_safe_uuid_parse(r) for r in f_data.get("affected_relationships", [])],
             source_type=f_data.get("source_type", ""),
             source_reference=f_data.get("source_reference", ""),
             current_state=f_data.get("current_state", ""),
@@ -301,7 +321,7 @@ def _deserialize_engineering_findings(json_str: str) -> list[EngineeringFinding]
     findings = []
     for f_data in data:
         finding = EngineeringFinding(
-            id=UUID(f_data["id"]) if f_data.get("id") else uuid4(),
+            id=_safe_uuid_parse(f_data.get("id")),
             title=f_data.get("title", ""),
             description=f_data.get("description", ""),
             severity=Severity(f_data["severity"]) if f_data.get("severity") else Severity.MEDIUM,
@@ -315,8 +335,8 @@ def _deserialize_engineering_findings(json_str: str) -> list[EngineeringFinding]
             lines_of_code_affected=f_data.get("lines_of_code_affected", 0),
             tech_debt_items=f_data.get("tech_debt_items", 0),
             test_coverage_gap=f_data.get("test_coverage_gap", 0.0),
-            affected_entities=[UUID(e) for e in f_data.get("affected_entities", [])],
-            affected_relationships=[UUID(r) for r in f_data.get("affected_relationships", [])],
+            affected_entities=[_safe_uuid_parse(e) for e in f_data.get("affected_entities", [])],
+            affected_relationships=[_safe_uuid_parse(r) for r in f_data.get("affected_relationships", [])],
             source_type=f_data.get("source_type", ""),
             source_reference=f_data.get("source_reference", ""),
             recommendation=f_data.get("recommendation", ""),
@@ -335,7 +355,7 @@ def _deserialize_architecture_findings(json_str: str) -> list[ArchitectureFindin
     findings = []
     for f_data in data:
         finding = ArchitectureFinding(
-            id=UUID(f_data["id"]) if f_data.get("id") else uuid4(),
+            id=_safe_uuid_parse(f_data.get("id")),
             title=f_data.get("title", ""),
             description=f_data.get("description", ""),
             severity=Severity(f_data["severity"]) if f_data.get("severity") else Severity.MEDIUM,
@@ -350,8 +370,8 @@ def _deserialize_architecture_findings(json_str: str) -> list[ArchitectureFindin
             breaking_change=f_data.get("breaking_change", False),
             downstream_impact=f_data.get("downstream_impact", []),
             upstream_dependencies=f_data.get("upstream_dependencies", []),
-            affected_entities=[UUID(e) for e in f_data.get("affected_entities", [])],
-            affected_relationships=[UUID(r) for r in f_data.get("affected_relationships", [])],
+            affected_entities=[_safe_uuid_parse(e) for e in f_data.get("affected_entities", [])],
+            affected_relationships=[_safe_uuid_parse(r) for r in f_data.get("affected_relationships", [])],
             source_type=f_data.get("source_type", ""),
             source_reference=f_data.get("source_reference", ""),
             recommendation=f_data.get("recommendation", ""),
@@ -401,8 +421,8 @@ def _deserialize_predicted_questions(json_str: str) -> list[PredictedQuestion]:
                 diff_hunks.append(dh)
             
             suggested_change = PRDChange(
-                id=UUID(sc_data["id"]) if sc_data.get("id") else uuid4(),
-                prediction_id=UUID(sc_data["prediction_id"]) if sc_data.get("prediction_id") else uuid4(),
+                id=_safe_uuid_parse(sc_data.get("id")),
+                prediction_id=_safe_uuid_parse(sc_data.get("prediction_id")),
                 section=sc_data.get("section", ""),
                 start_line=sc_data.get("start_line", 0),
                 end_line=sc_data.get("end_line", 0),
@@ -419,7 +439,7 @@ def _deserialize_predicted_questions(json_str: str) -> list[PredictedQuestion]:
             )
         
         question = PredictedQuestion(
-            id=UUID(q_data["id"]) if q_data.get("id") else uuid4(),
+            id=_safe_uuid_parse(q_data.get("id")),
             question=q_data.get("question", ""),
             team=q_data.get("team", ""),
             severity=q_data.get("severity", "likely"),
@@ -427,7 +447,7 @@ def _deserialize_predicted_questions(json_str: str) -> list[PredictedQuestion]:
             code_evidence=code_evidence,
             suggested_change=suggested_change,
             status=q_data.get("status", "open"),
-            expert_ask_id=UUID(q_data["expert_ask_id"]) if q_data.get("expert_ask_id") else None,
+            expert_ask_id=_safe_uuid_parse(q_data.get("expert_ask_id")) if q_data.get("expert_ask_id") else None,
         )
         questions.append(question)
     return questions
@@ -785,7 +805,7 @@ class SQLiteReviewStorage(ReviewStorage):
         
         # Reconstruct ReviewResult
         result = ReviewResult(
-            review_id=UUID(row["id"]),
+            review_id=_safe_uuid_parse(row["id"]),
             intent=_deserialize_intent(row["intent_json"]),
             state=_deserialize_state(row["state_json"]),
             pattern_findings=_deserialize_security_findings(row["pattern_findings_json"] or "[]"),
