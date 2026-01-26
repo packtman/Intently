@@ -62,6 +62,28 @@ ls pyproject.toml   # Should now show the file
 pip install -e .
 ```
 
+### "editable mode needs setuptools based build" error
+
+**Symptoms:**
+```
+ERROR: Project ... has a 'pyproject.toml' and its build backend is missing the 'build_editable' hook.
+```
+or
+```
+editable mode needs setuptools based build
+```
+
+**Cause:** Your pip or setuptools is outdated.
+
+**Solution:**
+```bash
+# Upgrade pip and setuptools first
+pip install --upgrade pip setuptools wheel
+
+# Then install
+pip install -e .
+```
+
 ### "pip install -e ." fails with dependency errors
 
 **Symptoms:**
@@ -72,7 +94,13 @@ ERROR: No matching distribution found...
 
 **Solutions:**
 
-1. **Wrong directory** - Make sure you're in the project root (where `pyproject.toml` is):
+1. **Outdated pip/setuptools:**
+   ```bash
+   pip install --upgrade pip setuptools wheel
+   pip install -e .
+   ```
+
+2. **Wrong directory** - Make sure you're in the project root (where `pyproject.toml` is):
    ```bash
    # Check if pyproject.toml exists
    ls pyproject.toml
@@ -239,7 +267,8 @@ This is typically a build/bundling issue. Try:
 |-------|-----------|
 | `command not found: context-graph` | Activate venv: `source .venv/bin/activate` |
 | `-e option requires 1 argument` | Wrong directory - run `ls pyproject.toml` to check |
-| `pip install -e .` fails | Check you're in project root (has `pyproject.toml`) |
+| `editable mode needs setuptools` | Run `pip install --upgrade pip setuptools wheel` first |
+| `pip install -e .` fails | Upgrade pip/setuptools, check you're in project root |
 | Python version error | Need Python 3.10+: `python3 --version` |
 | ModuleNotFoundError | Activate venv before running |
 | Clone permission error | Ensure using `/tmp/context-graph-repos/` on macOS |

@@ -98,7 +98,8 @@ ls pyproject.toml   # If this fails, you're in the wrong directory
 python3 -m venv .venv
 source .venv/bin/activate   # On Windows: .venv\Scripts\activate
 
-# 4. Install the package
+# 4. Upgrade pip/setuptools and install the package
+pip install --upgrade pip setuptools wheel
 pip install -e .
 
 # 5. Set API key (OpenAI or Anthropic)
@@ -218,6 +219,9 @@ If this command shows "No such file", you're in the wrong directory. Navigate to
 
 **Then install:**
 ```bash
+# Upgrade pip and setuptools first (required for editable installs)
+pip install --upgrade pip setuptools wheel
+
 # Install in "editable" mode (allows code changes without reinstalling)
 pip install -e .
 ```
@@ -464,7 +468,8 @@ python3 -m venv .venv
 source .venv/bin/activate   # macOS/Linux
 # OR: .venv\Scripts\activate  # Windows
 
-# 3. Install with development dependencies
+# 3. Upgrade pip/setuptools and install with dev dependencies
+pip install --upgrade pip setuptools wheel
 pip install -e ".[dev]"
 
 # 4. Verify installation
