@@ -38,7 +38,31 @@ zsh: command not found: context-graph
    python -m context_graph.cli --help
    ```
 
-### "pip install -e ." fails
+### "pip install -e ." fails with "-e option requires 1 argument"
+
+**Symptoms:**
+```
+error: -e option requires 1 argument
+```
+
+**Cause:** You're in the wrong directory. The `.` means "current directory" and pip can't find a `pyproject.toml` file there.
+
+**Solution:**
+```bash
+# Check if pyproject.toml exists in your current directory
+ls pyproject.toml
+
+# If "No such file", navigate to where you cloned the repo
+cd /path/to/Intently
+
+# Verify again
+ls pyproject.toml   # Should now show the file
+
+# Then install
+pip install -e .
+```
+
+### "pip install -e ." fails with dependency errors
 
 **Symptoms:**
 ```
@@ -214,6 +238,7 @@ This is typically a build/bundling issue. Try:
 | Issue | Quick Fix |
 |-------|-----------|
 | `command not found: context-graph` | Activate venv: `source .venv/bin/activate` |
+| `-e option requires 1 argument` | Wrong directory - run `ls pyproject.toml` to check |
 | `pip install -e .` fails | Check you're in project root (has `pyproject.toml`) |
 | Python version error | Need Python 3.10+: `python3 --version` |
 | ModuleNotFoundError | Activate venv before running |

@@ -91,22 +91,27 @@ Intently runs parallel analysis across five dimensions:
 git clone https://github.com/packtman/Intently.git
 cd Intently
 
-# 2. Create and activate a virtual environment (recommended)
+# 2. Verify you're in the right directory (should see pyproject.toml)
+ls pyproject.toml   # If this fails, you're in the wrong directory
+
+# 3. Create and activate a virtual environment (recommended)
 python3 -m venv .venv
 source .venv/bin/activate   # On Windows: .venv\Scripts\activate
 
-# 3. Install the package
+# 4. Install the package
 pip install -e .
 
-# 4. Set API key (OpenAI or Anthropic)
+# 5. Set API key (OpenAI or Anthropic)
 export OPENAI_API_KEY="sk-..."
 
-# 5. Run a multi-dimensional review
+# 6. Run a multi-dimensional review
 context-graph review examples/sample-prd.md /path/to/codebase --llm
 
-# 6. Or start the web UI
+# 7. Or start the web UI
 ./scripts/start-servers.sh   # Opens at http://localhost:3000
 ```
+
+**Getting "-e option requires 1 argument" error?** You're in the wrong directory. Make sure `pyproject.toml` exists in your current folder (`ls pyproject.toml`).
 
 For detailed setup including the Desktop app, see [Installation](#installation).
 
@@ -205,12 +210,21 @@ source .venv/bin/activate      # macOS/Linux
 
 ### 3. Install the Python Package
 
+**First, verify you're in the correct directory:**
+```bash
+ls pyproject.toml
+```
+If this command shows "No such file", you're in the wrong directory. Navigate to where you cloned the repo.
+
+**Then install:**
 ```bash
 # Install in "editable" mode (allows code changes without reinstalling)
 pip install -e .
 ```
 
 This installs the `context-graph` CLI command and all Python dependencies.
+
+> **Common error:** `-e option requires 1 argument` means pip can't find `pyproject.toml` in your current directory.
 
 **Verify installation:**
 ```bash
