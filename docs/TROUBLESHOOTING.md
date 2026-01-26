@@ -62,6 +62,58 @@ ls pyproject.toml   # Should now show the file
 pip install -e .
 ```
 
+### "requires a different Python: 3.9.x not in '>=3.10'"
+
+**Symptoms:**
+```
+ERROR: Package 'context-graph' requires a different Python: 3.9.6 not in '>=3.10'
+```
+
+**Cause:** Your Python version is too old. This package requires Python 3.10 or higher.
+
+**Check your version:**
+```bash
+python3 --version
+```
+
+**Solution - Install Python 3.10+:**
+
+**macOS (using Homebrew):**
+```bash
+brew install python@3.12
+```
+Then create venv with the new Python:
+```bash
+/opt/homebrew/bin/python3.12 -m venv .venv   # Apple Silicon
+# OR
+/usr/local/bin/python3.12 -m venv .venv      # Intel Mac
+
+source .venv/bin/activate
+pip install --upgrade pip setuptools wheel
+pip install -e .
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install python3.12 python3.12-venv
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip setuptools wheel
+pip install -e .
+```
+
+**Windows:**
+Download Python 3.12 from https://www.python.org/downloads/ and install it. Then:
+```bash
+py -3.12 -m venv .venv
+.venv\Scripts\activate
+pip install --upgrade pip setuptools wheel
+pip install -e .
+```
+
+---
+
 ### "editable mode needs setuptools based build" error
 
 **Symptoms:**
@@ -266,10 +318,10 @@ This is typically a build/bundling issue. Try:
 | Issue | Quick Fix |
 |-------|-----------|
 | `command not found: context-graph` | Activate venv: `source .venv/bin/activate` |
+| `requires Python ... not in >=3.10` | Install Python 3.10+: `brew install python@3.12` (macOS) |
 | `-e option requires 1 argument` | Wrong directory - run `ls pyproject.toml` to check |
 | `editable mode needs setuptools` | Run `pip install --upgrade pip setuptools wheel` first |
 | `pip install -e .` fails | Upgrade pip/setuptools, check you're in project root |
-| Python version error | Need Python 3.10+: `python3 --version` |
 | ModuleNotFoundError | Activate venv before running |
 | Clone permission error | Ensure using `/tmp/context-graph-repos/` on macOS |
 | Server won't reload | Kill processes and restart with `./start-servers.sh` |

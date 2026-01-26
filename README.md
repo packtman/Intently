@@ -180,7 +180,15 @@ severity_threshold: medium  # low, medium, high, critical
 
 ### Prerequisites
 
-- **Python 3.10 or higher** - Check with `python3 --version`
+- **Python 3.10 or higher** (required)
+  ```bash
+  python3 --version   # Must be 3.10+
+  ```
+  If your version is older, install Python 3.12:
+  - **macOS:** `brew install python@3.12`
+  - **Ubuntu:** `sudo apt install python3.12 python3.12-venv`
+  - **Windows:** Download from https://python.org/downloads/
+  
 - **pip** - Usually included with Python
 - **Node.js 18+** (optional) - Only needed for web UI or desktop app
 
@@ -196,8 +204,10 @@ cd Intently
 Using a virtual environment keeps dependencies isolated and prevents conflicts:
 
 ```bash
-# Create virtual environment
+# Create virtual environment (use python3.12 if python3 is too old)
 python3 -m venv .venv
+# OR if you installed a newer Python separately:
+# python3.12 -m venv .venv
 
 # Activate it
 source .venv/bin/activate      # macOS/Linux
@@ -208,6 +218,8 @@ source .venv/bin/activate      # macOS/Linux
 ```
 
 **Note:** You'll need to activate the virtual environment each time you open a new terminal.
+
+**Python version error?** If you get "requires Python >=3.10", see [Troubleshooting](docs/TROUBLESHOOTING.md#requires-a-different-python-39x-not-in-310).
 
 ### 3. Install the Python Package
 
