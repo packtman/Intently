@@ -113,7 +113,12 @@ export default function NewReview() {
         },
       }
       console.log('Creating review with dimensions:', dimensions)
-      console.log('Full request:', JSON.stringify(request, null, 2))
+      // Don't log full request - it contains API keys
+      console.log('Request config (keys redacted):', {
+        ...request.config,
+        openai_api_key: request.config.openai_api_key ? '[REDACTED]' : undefined,
+        anthropic_api_key: request.config.anthropic_api_key ? '[REDACTED]' : undefined,
+      })
       return api.createReview(request)
     },
     onSuccess: async (data) => {
