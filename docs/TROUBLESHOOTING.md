@@ -1,5 +1,101 @@
 # Troubleshooting Guide
 
+## Installation Issues
+
+### "command not found: context-graph" after pip install
+
+**Symptoms:**
+```
+zsh: command not found: context-graph
+```
+
+**Causes & Solutions:**
+
+1. **Virtual environment not activated:**
+   ```bash
+   # Activate your virtual environment first
+   source .venv/bin/activate   # macOS/Linux
+   .venv\Scripts\activate      # Windows
+   
+   # Then try again
+   context-graph --help
+   ```
+
+2. **Installed outside virtual environment:**
+   ```bash
+   # Create and activate venv, then reinstall
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -e .
+   ```
+
+3. **PATH issue (pip installed to user directory):**
+   ```bash
+   # Check where pip installed the command
+   pip show context-graph
+   
+   # Try running with python -m instead
+   python -m context_graph.cli --help
+   ```
+
+### "pip install -e ." fails
+
+**Symptoms:**
+```
+ERROR: Could not find a version that satisfies the requirement...
+ERROR: No matching distribution found...
+```
+
+**Solutions:**
+
+1. **Wrong directory** - Make sure you're in the project root (where `pyproject.toml` is):
+   ```bash
+   # Check if pyproject.toml exists
+   ls pyproject.toml
+   
+   # If not, navigate to the correct directory
+   cd /path/to/Intently
+   ```
+
+2. **Python version too old:**
+   ```bash
+   # Check Python version (needs 3.10+)
+   python3 --version
+   
+   # If < 3.10, install newer Python
+   # macOS: brew install python@3.12
+   # Ubuntu: sudo apt install python3.12
+   ```
+
+3. **pip is outdated:**
+   ```bash
+   pip install --upgrade pip
+   pip install -e .
+   ```
+
+4. **Network/proxy issues:**
+   ```bash
+   # Try with verbose output to see what's failing
+   pip install -e . -v
+   ```
+
+### ModuleNotFoundError after installation
+
+**Symptoms:**
+```
+ModuleNotFoundError: No module named 'context_graph'
+```
+
+**Solution:**
+You're likely running Python outside the virtual environment:
+```bash
+# Always activate venv before running
+source .venv/bin/activate
+context-graph --help
+```
+
+---
+
 ## Known Issues and Solutions
 
 ### 1. GitHub Clone "Operation not permitted" Error (macOS)
@@ -117,6 +213,10 @@ This is typically a build/bundling issue. Try:
 
 | Issue | Quick Fix |
 |-------|-----------|
+| `command not found: context-graph` | Activate venv: `source .venv/bin/activate` |
+| `pip install -e .` fails | Check you're in project root (has `pyproject.toml`) |
+| Python version error | Need Python 3.10+: `python3 --version` |
+| ModuleNotFoundError | Activate venv before running |
 | Clone permission error | Ensure using `/tmp/context-graph-repos/` on macOS |
 | Server won't reload | Kill processes and restart with `./start-servers.sh` |
 | Old code still running | Clear `__pycache__` directories |
@@ -124,5 +224,5 @@ This is typically a build/bundling issue. Try:
 
 ---
 
-*Last updated: 2026-01-11*
-*Issue first encountered: macOS sandbox restrictions on Electron-spawned Python processes*
+*Last updated: 2026-01-25*
+*Added installation troubleshooting section*

@@ -87,16 +87,24 @@ Intently runs parallel analysis across five dimensions:
 ## Quick Start
 
 ```bash
-# 1. Install
+# 1. Clone and navigate to the project folder
+git clone https://github.com/packtman/Intently.git
+cd Intently
+
+# 2. Create and activate a virtual environment (recommended)
+python3 -m venv .venv
+source .venv/bin/activate   # On Windows: .venv\Scripts\activate
+
+# 3. Install the package
 pip install -e .
 
-# 2. Set API key (OpenAI or Anthropic)
+# 4. Set API key (OpenAI or Anthropic)
 export OPENAI_API_KEY="sk-..."
 
-# 3. Run a multi-dimensional review
+# 5. Run a multi-dimensional review
 context-graph review examples/sample-prd.md /path/to/codebase --llm
 
-# 4. Or start the web UI
+# 6. Or start the web UI
 ./scripts/start-servers.sh   # Opens at http://localhost:3000
 ```
 
@@ -164,14 +172,56 @@ severity_threshold: medium  # low, medium, high, critical
 
 ## Installation
 
-### 1. Install Python Package
+### Prerequisites
+
+- **Python 3.10 or higher** - Check with `python3 --version`
+- **pip** - Usually included with Python
+- **Node.js 18+** (optional) - Only needed for web UI or desktop app
+
+### 1. Clone the Repository
 
 ```bash
-cd "Context graph"
+git clone https://github.com/packtman/Intently.git
+cd Intently
+```
+
+### 2. Create a Virtual Environment (Recommended)
+
+Using a virtual environment keeps dependencies isolated and prevents conflicts:
+
+```bash
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate it
+source .venv/bin/activate      # macOS/Linux
+# OR
+.venv\Scripts\activate         # Windows (Command Prompt)
+# OR
+.venv\Scripts\Activate.ps1     # Windows (PowerShell)
+```
+
+**Note:** You'll need to activate the virtual environment each time you open a new terminal.
+
+### 3. Install the Python Package
+
+```bash
+# Install in "editable" mode (allows code changes without reinstalling)
 pip install -e .
 ```
 
-### 2. Set Environment Variables
+This installs the `context-graph` CLI command and all Python dependencies.
+
+**Verify installation:**
+```bash
+context-graph --help
+```
+
+You should see the list of available commands.
+
+**Having trouble?** See [Troubleshooting](docs/TROUBLESHOOTING.md) for common installation issues like "command not found" or pip errors.
+
+### 4. Set Environment Variables
 
 **Required for AI-based findings and chat functionality:**
 
@@ -219,7 +269,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 **Note:** Without API keys, the system will fall back to pattern-based analysis only. AI-based findings and chat require valid API keys.
 
-### 3. Run CLI Review
+### 5. Run CLI Review
 
 ```bash
 # Parse a PRD and analyze against codebase
@@ -229,7 +279,7 @@ context-graph review examples/sample-prd.md /path/to/your/codebase --output repo
 context-graph review examples/sample-prd.md /path/to/codebase --llm -o report.md
 ```
 
-### 4. Start Web UI
+### 6. Start Web UI (Optional)
 
 **Option A: Quick Start (using start script)**
 
@@ -252,7 +302,7 @@ npm install
 npm run dev
 ```
 
-### 5. Desktop App (Electron)
+### 7. Desktop App (Optional)
 
 For a native desktop experience with local file system integration:
 
@@ -388,30 +438,39 @@ Intently/
 
 We welcome contributions! Here's how to get started:
 
-1. **Fork the repository** and clone locally
-2. **Create a virtual environment**: `python3 -m venv .venv && source .venv/bin/activate`
-3. **Install in development mode**: `pip install -e ".[dev]"`
-4. **Run tests**: `pytest`
-5. **Submit a pull request**
-
 ### Development Setup
 
 ```bash
-# Clone the repo
-git clone https://github.com/packtman/Intently.git
+# 1. Fork and clone the repo
+git clone https://github.com/YOUR_USERNAME/Intently.git
 cd Intently
 
-# Python backend
+# 2. Create and activate virtual environment
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # macOS/Linux
+# OR: .venv\Scripts\activate  # Windows
+
+# 3. Install with development dependencies
 pip install -e ".[dev]"
 
-# Frontend (web dashboard)
+# 4. Verify installation
+context-graph --help
+pytest  # Run tests
+
+# 5. (Optional) Frontend web dashboard
 cd frontend && npm install
 
-# Desktop app
+# 6. (Optional) Desktop app
 cd desktop && npm install
 ```
+
+### Contribution Steps
+
+1. **Fork the repository** and clone locally (see above)
+2. **Create a feature branch**: `git checkout -b my-feature`
+3. **Make your changes** and add tests
+4. **Run tests**: `pytest`
+5. **Submit a pull request**
 
 ### Code Quality
 
