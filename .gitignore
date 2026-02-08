@@ -76,3 +76,6 @@ data/
 
 # Comparison/test output
 comparison-*.json
+
+# Internal docs (not for repo)
+AI-Powered Product Review Platform.md
