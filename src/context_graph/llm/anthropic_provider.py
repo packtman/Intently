@@ -16,6 +16,7 @@ from context_graph.llm.provider import (
     LLMResponse,
     AnalysisRequest,
     AnalysisType,
+    REFINEMENT_PROMPT,
 )
 
 
@@ -271,7 +272,31 @@ class AnthropicProvider(LLMProvider):
             },
         )
         return await self.analyze(request)
-    
+
+    async def refine_findings(
+        self,
+        findings: list[dict[str, Any]],
+        dimension: str,
+    ) -> list[dict[str, Any]]:
+        """Run a refinement/consolidation pass over raw findings."""
+        request = AnalysisRequest(
+            analysis_type=AnalysisType.SECURITY_REVIEW,
+            content=json.dumps({"findings": findings}, indent=2),
+            context={
+                "custom_prompt": REFINEMENT_PROMPT,
+                "dimension": dimension,
+            },
+        )
+        response = await self.analyze(request)
+        refined = response.structured_data.get("findings", [])
+        if not refined:
+            logging.warning(
+                "Anthropic refinement for %s returned no findings — keeping originals",
+                dimension,
+            )
+            return findings
+        return refined
+
     # Expected top-level keys per analysis type.
     _EXPECTED_KEYS: dict[AnalysisType, list[str]] = {
         AnalysisType.SECURITY_REVIEW: ["findings"],

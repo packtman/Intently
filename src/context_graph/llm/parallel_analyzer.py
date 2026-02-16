@@ -131,7 +131,11 @@ class ParallelLLMAnalyzer:
         
         if not valid_responses:
             raise RuntimeError("LLM security_review failed: no providers returned a valid response")
-        return self._merge_security_results(valid_responses)
+        result = self._merge_security_results(valid_responses)
+        result.merged_findings = await self._refine_merged_findings(
+            result.merged_findings, "security"
+        )
+        return result
     
     async def threat_model(
         self,
@@ -181,7 +185,11 @@ class ParallelLLMAnalyzer:
         
         if not valid_responses:
             raise RuntimeError("LLM privacy_review failed: no providers returned a valid response")
-        return self._merge_privacy_results(valid_responses)
+        result = self._merge_privacy_results(valid_responses)
+        result.merged_findings = await self._refine_merged_findings(
+            result.merged_findings, "privacy"
+        )
+        return result
     
     async def compliance_review(
         self,
@@ -210,7 +218,11 @@ class ParallelLLMAnalyzer:
         
         if not valid_responses:
             raise RuntimeError("LLM compliance_review failed: no providers returned a valid response")
-        return self._merge_compliance_results(valid_responses)
+        result = self._merge_compliance_results(valid_responses)
+        result.merged_findings = await self._refine_merged_findings(
+            result.merged_findings, "compliance"
+        )
+        return result
     
     async def engineering_review(
         self,
@@ -261,7 +273,11 @@ class ParallelLLMAnalyzer:
         
         if not valid_responses:
             raise RuntimeError("LLM engineering_review failed: no providers returned a valid response")
-        return self._merge_engineering_results(valid_responses)
+        result = self._merge_engineering_results(valid_responses)
+        result.merged_findings = await self._refine_merged_findings(
+            result.merged_findings, "engineering"
+        )
+        return result
     
     async def architecture_review(
         self,
@@ -289,8 +305,51 @@ class ParallelLLMAnalyzer:
         
         if not valid_responses:
             raise RuntimeError("LLM architecture_review failed: no providers returned a valid response")
-        return self._merge_architecture_results(valid_responses)
+        result = self._merge_architecture_results(valid_responses)
+        result.merged_findings = await self._refine_merged_findings(
+            result.merged_findings, "architecture"
+        )
+        return result
     
+    async def _refine_merged_findings(
+        self,
+        findings: list[dict[str, Any]],
+        dimension: str,
+    ) -> list[dict[str, Any]]:
+        """Run an LLM consolidation pass on merged findings.
+
+        Sends the full raw findings list to one provider and asks it to
+        deduplicate, merge, validate severities, remove noise, and return
+        a concise prioritised list.
+        """
+        if not findings:
+            return findings
+
+        # Pick the first available provider for refinement
+        provider = self.providers[0]
+        try:
+            logging.info(
+                "Refinement pass for %s: sending %d raw findings to %s",
+                dimension,
+                len(findings),
+                provider.provider_name,
+            )
+            refined = await provider.refine_findings(findings, dimension)
+            logging.info(
+                "Refinement pass for %s: %d → %d findings",
+                dimension,
+                len(findings),
+                len(refined),
+            )
+            return refined
+        except Exception as e:
+            logging.warning(
+                "Refinement pass for %s failed (%s) — keeping raw merged findings",
+                dimension,
+                e,
+            )
+            return findings
+
     def _merge_intent_results(
         self, 
         responses: list[LLMResponse]
@@ -898,8 +957,12 @@ class ParallelLLMAnalyzer:
         tasks = [run_for_provider(provider) for provider in self.providers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        # Merge iterative results
-        return self._merge_iterative_results(results, analysis_type)
+        # Merge iterative results then refine
+        result = self._merge_iterative_results(results, analysis_type)
+        result.merged_findings = await self._refine_merged_findings(
+            result.merged_findings, analysis_type.value
+        )
+        return result
     
     async def _provider_call_wrapper(
         self,

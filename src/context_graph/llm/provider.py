@@ -173,6 +173,20 @@ class LLMProvider(ABC):
     ) -> LLMResponse:
         """Perform architecture review (API design, dependencies, patterns)."""
         pass
+
+    @abstractmethod
+    async def refine_findings(
+        self,
+        findings: list[dict[str, Any]],
+        dimension: str,
+    ) -> list[dict[str, Any]]:
+        """Run a consolidation/refinement pass over raw findings.
+
+        Given a raw list of findings (potentially from multiple providers),
+        deduplicate, merge, validate severities, remove noise, and return
+        a concise, prioritised list.
+        """
+        pass
     
     def _get_system_prompt(self, analysis_type: AnalysisType) -> str:
         """Get the system prompt for an analysis type."""
@@ -992,4 +1006,39 @@ ANALYSIS FRAMEWORK:
    - Load balancing consideration
 
 Be comprehensive. Architectural decisions have long-lasting impact and are expensive to change later.""" + GENERATION_METADATA_PROMPT
+
+
+# ---------------------------------------------------------------------------
+# Refinement / consolidation prompt – used after the initial multi-provider
+# pass to let the LLM deduplicate, merge, validate and prioritize findings.
+# ---------------------------------------------------------------------------
+
+REFINEMENT_PROMPT = """You are a senior staff engineer performing a FINAL quality-assurance pass on a set of automated review findings produced by multiple AI reviewers.
+
+Your job is NOT to add new findings.  Instead you must:
+
+1. **MERGE DUPLICATES** – Many findings describe the same underlying issue with different wording.  Combine them into ONE finding keeping the most detailed description, best recommendations, and highest applicable severity.
+2. **VALIDATE SEVERITY** – Reassess each finding's severity.  Down-grade speculative/theoretical issues that have little real-world exploitability.  Up-grade issues that were under-rated.
+3. **REMOVE NOISE** – Drop findings that are purely informational, not actionable, or already covered by another finding at higher severity.
+4. **CONSOLIDATE** – Where multiple findings are really sub-points of a single broader concern, collapse them into one finding with a richer description.
+5. **PRIORITIZE** – Return findings ordered by severity (critical → high → medium → low).  Within the same severity, order by confidence descending.
+
+IMPORTANT RULES:
+- Output ONLY valid JSON, no markdown, no explanations outside the JSON.
+- Keep the SAME JSON schema as the input findings (same fields).
+- Preserve the "providers" array so we know which original providers flagged each issue.
+- Each output finding must have a unique "id" (F1, F2, …).
+- Aim for a CONCISE yet thorough list.  Quality over quantity.
+- Typical good output: 8-15 well-articulated findings per dimension, not 30+.
+
+{
+    "findings": [ ... consolidated list ... ],
+    "refinement_metadata": {
+        "input_count": <number of findings you received>,
+        "output_count": <number of findings you are returning>,
+        "duplicates_merged": <how many duplicates you collapsed>,
+        "noise_removed": <how many findings you dropped as noise>,
+        "severity_changes": <how many severity ratings you adjusted>
+    }
+}"""
 
