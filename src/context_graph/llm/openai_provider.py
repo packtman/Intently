@@ -81,7 +81,10 @@ class OpenAIProvider(LLMProvider):
                 create_kwargs.pop("max_tokens", None)
                 create_kwargs["max_completion_tokens"] = self.max_tokens
                 response = await self.client.chat.completions.create(**create_kwargs)
-            elif "Unsupported parameter: 'response_format'" in msg or "response_format" in msg and "unsupported" in msg.lower():
+            elif (
+                "Unsupported parameter: 'response_format'" in msg
+                or ("response_format" in msg and "unsupported" in msg.lower())
+            ):
                 # Some models/endpoints may not support structured response formatting.
                 # Fall back to prompt-only JSON instruction.
                 create_kwargs.pop("response_format", None)
