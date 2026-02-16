@@ -846,6 +846,21 @@ class LearnedPattern:
 
 
 @dataclass
+class FalsePositiveFilterStats:
+    """Statistics from the false positive filtering pipeline."""
+    
+    dimension: str = ""
+    original_count: int = 0
+    final_count: int = 0
+    total_removed: int = 0
+    total_downgraded: int = 0
+    total_iterations: int = 0
+    removal_rate: float = 0.0
+    iteration_details: list[dict[str, Any]] = field(default_factory=list)
+    removed_findings: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
 class PRDQualityScore:
     """PRD quality assessment."""
     score: float = 0.0  # 0-100

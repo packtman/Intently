@@ -31,6 +31,7 @@ from context_graph.core.models import (
     PredictedQuestion,
     PRDQualityScore,
     EffortEstimation,
+    FalsePositiveFilterStats,
 )
 from context_graph.core.graph import ContextGraph
 from context_graph.security.delta_analyzer import DeltaAnalyzer, DeltaAnalysisResult
@@ -113,6 +114,9 @@ class ReviewResult:
     executive_summary: str = ""
     risk_rating: str = ""
     reviewed_at: datetime = field(default_factory=datetime.now)
+    
+    # False positive filter stats (per dimension)
+    fp_filter_stats: list[FalsePositiveFilterStats] = field(default_factory=list)
     
     # PM-focused features (Unified PM Tool)
     predicted_questions: list[PredictedQuestion] = field(default_factory=list)
@@ -249,14 +253,40 @@ class SecurityReviewEngine:
         if self.config.use_graph_analysis and ReviewDimension.SECURITY in self.config.dimensions:
             result.graph_findings = self._analyze_graph()
         
-        # Step 5: Merge findings (legacy support)
+        # Step 5: Collect false positive filter stats
+        if self.llm_analyzer:
+            for dim_name, fp_result in self.llm_analyzer.fp_filter_results.items():
+                result.fp_filter_stats.append(FalsePositiveFilterStats(
+                    dimension=dim_name,
+                    original_count=fp_result.original_count,
+                    final_count=fp_result.final_count,
+                    total_removed=fp_result.total_removed,
+                    total_downgraded=fp_result.total_downgraded,
+                    total_iterations=fp_result.total_iterations,
+                    removal_rate=fp_result.removal_rate,
+                    iteration_details=[
+                        {
+                            "round": ir.round_num,
+                            "strategy": ir.strategy_name,
+                            "input": ir.input_count,
+                            "kept": ir.kept_count,
+                            "removed": ir.removed_count,
+                            "downgraded": ir.downgraded_count,
+                            "reasons": ir.removal_reasons,
+                        }
+                        for ir in fp_result.iteration_results
+                    ],
+                    removed_findings=fp_result.removed_findings,
+                ))
+        
+        # Step 6: Merge findings (legacy support)
         result.merged_findings = self._merge_findings(result)
         
-        # Step 6: Generate summary
+        # Step 7: Generate summary
         result.executive_summary = self._generate_summary(result)
         result.risk_rating = self._compute_risk_rating(result)
         
-        # Step 7: Generate PM-focused features (Unified PM Tool) - Feature-flagged
+        # Step 8: Generate PM-focused features (Unified PM Tool) - Feature-flagged
         from context_graph.config.features import get_features
         features = get_features()
         
@@ -1478,6 +1508,23 @@ class SecurityReviewEngine:
             if ReviewDimension.ARCHITECTURE in result.dimensions_analyzed:
                 parts.append(f"- Architecture (Design/Dependencies): {len(result.architecture_findings)} findings")
             parts.append("")
+        
+        # Add FP filter stats if any filtering was done
+        if result.fp_filter_stats:
+            total_original = sum(s.original_count for s in result.fp_filter_stats)
+            total_removed = sum(s.total_removed for s in result.fp_filter_stats)
+            total_downgraded = sum(s.total_downgraded for s in result.fp_filter_stats)
+            if total_removed > 0 or total_downgraded > 0:
+                parts.append("**False Positive Filtering:**")
+                for stat in result.fp_filter_stats:
+                    if stat.total_removed > 0 or stat.total_downgraded > 0:
+                        parts.append(
+                            f"- {stat.dimension.title()}: {stat.original_count} → "
+                            f"{stat.final_count} findings "
+                            f"(removed {stat.total_removed}, downgraded {stat.total_downgraded}, "
+                            f"{stat.total_iterations} iterations)"
+                        )
+                parts.append("")
         
         if result.delta_result:
             parts.append(f"**Change Summary:** {result.delta_result.delta.summary}")

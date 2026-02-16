@@ -17,6 +17,11 @@ from context_graph.llm.analysis_categories import (
     get_analysis_config,
     get_all_analysis_configs,
 )
+from context_graph.llm.false_positive_filter import (
+    FalsePositiveFilter,
+    FalsePositiveFilterResult,
+    FilterIterationResult,
+)
 
 __all__ = [
     # Core LLM
@@ -37,5 +42,9 @@ __all__ = [
     "IterativeAnalysisConfig",
     "get_analysis_config",
     "get_all_analysis_configs",
+    # False Positive Filter
+    "FalsePositiveFilter",
+    "FalsePositiveFilterResult",
+    "FilterIterationResult",
 ]
 

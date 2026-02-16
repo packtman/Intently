@@ -18,7 +18,7 @@ class JSONReportGenerator:
     
     def generate(self, result: ReviewResult) -> dict[str, Any]:
         """Generate complete JSON report."""
-        return {
+        report: dict[str, Any] = {
             "meta": self._generate_meta(result),
             "summary": self._generate_summary(result),
             "delta": self._generate_delta(result),
@@ -26,6 +26,13 @@ class JSONReportGenerator:
             "recommendations": self._generate_recommendations(result),
             "llm_analysis": self._generate_llm_analysis(result),
         }
+        
+        # Include false positive filter stats if filtering was applied
+        fp_stats = self._generate_fp_filter_stats(result)
+        if fp_stats:
+            report["false_positive_filter"] = fp_stats
+        
+        return report
     
     def generate_json(self, result: ReviewResult, indent: int = 2) -> str:
         """Generate JSON string."""
@@ -151,6 +158,42 @@ class JSONReportGenerator:
             "average_confidence": result.llm_result.average_confidence,
             "consensus_items_count": len(result.llm_result.consensus_items),
             "divergent_items_count": len(result.llm_result.divergent_items),
+        }
+    
+    def _generate_fp_filter_stats(self, result: ReviewResult) -> dict[str, Any] | None:
+        """Generate false positive filter statistics."""
+        if not result.fp_filter_stats:
+            return None
+        
+        total_original = sum(s.original_count for s in result.fp_filter_stats)
+        total_final = sum(s.final_count for s in result.fp_filter_stats)
+        total_removed = sum(s.total_removed for s in result.fp_filter_stats)
+        total_downgraded = sum(s.total_downgraded for s in result.fp_filter_stats)
+        
+        if total_removed == 0 and total_downgraded == 0:
+            return None
+        
+        return {
+            "enabled": True,
+            "total_original_findings": total_original,
+            "total_final_findings": total_final,
+            "total_removed": total_removed,
+            "total_downgraded": total_downgraded,
+            "overall_removal_rate": round(total_removed / total_original, 3) if total_original > 0 else 0,
+            "by_dimension": [
+                {
+                    "dimension": stat.dimension,
+                    "original_count": stat.original_count,
+                    "final_count": stat.final_count,
+                    "removed": stat.total_removed,
+                    "downgraded": stat.total_downgraded,
+                    "iterations": stat.total_iterations,
+                    "removal_rate": round(stat.removal_rate, 3),
+                    "iteration_details": stat.iteration_details,
+                }
+                for stat in result.fp_filter_stats
+                if stat.total_removed > 0 or stat.total_downgraded > 0
+            ],
         }
 
 

@@ -24,6 +24,10 @@ from context_graph.llm.analysis_categories import (
     AnalysisTypeCategories,
     get_analysis_config,
 )
+from context_graph.llm.false_positive_filter import (
+    FalsePositiveFilter,
+    FalsePositiveFilterResult,
+)
 from context_graph.config.features import get_features
 
 
@@ -85,6 +89,9 @@ class ParallelLLMAnalyzer:
         
         if not self.providers:
             raise ValueError("At least one API key must be provided")
+        
+        # Track false positive filter results per dimension (populated after each review)
+        self.fp_filter_results: dict[str, FalsePositiveFilterResult] = {}
     
     async def extract_intent(self, prd_content: str) -> ParallelAnalysisResult:
         """Extract intent using all providers in parallel."""
@@ -132,8 +139,9 @@ class ParallelLLMAnalyzer:
         if not valid_responses:
             raise RuntimeError("LLM security_review failed: no providers returned a valid response")
         result = self._merge_security_results(valid_responses)
-        result.merged_findings = await self._refine_merged_findings(
-            result.merged_findings, "security"
+        result.merged_findings = await self._refine_and_filter(
+            result.merged_findings, "security",
+            intent=intent, state=state, delta=delta,
         )
         return result
     
@@ -186,8 +194,9 @@ class ParallelLLMAnalyzer:
         if not valid_responses:
             raise RuntimeError("LLM privacy_review failed: no providers returned a valid response")
         result = self._merge_privacy_results(valid_responses)
-        result.merged_findings = await self._refine_merged_findings(
-            result.merged_findings, "privacy"
+        result.merged_findings = await self._refine_and_filter(
+            result.merged_findings, "privacy",
+            intent=intent, state=state, delta=delta,
         )
         return result
     
@@ -219,8 +228,9 @@ class ParallelLLMAnalyzer:
         if not valid_responses:
             raise RuntimeError("LLM compliance_review failed: no providers returned a valid response")
         result = self._merge_compliance_results(valid_responses)
-        result.merged_findings = await self._refine_merged_findings(
-            result.merged_findings, "compliance"
+        result.merged_findings = await self._refine_and_filter(
+            result.merged_findings, "compliance",
+            intent=intent, state=state, delta=delta,
         )
         return result
     
@@ -274,8 +284,9 @@ class ParallelLLMAnalyzer:
         if not valid_responses:
             raise RuntimeError("LLM engineering_review failed: no providers returned a valid response")
         result = self._merge_engineering_results(valid_responses)
-        result.merged_findings = await self._refine_merged_findings(
-            result.merged_findings, "engineering"
+        result.merged_findings = await self._refine_and_filter(
+            result.merged_findings, "engineering",
+            intent=intent, state=state, delta=delta,
         )
         return result
     
@@ -306,8 +317,9 @@ class ParallelLLMAnalyzer:
         if not valid_responses:
             raise RuntimeError("LLM architecture_review failed: no providers returned a valid response")
         result = self._merge_architecture_results(valid_responses)
-        result.merged_findings = await self._refine_merged_findings(
-            result.merged_findings, "architecture"
+        result.merged_findings = await self._refine_and_filter(
+            result.merged_findings, "architecture",
+            intent=intent, state=state, delta=delta,
         )
         return result
     
@@ -349,6 +361,95 @@ class ParallelLLMAnalyzer:
                 e,
             )
             return findings
+
+    async def _filter_false_positives(
+        self,
+        findings: list[dict[str, Any]],
+        dimension: str,
+        intent: dict[str, Any] | None = None,
+        state: dict[str, Any] | None = None,
+        delta: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Run multi-iteration false positive filtering on findings.
+
+        Each iteration applies a different validation strategy (context
+        validation, specificity check, evidence grounding) to progressively
+        remove false positives while preserving true findings.
+
+        Only runs when the ``enable_false_positive_filtering`` feature flag
+        is enabled.  Falls back gracefully on error.
+        """
+        features = get_features()
+        if not features.enable_false_positive_filtering:
+            return findings
+
+        if not findings:
+            return findings
+
+        provider = self.providers[0]
+        try:
+            fp_filter = FalsePositiveFilter(
+                llm_provider=provider,
+                max_iterations=features.false_positive_max_iterations,
+                min_findings_to_filter=features.false_positive_min_findings,
+                verbose=True,
+            )
+            fp_result = await fp_filter.filter_findings(
+                findings=findings,
+                dimension=dimension,
+                intent=intent,
+                state=state,
+                delta=delta,
+            )
+            self.fp_filter_results[dimension] = fp_result
+            logging.info(
+                "FP filter for %s: %d → %d findings (removed %d, %.0f%%)",
+                dimension,
+                fp_result.original_count,
+                fp_result.final_count,
+                fp_result.total_removed,
+                fp_result.removal_rate * 100,
+            )
+            return fp_result.filtered_findings
+        except Exception as e:
+            logging.warning(
+                "False positive filter for %s failed (%s) — keeping all findings",
+                dimension,
+                e,
+            )
+            return findings
+
+    async def _refine_and_filter(
+        self,
+        findings: list[dict[str, Any]],
+        dimension: str,
+        intent: dict[str, Any] | None = None,
+        state: dict[str, Any] | None = None,
+        delta: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Chain refinement (dedup/merge) then false-positive filtering.
+
+        This is the recommended post-processing pipeline for merged findings:
+        1. Refinement pass — dedup, merge, validate severities, remove noise
+        2. False positive filter — multi-iteration context-aware validation
+
+        Args:
+            findings: Raw merged findings.
+            dimension: Review dimension name.
+            intent: Optional PRD intent dict (improves FP detection).
+            state: Optional codebase state dict (improves FP detection).
+            delta: Optional delta dict (improves FP detection).
+
+        Returns:
+            Refined and filtered findings list.
+        """
+        # Step 1: refinement (existing single-pass consolidation)
+        refined = await self._refine_merged_findings(findings, dimension)
+        # Step 2: false positive filtering (multi-iteration)
+        filtered = await self._filter_false_positives(
+            refined, dimension, intent=intent, state=state, delta=delta,
+        )
+        return filtered
 
     def _merge_intent_results(
         self, 
@@ -957,10 +1058,11 @@ class ParallelLLMAnalyzer:
         tasks = [run_for_provider(provider) for provider in self.providers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        # Merge iterative results then refine
+        # Merge iterative results then refine + filter false positives
         result = self._merge_iterative_results(results, analysis_type)
-        result.merged_findings = await self._refine_merged_findings(
-            result.merged_findings, analysis_type.value
+        result.merged_findings = await self._refine_and_filter(
+            result.merged_findings, analysis_type.value,
+            intent=intent, state=state, delta=delta,
         )
         return result
     

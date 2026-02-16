@@ -47,6 +47,11 @@ Environment Variables:
     FEATURE_ITERATIVE_ARCHITECTURE_ANALYSIS=true
     FEATURE_ITERATIVE_THREAT_MODEL=true
     ITERATIVE_ANALYSIS_MAX_ROUNDS=5
+    
+    # False Positive Filtering
+    FEATURE_FALSE_POSITIVE_FILTERING=true
+    FALSE_POSITIVE_MAX_ITERATIONS=3
+    FALSE_POSITIVE_MIN_FINDINGS=3
 """
 
 from __future__ import annotations
@@ -193,6 +198,24 @@ class FeatureFlags:
     # Maximum rounds for iterative analysis (default: 5)
     iterative_analysis_max_rounds: int = 5
     
+    # ==================== False Positive Filtering ====================
+    # Multi-iteration LLM-based false positive removal
+    
+    # Enable false positive filtering on scan findings
+    # Runs multiple validation passes to remove false positives
+    enable_false_positive_filtering: bool = True
+    
+    # Maximum iterations for false positive filtering (1-5)
+    # Each iteration applies a different validation strategy:
+    #   1 = context validation (check existing mitigations)
+    #   2 = specificity check (remove generic boilerplate)
+    #   3 = evidence grounding (ensure concrete evidence)
+    false_positive_max_iterations: int = 3
+    
+    # Minimum number of findings before filtering is applied
+    # (skip filtering for very small result sets — not worth the cost)
+    false_positive_min_findings: int = 3
+    
     # ==================== Utility Methods ====================
     
     @classmethod
@@ -236,6 +259,10 @@ class FeatureFlags:
             enable_iterative_architecture_analysis=_env_bool("FEATURE_ITERATIVE_ARCHITECTURE_ANALYSIS"),
             enable_iterative_threat_model=_env_bool("FEATURE_ITERATIVE_THREAT_MODEL"),
             iterative_analysis_max_rounds=int(os.getenv("ITERATIVE_ANALYSIS_MAX_ROUNDS", "5")),
+            # False positive filtering
+            enable_false_positive_filtering=_env_bool("FEATURE_FALSE_POSITIVE_FILTERING", True),
+            false_positive_max_iterations=int(os.getenv("FALSE_POSITIVE_MAX_ITERATIONS", "3")),
+            false_positive_min_findings=int(os.getenv("FALSE_POSITIVE_MIN_FINDINGS", "3")),
         )
     
     @classmethod
@@ -274,6 +301,10 @@ class FeatureFlags:
             enable_iterative_architecture_analysis=True,
             enable_iterative_threat_model=True,
             iterative_analysis_max_rounds=5,
+            # False positive filtering
+            enable_false_positive_filtering=True,
+            false_positive_max_iterations=3,
+            false_positive_min_findings=3,
         )
     
     def to_dict(self) -> dict[str, Any]:
@@ -311,6 +342,10 @@ class FeatureFlags:
             "iterative_architecture_analysis": self.enable_iterative_architecture_analysis,
             "iterative_threat_model": self.enable_iterative_threat_model,
             "iterative_analysis_max_rounds": self.iterative_analysis_max_rounds,
+            # False positive filtering
+            "false_positive_filtering": self.enable_false_positive_filtering,
+            "false_positive_max_iterations": self.false_positive_max_iterations,
+            "false_positive_min_findings": self.false_positive_min_findings,
         }
     
     def get_enabled_features(self) -> list[str]:
@@ -368,6 +403,9 @@ class FeatureFlags:
             enabled.append("iterative_architecture_analysis")
         if self.enable_iterative_threat_model:
             enabled.append("iterative_threat_model")
+        # False positive filtering
+        if self.enable_false_positive_filtering:
+            enabled.append("false_positive_filtering")
         return enabled
 
 

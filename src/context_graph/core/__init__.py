@@ -16,6 +16,7 @@ from context_graph.core.models import (
     PrivacyCategory,
     ComplianceCategory,
     ComplianceFramework,
+    FalsePositiveFilterStats,
 )
 
 __all__ = [
@@ -34,5 +35,6 @@ __all__ = [
     "PrivacyCategory",
     "ComplianceCategory",
     "ComplianceFramework",
+    "FalsePositiveFilterStats",
 ]
 
