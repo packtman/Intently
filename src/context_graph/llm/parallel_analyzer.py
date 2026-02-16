@@ -66,8 +66,8 @@ class ParallelLLMAnalyzer:
         self,
         openai_api_key: str | None = None,
         anthropic_api_key: str | None = None,
-        openai_model: str = "gpt-4o",
-        anthropic_model: str = "claude-sonnet-4-20250514",
+        openai_model: str = "gpt-5.2",
+        anthropic_model: str = "claude-opus-4-5-20251101",
     ) -> None:
         self.providers: list[LLMProvider] = []
         
@@ -101,6 +101,8 @@ class ParallelLLMAnalyzer:
             if isinstance(r, LLMResponse)
         ]
         
+        if not valid_responses:
+            raise RuntimeError("LLM extract_intent failed: no providers returned a valid response")
         return self._merge_intent_results(valid_responses)
     
     async def security_review(
@@ -128,8 +130,7 @@ class ParallelLLMAnalyzer:
                 logging.error(f"LLM provider {self.providers[i].provider_name} failed: {r}")
         
         if not valid_responses:
-            logging.warning("All LLM providers failed or returned no valid responses")
-        
+            raise RuntimeError("LLM security_review failed: no providers returned a valid response")
         return self._merge_security_results(valid_responses)
     
     async def threat_model(
@@ -150,6 +151,8 @@ class ParallelLLMAnalyzer:
             if isinstance(r, LLMResponse)
         ]
         
+        if not valid_responses:
+            raise RuntimeError("LLM threat_model failed: no providers returned a valid response")
         return self._merge_threat_results(valid_responses)
     
     async def privacy_review(
@@ -177,8 +180,7 @@ class ParallelLLMAnalyzer:
                 logging.error(f"LLM provider {self.providers[i].provider_name} privacy review failed: {r}")
         
         if not valid_responses:
-            logging.warning("All LLM providers failed or returned no valid privacy responses")
-        
+            raise RuntimeError("LLM privacy_review failed: no providers returned a valid response")
         return self._merge_privacy_results(valid_responses)
     
     async def compliance_review(
@@ -207,8 +209,7 @@ class ParallelLLMAnalyzer:
                 logging.error(f"LLM provider {self.providers[i].provider_name} compliance review failed: {r}")
         
         if not valid_responses:
-            logging.warning("All LLM providers failed or returned no valid compliance responses")
-        
+            raise RuntimeError("LLM compliance_review failed: no providers returned a valid response")
         return self._merge_compliance_results(valid_responses)
     
     async def engineering_review(
@@ -259,8 +260,7 @@ class ParallelLLMAnalyzer:
                 logging.error(f"LLM provider {self.providers[i].provider_name} engineering review failed: {r}")
         
         if not valid_responses:
-            logging.warning("All LLM providers failed or returned no valid engineering responses")
-        
+            raise RuntimeError("LLM engineering_review failed: no providers returned a valid response")
         return self._merge_engineering_results(valid_responses)
     
     async def architecture_review(
@@ -288,8 +288,7 @@ class ParallelLLMAnalyzer:
                 logging.error(f"LLM provider {self.providers[i].provider_name} architecture review failed: {r}")
         
         if not valid_responses:
-            logging.warning("All LLM providers failed or returned no valid architecture responses")
-        
+            raise RuntimeError("LLM architecture_review failed: no providers returned a valid response")
         return self._merge_architecture_results(valid_responses)
     
     def _merge_intent_results(
@@ -701,11 +700,35 @@ class ParallelLLMAnalyzer:
         return result
     
     def _finding_signature(self, finding: dict[str, Any]) -> str:
-        """Create a signature for finding deduplication."""
-        title = finding.get("title", "").lower()[:30]
-        category = finding.get("category", "").lower()
-        severity = finding.get("severity", "").lower()
-        return f"{severity}:{category}:{title}"
+        """Create a signature for finding deduplication.
+        
+        Uses category + severity + normalised title keywords so that
+        semantically identical findings from different providers merge
+        even when phrased differently (e.g. "SQL Injection in Login" vs
+        "Login Endpoint SQL Injection Attack").
+        """
+        import re
+
+        category = finding.get("category", "").lower().strip()
+        severity = finding.get("severity", "").lower().strip()
+
+        # Normalise the title: lowercase, strip punctuation, sort keywords
+        raw_title = finding.get("title", "").lower()
+        words = sorted(set(re.sub(r"[^a-z0-9 ]", "", raw_title).split()))
+        # Also pull top keywords from affected_components for extra signal
+        components = finding.get("affected_components", [])
+        if isinstance(components, list):
+            comp_words = sorted(
+                set(
+                    w
+                    for c in components
+                    for w in re.sub(r"[^a-z0-9 ]", "", str(c).lower()).split()
+                )
+            )
+        else:
+            comp_words = []
+
+        return f"{severity}:{category}:{' '.join(words)}:{' '.join(comp_words)}"
     
     # ==================== Iterative Analysis Methods ====================
     

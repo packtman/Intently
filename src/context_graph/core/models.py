@@ -639,6 +639,8 @@ class ArchitectureFinding:
     
     # Impact assessment
     breaking_change: bool = False
+    backward_compatible: bool = True
+    migration_required: bool = False
     downstream_impact: list[str] = field(default_factory=list)
     upstream_dependencies: list[str] = field(default_factory=list)
     

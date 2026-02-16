@@ -160,7 +160,7 @@ Product management utilities:
 # context-graph.yaml
 llm:
   provider: anthropic  # or openai
-  model: claude-sonnet-4-20250514
+  model: claude-opus-4-5-20251101
 
 codebase:
   languages: [python, typescript, kotlin]

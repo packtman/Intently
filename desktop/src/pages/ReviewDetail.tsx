@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Shield,
@@ -119,6 +119,7 @@ function ReviewDetailContent() {
   
   // Track if we've triggered a manual refetch to avoid infinite loops
   const [manualRefetchTriggered, setManualRefetchTriggered] = useState(false)
+  const queryClient = useQueryClient()
 
   // Poll for status while pending/running
   const { data: status, refetch: refetchStatus } = useQuery<ReviewStatus>({
@@ -185,6 +186,13 @@ function ReviewDetailContent() {
       dashboardError: dashboardError?.message,
     })
   }, [id, isConnected, status?.status, dashboardQueryStatus, isDashboardPending, isLoading, isDashboardFetching, dashboard, dashboardError])
+
+  // Invalidate the reviews list cache when a review finishes so the Dashboard picks it up
+  useEffect(() => {
+    if (status?.status === 'completed' || status?.status === 'failed') {
+      queryClient.invalidateQueries({ queryKey: ['reviews'] })
+    }
+  }, [status?.status, queryClient])
 
   // Force refetch dashboard when status becomes completed
   // This ensures fresh data is always fetched, working around any React Query caching issues

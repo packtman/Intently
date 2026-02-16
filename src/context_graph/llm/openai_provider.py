@@ -5,6 +5,7 @@ OpenAI LLM Provider implementation.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any
 
@@ -20,13 +21,21 @@ from context_graph.llm.provider import (
 
 class OpenAIProvider(LLMProvider):
     """OpenAI API provider for LLM analysis."""
+
+    def _uses_max_completion_tokens(self, model: str) -> bool:
+        """
+        Some newer OpenAI models (e.g., GPT-5 family) require `max_completion_tokens`
+        instead of `max_tokens` on the Chat Completions API.
+        """
+        m = (model or "").lower()
+        return m.startswith("gpt-5") or m.startswith("o")
     
     def __init__(
         self,
         api_key: str,
-        model: str = "gpt-4o",
-        temperature: float = 0.1,
-        max_tokens: int = 4096,
+        model: str = "gpt-5.2",
+        temperature: float = 0.0,
+        max_tokens: int = 16384,
     ) -> None:
         super().__init__(api_key, model, temperature, max_tokens)
         self.client = AsyncOpenAI(api_key=api_key)
@@ -37,22 +46,47 @@ class OpenAIProvider(LLMProvider):
     
     async def analyze(self, request: AnalysisRequest) -> LLMResponse:
         """Perform analysis using OpenAI."""
-        system_prompt = self._get_system_prompt(request.analysis_type)
+        system_prompt = (
+            request.context.get("custom_prompt")
+            if request.context and isinstance(request.context.get("custom_prompt"), str)
+            else self._get_system_prompt(request.analysis_type)
+        )
         
         user_content = self._build_user_prompt(request)
         
         start_time = time.time()
-        
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
+
+        create_kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content},
             ],
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            response_format={"type": "json_object"},
-        )
+            "temperature": self.temperature,
+            "response_format": {"type": "json_object"},
+            "seed": 42,
+        }
+        if self._uses_max_completion_tokens(self.model):
+            create_kwargs["max_completion_tokens"] = self.max_tokens
+        else:
+            create_kwargs["max_tokens"] = self.max_tokens
+
+        # Retry with `max_completion_tokens` if the model rejects `max_tokens`
+        try:
+            response = await self.client.chat.completions.create(**create_kwargs)
+        except Exception as e:
+            msg = str(e)
+            if "Unsupported parameter: 'max_tokens'" in msg:
+                create_kwargs.pop("max_tokens", None)
+                create_kwargs["max_completion_tokens"] = self.max_tokens
+                response = await self.client.chat.completions.create(**create_kwargs)
+            elif "Unsupported parameter: 'response_format'" in msg or "response_format" in msg and "unsupported" in msg.lower():
+                # Some models/endpoints may not support structured response formatting.
+                # Fall back to prompt-only JSON instruction.
+                create_kwargs.pop("response_format", None)
+                response = await self.client.chat.completions.create(**create_kwargs)
+            else:
+                raise
         
         latency_ms = (time.time() - start_time) * 1000
         
@@ -63,7 +97,19 @@ class OpenAIProvider(LLMProvider):
         try:
             structured_data = json.loads(content)
         except json.JSONDecodeError:
-            structured_data = {"raw": content}
+            logging.warning(
+                "OpenAI response for %s was not valid JSON (%d chars). "
+                "First 200 chars: %s",
+                request.analysis_type.value,
+                len(content),
+                content[:200],
+            )
+            structured_data = {"raw": content, "parse_error": True}
+
+        # Validate that the response contains the expected top-level keys
+        structured_data = self._validate_response(
+            structured_data, request.analysis_type
+        )
         
         return LLMResponse(
             provider=self.provider_name,
@@ -178,7 +224,8 @@ class OpenAIProvider(LLMProvider):
         ])
         
         # Create custom prompt with selected frameworks
-        custom_prompt = COMPLIANCE_REVIEW_PROMPT.format(frameworks=selected_frameworks)
+        # IMPORTANT: don't use `.format(...)` because the prompt contains many `{}` JSON braces.
+        custom_prompt = COMPLIANCE_REVIEW_PROMPT.replace("{frameworks}", selected_frameworks)
         
         request = AnalysisRequest(
             analysis_type=AnalysisType.COMPLIANCE_REVIEW,
@@ -257,6 +304,45 @@ class OpenAIProvider(LLMProvider):
         )
         return await self.analyze(request)
     
+    # Expected top-level keys per analysis type.
+    # If the response is missing *all* of them, the JSON is likely malformed.
+    _EXPECTED_KEYS: dict[AnalysisType, list[str]] = {
+        AnalysisType.SECURITY_REVIEW: ["findings"],
+        AnalysisType.PRIVACY_REVIEW: ["findings"],
+        AnalysisType.COMPLIANCE_REVIEW: ["findings"],
+        AnalysisType.ENGINEERING_REVIEW: ["findings"],
+        AnalysisType.ARCHITECTURE_REVIEW: ["findings"],
+        AnalysisType.INTENT_EXTRACTION: ["title", "features", "data_entities"],
+        AnalysisType.THREAT_MODELING: ["attack_paths", "trust_boundaries"],
+    }
+
+    def _validate_response(
+        self,
+        data: dict[str, Any],
+        analysis_type: AnalysisType,
+    ) -> dict[str, Any]:
+        """Validate that the LLM response contains expected keys.
+
+        If the response has a parse error or is completely missing the
+        expected structure, log a warning and inject empty defaults so
+        downstream merge logic doesn't break.
+        """
+        if data.get("parse_error"):
+            return data
+
+        expected = self._EXPECTED_KEYS.get(analysis_type, [])
+        if expected and not any(k in data for k in expected):
+            logging.warning(
+                "OpenAI %s response missing expected keys %s. "
+                "Got keys: %s — injecting empty defaults.",
+                analysis_type.value,
+                expected,
+                list(data.keys())[:10],
+            )
+            for key in expected:
+                data.setdefault(key, [])
+        return data
+
     def _build_user_prompt(self, request: AnalysisRequest) -> str:
         """Build the user prompt from request."""
         parts = []

@@ -5,6 +5,7 @@ Anthropic Claude LLM Provider implementation.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any
 
@@ -24,9 +25,9 @@ class AnthropicProvider(LLMProvider):
     def __init__(
         self,
         api_key: str,
-        model: str = "claude-sonnet-4-20250514",
-        temperature: float = 0.1,
-        max_tokens: int = 4096,
+        model: str = "claude-opus-4-5-20251101",
+        temperature: float = 0.0,
+        max_tokens: int = 16384,
     ) -> None:
         super().__init__(api_key, model, temperature, max_tokens)
         self.client = AsyncAnthropic(api_key=api_key)
@@ -37,7 +38,11 @@ class AnthropicProvider(LLMProvider):
     
     async def analyze(self, request: AnalysisRequest) -> LLMResponse:
         """Perform analysis using Anthropic Claude."""
-        system_prompt = self._get_system_prompt(request.analysis_type)
+        system_prompt = (
+            request.context.get("custom_prompt")
+            if request.context and isinstance(request.context.get("custom_prompt"), str)
+            else self._get_system_prompt(request.analysis_type)
+        )
         
         # Add JSON instruction to system prompt for Claude
         system_prompt += "\n\nIMPORTANT: Respond with valid JSON only. No markdown formatting, no code blocks, just raw JSON."
@@ -68,6 +73,11 @@ class AnthropicProvider(LLMProvider):
         
         # Parse JSON response
         structured_data = self._parse_json_response(content)
+
+        # Validate that the response contains the expected top-level keys
+        structured_data = self._validate_response(
+            structured_data, request.analysis_type
+        )
         
         return LLMResponse(
             provider=self.provider_name,
@@ -182,7 +192,8 @@ class AnthropicProvider(LLMProvider):
         ])
         
         # Create custom prompt with selected frameworks
-        custom_prompt = COMPLIANCE_REVIEW_PROMPT.format(frameworks=selected_frameworks)
+        # IMPORTANT: don't use `.format(...)` because the prompt contains many `{}` JSON braces.
+        custom_prompt = COMPLIANCE_REVIEW_PROMPT.replace("{frameworks}", selected_frameworks)
         
         request = AnalysisRequest(
             analysis_type=AnalysisType.COMPLIANCE_REVIEW,
@@ -261,6 +272,39 @@ class AnthropicProvider(LLMProvider):
         )
         return await self.analyze(request)
     
+    # Expected top-level keys per analysis type.
+    _EXPECTED_KEYS: dict[AnalysisType, list[str]] = {
+        AnalysisType.SECURITY_REVIEW: ["findings"],
+        AnalysisType.PRIVACY_REVIEW: ["findings"],
+        AnalysisType.COMPLIANCE_REVIEW: ["findings"],
+        AnalysisType.ENGINEERING_REVIEW: ["findings"],
+        AnalysisType.ARCHITECTURE_REVIEW: ["findings"],
+        AnalysisType.INTENT_EXTRACTION: ["title", "features", "data_entities"],
+        AnalysisType.THREAT_MODELING: ["attack_paths", "trust_boundaries"],
+    }
+
+    def _validate_response(
+        self,
+        data: dict[str, Any],
+        analysis_type: AnalysisType,
+    ) -> dict[str, Any]:
+        """Validate that the LLM response contains expected keys."""
+        if data.get("parse_error"):
+            return data
+
+        expected = self._EXPECTED_KEYS.get(analysis_type, [])
+        if expected and not any(k in data for k in expected):
+            logging.warning(
+                "Anthropic %s response missing expected keys %s. "
+                "Got keys: %s — injecting empty defaults.",
+                analysis_type.value,
+                expected,
+                list(data.keys())[:10],
+            )
+            for key in expected:
+                data.setdefault(key, [])
+        return data
+
     def _build_user_prompt(self, request: AnalysisRequest) -> str:
         """Build the user prompt from request."""
         parts = []

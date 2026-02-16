@@ -23,6 +23,9 @@ export default function Reviews() {
     queryKey: ['reviews'],
     queryFn: () => api.listReviews(),
     enabled: isConnected,
+    // Refetch on mount when data is stale so new reviews show up
+    refetchOnMount: true,
+    staleTime: 30 * 1000,
   })
 
   const filteredReviews = reviews.filter((review) => {

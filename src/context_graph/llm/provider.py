@@ -73,8 +73,8 @@ class LLMProvider(ABC):
         self,
         api_key: str,
         model: str,
-        temperature: float = 0.1,
-        max_tokens: int = 4096,
+        temperature: float = 0.0,
+        max_tokens: int = 16384,
     ) -> None:
         self.api_key = api_key
         self.model = model

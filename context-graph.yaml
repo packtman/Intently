@@ -9,14 +9,14 @@ llm:
   # OpenAI configuration
   openai:
     # Set via OPENAI_API_KEY environment variable
-    model: gpt-4o
+    model: gpt-5.2
     temperature: 0.1
     max_tokens: 4096
   
   # Anthropic configuration
   anthropic:
     # Set via ANTHROPIC_API_KEY environment variable
-    model: claude-sonnet-4-20250514
+    model: claude-opus-4-5-20251101
     temperature: 0.1
     max_tokens: 4096
 

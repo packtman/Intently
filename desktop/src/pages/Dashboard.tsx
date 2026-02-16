@@ -37,8 +37,9 @@ export default function Dashboard() {
     queryKey: ['reviews'],
     queryFn: () => api.listReviews(),
     enabled: isConnected,
-    // PERFORMANCE: Don't refetch on every mount, rely on stale time
-    refetchOnMount: false,
+    // Refetch on mount when data is stale so new reviews show up
+    refetchOnMount: true,
+    staleTime: 30 * 1000, // 30 seconds — reviews list should stay fairly fresh
   })
 
   const stats = {

@@ -724,7 +724,7 @@ Respond ONLY with valid JSON, no additional text."""
                     "content-type": "application/json",
                 },
                 json={
-                    "model": "claude-sonnet-4-20250514",
+                    "model": "claude-opus-4-5-20251101",
                     "max_tokens": 8000,
                     "messages": [{"role": "user", "content": prompt}],
                 },
@@ -745,8 +745,9 @@ Respond ONLY with valid JSON, no additional text."""
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "gpt-4o",
-                    "max_tokens": 8000,
+                    "model": "gpt-5.2",
+                    # GPT-5 family expects `max_completion_tokens` instead of `max_tokens`
+                    "max_completion_tokens": 8000,
                     "messages": [{"role": "user", "content": prompt}],
                     "response_format": {"type": "json_object"},
                 },
