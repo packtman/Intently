@@ -856,6 +856,7 @@ class FalsePositiveFilterStats:
     total_downgraded: int = 0
     total_iterations: int = 0
     removal_rate: float = 0.0
+    execution_mode: str = "parallel"
     iteration_details: list[dict[str, Any]] = field(default_factory=list)
     removed_findings: list[dict[str, Any]] = field(default_factory=list)
 

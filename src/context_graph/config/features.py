@@ -216,6 +216,17 @@ class FeatureFlags:
     # (skip filtering for very small result sets — not worth the cost)
     false_positive_min_findings: int = 3
     
+    # Run FP filter strategies in parallel (fan-out + majority vote)
+    # instead of sequentially (pipeline).  ~3x faster wall-clock time.
+    false_positive_parallel: bool = True
+    
+    # In parallel mode, the minimum number of strategies that must vote
+    # "remove" to actually remove a finding.
+    # 1 = any strategy can remove (matches sequential aggressiveness)
+    # 2 = majority must agree (conservative)
+    # 3 = unanimous (very conservative)
+    false_positive_removal_threshold: int = 1
+    
     # ==================== Utility Methods ====================
     
     @classmethod
@@ -263,6 +274,8 @@ class FeatureFlags:
             enable_false_positive_filtering=_env_bool("FEATURE_FALSE_POSITIVE_FILTERING", True),
             false_positive_max_iterations=int(os.getenv("FALSE_POSITIVE_MAX_ITERATIONS", "3")),
             false_positive_min_findings=int(os.getenv("FALSE_POSITIVE_MIN_FINDINGS", "3")),
+            false_positive_parallel=_env_bool("FALSE_POSITIVE_PARALLEL", True),
+            false_positive_removal_threshold=int(os.getenv("FALSE_POSITIVE_REMOVAL_THRESHOLD", "1")),
         )
     
     @classmethod
@@ -305,6 +318,8 @@ class FeatureFlags:
             enable_false_positive_filtering=True,
             false_positive_max_iterations=3,
             false_positive_min_findings=3,
+            false_positive_parallel=True,
+            false_positive_removal_threshold=1,
         )
     
     def to_dict(self) -> dict[str, Any]:
@@ -346,6 +361,8 @@ class FeatureFlags:
             "false_positive_filtering": self.enable_false_positive_filtering,
             "false_positive_max_iterations": self.false_positive_max_iterations,
             "false_positive_min_findings": self.false_positive_min_findings,
+            "false_positive_parallel": self.false_positive_parallel,
+            "false_positive_removal_threshold": self.false_positive_removal_threshold,
         }
     
     def get_enabled_features(self) -> list[str]:
@@ -406,6 +423,8 @@ class FeatureFlags:
         # False positive filtering
         if self.enable_false_positive_filtering:
             enabled.append("false_positive_filtering")
+        if self.false_positive_parallel:
+            enabled.append("false_positive_parallel")
         return enabled
 
 

@@ -264,6 +264,7 @@ class SecurityReviewEngine:
                     total_downgraded=fp_result.total_downgraded,
                     total_iterations=fp_result.total_iterations,
                     removal_rate=fp_result.removal_rate,
+                    execution_mode=fp_result.execution_mode,
                     iteration_details=[
                         {
                             "round": ir.round_num,

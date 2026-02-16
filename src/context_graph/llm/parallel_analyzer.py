@@ -393,6 +393,8 @@ class ParallelLLMAnalyzer:
                 max_iterations=features.false_positive_max_iterations,
                 min_findings_to_filter=features.false_positive_min_findings,
                 verbose=True,
+                parallel=features.false_positive_parallel,
+                removal_threshold=features.false_positive_removal_threshold,
             )
             fp_result = await fp_filter.filter_findings(
                 findings=findings,
