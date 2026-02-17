@@ -8,6 +8,7 @@ import Reviews from './pages/Reviews'
 import Settings from './pages/Settings'
 import BulkAnalysis from './pages/BulkAnalysis'
 import PRDGenerator from './pages/PRDGenerator'
+import Analytics from './pages/Analytics'
 import { BackendProvider } from './hooks/useBackend'
 
 function App() {
@@ -48,6 +49,7 @@ function App() {
           <Route path="/new" element={<NewReview />} />
           <Route path="/bulk" element={<BulkAnalysis />} />
           <Route path="/generate" element={<PRDGenerator />} />
+          <Route path="/analytics" element={<Analytics />} />
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/review/:id" element={<ReviewDetail />} />
           <Route path="/settings" element={<Settings />} />
