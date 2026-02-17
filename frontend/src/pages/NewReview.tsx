@@ -55,6 +55,7 @@ export default function NewReview() {
   const [parsedIntent, setParsedIntent] = useState<ParsedIntent | null>(null)
   const [openaiKey, setOpenaiKey] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
+  const [modelOverride, setModelOverride] = useState('')
 
   const createReview = useMutation({
     mutationFn: async () => {
@@ -76,6 +77,7 @@ export default function NewReview() {
             dimensions: dimensions,
             openai_api_key: openaiKey || undefined,
             anthropic_api_key: anthropicKey || undefined,
+            model_override: modelOverride || undefined,
           },
         }),
       })
@@ -206,10 +208,12 @@ export default function NewReview() {
               dimensions={dimensions}
               openaiKey={openaiKey}
               anthropicKey={anthropicKey}
+              modelOverride={modelOverride}
               onUseLLMChange={setUseLLM}
               onDimensionsChange={setDimensions}
               onOpenaiKeyChange={setOpenaiKey}
               onAnthropicKeyChange={setAnthropicKey}
+              onModelOverrideChange={setModelOverride}
               onNext={() => setStep('review')}
               onBack={() => setStep('codebase')}
             />
@@ -657,10 +661,12 @@ function StepConfig({
   dimensions,
   openaiKey,
   anthropicKey,
+  modelOverride,
   onUseLLMChange,
   onDimensionsChange,
   onOpenaiKeyChange,
   onAnthropicKeyChange,
+  onModelOverrideChange,
   onNext,
   onBack,
 }: {
@@ -668,10 +674,12 @@ function StepConfig({
   dimensions: string[]
   openaiKey: string
   anthropicKey: string
+  modelOverride: string
   onUseLLMChange: (v: boolean) => void
   onDimensionsChange: (v: string[]) => void
   onOpenaiKeyChange: (v: string) => void
   onAnthropicKeyChange: (v: string) => void
+  onModelOverrideChange: (v: string) => void
   onNext: () => void
   onBack: () => void
 }) {
@@ -901,6 +909,25 @@ function StepConfig({
                              focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all"
                 />
               </div>
+            </div>
+
+            {/* Model Override */}
+            <div>
+              <label className="block text-xs font-medium text-surface-400 mb-1.5">
+                Model Override <span className="text-surface-600">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={modelOverride}
+                onChange={(e) => onModelOverrideChange(e.target.value)}
+                placeholder="e.g. gpt-4.1-mini, claude-haiku-4-5-20251001"
+                className="w-full px-3 py-2 bg-surface-900 border border-surface-700 rounded-lg
+                           text-white placeholder-surface-500 text-sm
+                           focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all"
+              />
+              <p className="text-xs text-surface-600 mt-1">
+                Override the default model for faster or cheaper analysis.
+              </p>
             </div>
 
             <p className="text-xs text-surface-500">

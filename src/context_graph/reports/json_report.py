@@ -207,7 +207,7 @@ class DashboardDataGenerator:
     
     def generate(self, result: ReviewResult) -> dict[str, Any]:
         """Generate dashboard-friendly data."""
-        return {
+        data: dict[str, Any] = {
             "overview": self._overview_card(result),
             "severity_chart": self._severity_chart_data(result),
             "category_chart": self._category_chart_data(result),
@@ -217,6 +217,12 @@ class DashboardDataGenerator:
             "delta_summary": self._delta_summary_data(result),
             "llm_analysis": self._llm_analysis_data(result),
         }
+
+        fp_stats = self._fp_filter_stats_data(result)
+        if fp_stats:
+            data["false_positive_filter"] = fp_stats
+
+        return data
     
     def _llm_analysis_data(self, result: ReviewResult) -> dict[str, Any] | None:
         """Data for LLM analysis section."""
@@ -394,6 +400,45 @@ class DashboardDataGenerator:
         
         return findings_data
     
+    def _fp_filter_stats_data(self, result: ReviewResult) -> dict[str, Any] | None:
+        """Data for false positive filter statistics display."""
+        if not result.fp_filter_stats:
+            return None
+
+        total_original = sum(s.original_count for s in result.fp_filter_stats)
+        total_final = sum(s.final_count for s in result.fp_filter_stats)
+        total_removed = sum(s.total_removed for s in result.fp_filter_stats)
+        total_downgraded = sum(s.total_downgraded for s in result.fp_filter_stats)
+
+        if total_removed == 0 and total_downgraded == 0:
+            return None
+
+        exec_mode = result.fp_filter_stats[0].execution_mode if result.fp_filter_stats else "unknown"
+
+        return {
+            "enabled": True,
+            "execution_mode": exec_mode,
+            "total_original": total_original,
+            "total_final": total_final,
+            "total_removed": total_removed,
+            "total_downgraded": total_downgraded,
+            "removal_rate": round(total_removed / total_original, 3) if total_original > 0 else 0,
+            "by_dimension": [
+                {
+                    "dimension": stat.dimension,
+                    "execution_mode": stat.execution_mode,
+                    "original_count": stat.original_count,
+                    "final_count": stat.final_count,
+                    "removed": stat.total_removed,
+                    "downgraded": stat.total_downgraded,
+                    "removal_rate": round(stat.removal_rate, 3),
+                    "strategies_run": stat.total_iterations,
+                }
+                for stat in result.fp_filter_stats
+                if stat.total_removed > 0 or stat.total_downgraded > 0
+            ],
+        }
+
     def _delta_summary_data(self, result: ReviewResult) -> dict[str, Any]:
         """Data for delta summary cards."""
         if not result.delta_result:

@@ -94,6 +94,7 @@ class ReviewConfigInput(BaseModel):
     )
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key (optional, uses env var if not provided)")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key (optional, uses env var if not provided)")
+    model_override: Optional[str] = Field(None, description="Override the default LLM model (e.g. gpt-4.1-mini, claude-haiku-4-5-20251001)")
 
 
 class ReviewRequest(BaseModel):
@@ -483,6 +484,7 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
             use_graph_analysis=not llm_enabled,
             dimensions=requested_dimensions,
             compliance_frameworks=compliance_frameworks,
+            model_override=request.config.model_override or None,
         )
         
         tc.emit("info", "llm_dispatch",

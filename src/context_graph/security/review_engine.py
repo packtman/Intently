@@ -65,6 +65,7 @@ class ReviewConfig:
     # LLM settings
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
+    model_override: str | None = None  # Per-request LLM model override
     
     # Thresholds
     min_severity: Severity = Severity.LOW
@@ -201,11 +202,15 @@ class SecurityReviewEngine:
         """Lazy-initialize LLM analyzer."""
         if self._llm_analyzer is None and self.config.use_llm:
             if self.config.openai_api_key or self.config.anthropic_api_key:
-                self._llm_analyzer = ParallelLLMAnalyzer(
-                    openai_api_key=self.config.openai_api_key,
-                    anthropic_api_key=self.config.anthropic_api_key,
-                    trace_collector=self._trace_collector,
-                )
+                kwargs: dict = {
+                    "openai_api_key": self.config.openai_api_key,
+                    "anthropic_api_key": self.config.anthropic_api_key,
+                    "trace_collector": self._trace_collector,
+                }
+                if self.config.model_override:
+                    kwargs["openai_model"] = self.config.model_override
+                    kwargs["anthropic_model"] = self.config.model_override
+                self._llm_analyzer = ParallelLLMAnalyzer(**kwargs)
         return self._llm_analyzer
     
     @property

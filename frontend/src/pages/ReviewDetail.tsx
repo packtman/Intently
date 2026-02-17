@@ -110,6 +110,25 @@ interface DashboardData {
       expands_attack_surface: boolean
     }
   }
+  false_positive_filter?: {
+    enabled: boolean
+    execution_mode: string
+    total_original: number
+    total_final: number
+    total_removed: number
+    total_downgraded: number
+    removal_rate: number
+    by_dimension: Array<{
+      dimension: string
+      execution_mode: string
+      original_count: number
+      final_count: number
+      removed: number
+      downgraded: number
+      removal_rate: number
+      strategies_run: number
+    }>
+  }
   llm_analysis?: {
     used: boolean
     providers: string[]
@@ -466,6 +485,11 @@ export default function ReviewDetail() {
           dimensionsAnalyzed={dashboard.overview.dimensions_analyzed}
           findings={dashboard.findings_table}
         />
+      )}
+
+      {/* False Positive Filter Stats */}
+      {dashboard.false_positive_filter && (
+        <FPFilterStatsSection fpStats={dashboard.false_positive_filter} />
       )}
 
       {/* PM Tool Section - Tab Navigation */}
@@ -1068,6 +1092,87 @@ function LLMAnalysisSection({
           </motion.div>
         )}
       </AnimatePresence>
+    </motion.div>
+  )
+}
+
+function FPFilterStatsSection({
+  fpStats,
+}: {
+  fpStats: NonNullable<DashboardData['false_positive_filter']>
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-surface-900/50 backdrop-blur-sm rounded-2xl border border-surface-800 p-6"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-white flex items-center gap-2">
+          <Shield className="w-5 h-5 text-yellow-400" />
+          False Positive Filter
+        </h3>
+        <span className="px-2 py-0.5 rounded-full bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-xs font-medium">
+          {fpStats.execution_mode === 'parallel' ? 'Parallel (Majority Vote)' : 'Sequential'}
+        </span>
+      </div>
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-4 gap-4 mb-4">
+        <div className="p-3 rounded-xl bg-surface-800/50 border border-surface-700 text-center">
+          <p className="text-2xl font-bold text-white">{fpStats.total_original}</p>
+          <p className="text-xs text-surface-400 mt-1">Raw Findings</p>
+        </div>
+        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
+          <p className="text-2xl font-bold text-red-400">{fpStats.total_removed}</p>
+          <p className="text-xs text-surface-400 mt-1">Removed</p>
+        </div>
+        <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-center">
+          <p className="text-2xl font-bold text-yellow-400">{fpStats.total_downgraded}</p>
+          <p className="text-xs text-surface-400 mt-1">Downgraded</p>
+        </div>
+        <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-center">
+          <p className="text-2xl font-bold text-green-400">{fpStats.total_final}</p>
+          <p className="text-xs text-surface-400 mt-1">Final Findings</p>
+        </div>
+      </div>
+
+      {/* Removal rate bar */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between text-sm mb-1">
+          <span className="text-surface-400">Noise Removal Rate</span>
+          <span className="text-white font-medium">{Math.round(fpStats.removal_rate * 100)}%</span>
+        </div>
+        <div className="w-full h-2 bg-surface-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-yellow-500 to-green-500 rounded-full transition-all"
+            style={{ width: `${Math.round(fpStats.removal_rate * 100)}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Per-dimension breakdown */}
+      {fpStats.by_dimension.length > 1 && (
+        <div className="space-y-2">
+          <p className="text-xs text-surface-500 font-medium uppercase tracking-wide">By Dimension</p>
+          {fpStats.by_dimension.map((dim) => (
+            <div
+              key={dim.dimension}
+              className="flex items-center justify-between p-2 rounded-lg bg-surface-800/30 text-sm"
+            >
+              <span className="text-surface-300 capitalize font-medium w-28">{dim.dimension}</span>
+              <span className="text-surface-400">
+                {dim.original_count} &rarr; {dim.final_count}
+              </span>
+              <span className="text-red-400 text-xs">-{dim.removed} removed</span>
+              {dim.downgraded > 0 && (
+                <span className="text-yellow-400 text-xs">{dim.downgraded} downgraded</span>
+              )}
+              <span className="text-surface-500 text-xs">{dim.strategies_run} strategies</span>
+            </div>
+          ))}
+        </div>
+      )}
     </motion.div>
   )
 }
