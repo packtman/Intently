@@ -235,6 +235,11 @@ class FeatureFlags:
     # Set to "disabled" to use the same model as the main analysis.
     false_positive_model: str = "disabled"
     
+    # ==================== P3: Enterprise Readiness ====================
+
+    # Enable compliance audit trail (immutable action logging)
+    enable_audit_trail: bool = False
+
     # ==================== Scan Tracing ====================
     # Real-time trace log streaming for scan observability
     
@@ -293,6 +298,8 @@ class FeatureFlags:
             false_positive_parallel=_env_bool("FALSE_POSITIVE_PARALLEL", True),
             false_positive_removal_threshold=int(os.getenv("FALSE_POSITIVE_REMOVAL_THRESHOLD", "1")),
             false_positive_model=os.getenv("FALSE_POSITIVE_MODEL", "disabled"),
+            # P3: Enterprise Readiness
+            enable_audit_trail=_env_bool("FEATURE_AUDIT_TRAIL"),
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
         )
@@ -340,6 +347,8 @@ class FeatureFlags:
             false_positive_parallel=True,
             false_positive_removal_threshold=1,
             false_positive_model="disabled",
+            # P3: Enterprise Readiness
+            enable_audit_trail=True,
             # Scan tracing
             enable_scan_tracing=True,
         )
@@ -386,6 +395,8 @@ class FeatureFlags:
             "false_positive_parallel": self.false_positive_parallel,
             "false_positive_removal_threshold": self.false_positive_removal_threshold,
             "false_positive_model": self.false_positive_model,
+            # P3: Enterprise Readiness
+            "audit_trail": self.enable_audit_trail,
             # Scan tracing
             "scan_tracing": self.enable_scan_tracing,
         }
@@ -450,6 +461,9 @@ class FeatureFlags:
             enabled.append("false_positive_filtering")
         if self.false_positive_parallel:
             enabled.append("false_positive_parallel")
+        # P3: Enterprise Readiness
+        if self.enable_audit_trail:
+            enabled.append("audit_trail")
         # Scan tracing
         if self.enable_scan_tracing:
             enabled.append("scan_tracing")
