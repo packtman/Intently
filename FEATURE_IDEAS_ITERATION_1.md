@@ -2,459 +2,765 @@
 
 ## Vision: Cursor + GitHub for Product Managers
 
-**Cursor** gives developers an AI-powered workspace that deeply understands code context, offers intelligent assistance inline, and accelerates every part of the development workflow. **GitHub** gives developers version control, collaboration, review workflows, and project management — all centered around code artifacts.
+Intently should be an AI-powered workspace for PMs — intelligent authoring, structured reviews, and organizational knowledge — all grounded in actual codebase context.
 
-**Intently** should do both of these things, but for **product managers** and their artifacts: PRDs, specs, user stories, roadmaps, and the decisions that connect product intent to engineering reality.
-
-This document proposes features across six themes that would move Intently toward that vision, building on the existing foundation of PRD analysis, multi-dimensional review, codebase analysis, collaboration, and pattern learning.
+This document proposes **14 features** that are directly complementary to the existing codebase. Every feature extends an existing module, wires together existing capabilities, or fills a gap identified in the current ROADMAP. No greenfield rewrites — each idea specifies the exact files, classes, and APIs it builds on.
 
 ---
 
 ## Table of Contents
 
-1. [Theme 1: AI-Powered PRD Workspace](#theme-1-ai-powered-prd-workspace)
-2. [Theme 2: Version Control for Product Artifacts](#theme-2-version-control-for-product-artifacts)
-3. [Theme 3: PRD Review Workflows (Pull Requests for PMs)](#theme-3-prd-review-workflows-pull-requests-for-pms)
-4. [Theme 4: Product Intelligence Dashboard](#theme-4-product-intelligence-dashboard)
-5. [Theme 5: Integrations & Ecosystem](#theme-5-integrations--ecosystem)
-6. [Theme 6: Team & Org-Wide Product Governance](#theme-6-team--org-wide-product-governance)
-7. [Prioritization Matrix](#prioritization-matrix)
-8. [Summary](#summary)
+1. [Feature 1: Product-Aware Chat](#feature-1-product-aware-chat)
+2. [Feature 2: Real-Time Analysis While Writing](#feature-2-real-time-analysis-while-writing)
+3. [Feature 3: PRD Version History & Diffing](#feature-3-prd-version-history--diffing)
+4. [Feature 4: Formal PRD Review Requests](#feature-4-formal-prd-review-requests)
+5. [Feature 5: Impact Graph Visualization](#feature-5-impact-graph-visualization)
+6. [Feature 6: Approval Gates & Policies](#feature-6-approval-gates--policies)
+7. [Feature 7: Decision Log](#feature-7-decision-log)
+8. [Feature 8: Predictive Risk Scoring](#feature-8-predictive-risk-scoring)
+9. [Feature 9: PRD Templates Library](#feature-9-prd-templates-library)
+10. [Feature 10: Review Analytics Dashboard](#feature-10-review-analytics-dashboard)
+11. [Feature 11: GitHub PR Finding Sync](#feature-11-github-pr-finding-sync)
+12. [Feature 12: Inline PRD Authoring with AI Assist](#feature-12-inline-prd-authoring-with-ai-assist)
+13. [Feature 13: Compliance Audit Trail](#feature-13-compliance-audit-trail)
+14. [Feature 14: Product Health Overview](#feature-14-product-health-overview)
+15. [Prioritization Matrix](#prioritization-matrix)
+16. [Summary](#summary)
 
 ---
 
-## Theme 1: AI-Powered PRD Workspace
+## Feature 1: Product-Aware Chat
 
-> The "Cursor editor" for product managers — an intelligent authoring environment that understands your product, codebase, and organizational context while you write.
+> **What:** A conversational AI interface where PMs ask natural-language questions about their product, codebase, and review history — grounded in actual data from the context graph, review storage, and pattern learner.
 
-### 1.1 Inline PRD Authoring with AI Assist
+### Grounding in Existing Code
 
-**What:** A rich-text PRD editor (web and desktop) with AI-powered inline suggestions. As the PM types requirements, the system surfaces relevant context: existing APIs that could be reused, data models that already exist, patterns from past PRDs, and potential conflicts with in-flight work.
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `ContextGraph` | `src/context_graph/core/graph.py` | `get_entities_by_type()`, `get_sensitive_entities()`, `find_unauthenticated_paths()`, `find_trust_boundary_crossings()`, `compute_risk_score()` — all queryable via chat |
+| `SQLiteReviewStorage` | `src/context_graph/storage/sqlite.py` | `list_reviews()`, `get_review()` — chat can query review history |
+| `SQLiteCollaborationStorage` | `src/context_graph/storage/sqlite.py` | Feedback stats, validation history, comments — chat can surface expert decisions |
+| `ParallelLLMAnalyzer` | `src/context_graph/llm/parallel_analyzer.py` | OpenAI + Anthropic providers already configured — reuse for chat completions |
+| `PatternLearner` | `src/context_graph/pm/pattern_learner.py` | `learned_patterns` — chat can reference what the system has learned |
 
-**Why:** Today, PMs write PRDs in Google Docs or Notion with zero awareness of the codebase. They discover implementation issues only after engineering reviews, wasting cycles. This feature shifts that feedback left — to the moment of writing.
+### Implementation
 
-**How it works:**
-- PM opens a new PRD in Intently's editor
-- As they type "Add a new endpoint for user preferences," the system:
-  - Shows existing preference-related endpoints from the codebase analysis
-  - Surfaces the data model for user preferences if it already exists
-  - Warns if a similar feature is described in another active PRD
-  - Suggests auth requirements based on the entity type (PII, user data)
-- Autocomplete suggestions appear inline, similar to Cursor's Tab completions
-- PM can accept, dismiss, or ask follow-up questions in a side panel
+**New file:** `src/context_graph/api/chat_routes.py`
 
-**Key capabilities:**
-- **Context-aware autocomplete:** Suggest API names, data models, component names from the codebase
-- **Inline warnings:** Flag potential security/privacy/compliance issues as the PM writes
-- **Snippet suggestions:** Insert boilerplate sections (auth requirements, data flow diagrams, acceptance criteria) pre-filled with context
-- **"Explain this code" for PMs:** Select a component name and get a plain-English explanation of what it does, its dependencies, and its current state
+```python
+@router.post("/chat")
+async def chat(request: ChatRequest) -> ChatResponse:
+    """Answer product questions using context graph + review history + LLM."""
+    # 1. Query context graph for relevant entities
+    # 2. Query review storage for relevant past reviews
+    # 3. Query collaboration storage for expert decisions
+    # 4. Build grounded context from the above
+    # 5. Send to existing LLM provider with citations
+```
 
-**Builds on:** Existing PRD parser, codebase analyzer, context graph, PM tools
+**New file:** `src/context_graph/chat/product_chat.py`
 
-### 1.2 Real-Time Analysis While Writing
+The chat engine queries existing storage classes and builds a grounded prompt. No new storage tables required — it reads from what exists.
 
-**What:** As the PM writes or edits a PRD, continuously run lightweight analysis in the background and display results in a sidebar — like IDE linting but for product requirements.
+**Frontend:** New `ChatPanel` component in the sidebar of `ReviewDetail.tsx`, similar to Cursor's Cmd+L.
 
-**Why:** The current flow requires the PM to finish writing, submit the PRD, wait for analysis, and then iterate. Real-time feedback collapses this into a single writing session.
+### Example Queries (all answerable from existing data)
+- "What services access PII?" → `graph.get_entities_by_type(EntityType.PII)` + relationships
+- "What did the security team flag in the last review?" → `storage.get_review(last_id)` → `review.security_findings`
+- "How many times has rate limiting been flagged?" → `storage.list_reviews()` → scan findings
+- "What patterns has the system learned?" → `pattern_learner.learned_patterns`
 
-**How it works:**
-- Debounced analysis triggers as the PM pauses typing (e.g., 2-second delay)
-- Lightweight checks run first (pattern matching, entity recognition, quality scoring)
-- Heavier LLM-based analysis runs on explicit save or "Analyze" button
-- Results appear in a right-hand panel organized by dimension (Security, Privacy, etc.)
-- Each finding links to the specific section of the PRD that triggered it
-- Severity badges update in real time as issues are introduced or resolved
-
-**Key capabilities:**
-- **Live quality score:** PRD completeness score updates as sections are added
-- **Live effort estimate:** Rough complexity/effort estimate adjusts as requirements grow
-- **Issue count by dimension:** "3 security, 1 privacy, 0 compliance" badges in the sidebar
-- **Section-level annotations:** Underline or highlight specific sentences with dimension-specific feedback
-
-### 1.3 Product-Aware Chat (Conversational AI)
-
-**What:** A chat interface embedded in the workspace where PMs can ask natural-language questions about their product, codebase, past decisions, and organizational patterns — and get answers grounded in actual data.
-
-**Why:** PMs constantly need to answer questions like "Do we already have rate limiting on the payments API?" or "What did we decide about GDPR consent flows last quarter?" Today, this requires Slack threads, code searches, or asking engineers. A product-aware chat that queries the context graph, past reviews, and learned patterns can answer these instantly.
-
-**How it works:**
-- Chat panel in the workspace (similar to Cursor's Cmd+L chat)
-- Queries are routed to the context graph, review history, codebase analysis, and pattern store
-- Responses include citations: "Based on review R-123 from Jan 2026..." or "From codebase analysis of auth_service..."
-- Supports follow-up questions with conversation context
-- Can generate artifacts: "Draft a data flow diagram for this feature" or "Write the auth requirements section"
-
-**Example queries:**
-- "What services access PII in our system?"
-- "Has anyone proposed a notification service before? What happened?"
-- "What are the compliance requirements for storing payment data?"
-- "What did the security team flag in the last review of the payments PRD?"
-- "Generate acceptance criteria for this user story based on our engineering patterns"
-
-**Builds on:** Existing context graph, review storage, LLM providers, pattern learner
-
-### 1.4 PRD Templates Library
-
-**What:** A library of organization-specific PRD templates that encode best practices, required sections, and pre-filled boilerplate. Templates evolve based on pattern learning — if reviews consistently flag missing sections, those sections get added to templates.
-
-**Why:** Many PRD quality issues are structural: missing auth requirements, no data flow section, no rollback plan. Templates solve this at the source rather than catching it in review.
-
-**How it works:**
-- Default templates for common PRD types: new feature, API change, data migration, integration, deprecation
-- Each template includes required sections with guidance text
-- Templates auto-suggest based on PRD content: "This looks like a data migration — switch to the Data Migration template?"
-- Organization-specific templates created from high-scoring past PRDs
-- Template effectiveness tracking: which templates produce the fewest review findings?
+### Feature Flag
+`FEATURE_PRODUCT_CHAT=true`
 
 ---
 
-## Theme 2: Version Control for Product Artifacts
+## Feature 2: Real-Time Analysis While Writing
 
-> The "Git" for product decisions — track every change, understand what evolved and why, and never lose the history of a product decision.
+> **What:** As the PM writes or edits a PRD, continuously run lightweight analysis and display results in a sidebar — PRD quality score, finding counts by dimension, and effort estimates update live.
 
-### 2.1 PRD Version History & Diffing
+### Grounding in Existing Code
 
-**What:** Full version history for every PRD, with diff views showing exactly what changed between versions. Each version captures not just the text changes but also the analysis delta: which findings were introduced, resolved, or changed severity.
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `MarkdownPRDParser` | `src/context_graph/parsers/markdown_parser.py` | Already parses PRD text → `Intent`. Can be called repeatedly. |
+| `PRDQualityScorer` | `src/context_graph/pm/quality_scorer.py` | `calculate_score(predicted_questions, prd_content)` — returns score, grade, gaps. Already fast (no LLM). |
+| `PRDChangeGenerator` | `src/context_graph/pm/prd_change_generator.py` | `generate_changes(findings, prd_content)` — pattern-based, no LLM required for quick pass. |
+| `ThreatPatternMatcher` | `src/context_graph/security/threat_patterns.py` | `match(delta_result)` — fast pattern matching, no LLM call. |
+| `DeltaAnalyzer` | `src/context_graph/security/delta_analyzer.py` | `analyze(intent, state)` — computes delta synchronously. |
 
-**Why:** PRDs evolve significantly during review cycles. Today, that history is lost in Google Docs version history (which no one reads) or scattered across Slack threads. Structured version history tied to analysis results creates accountability and learning.
+### Implementation
 
-**How it works:**
-- Every save creates a new version with timestamp and author
-- Diff view shows side-by-side or inline text changes (like GitHub's PR diff)
-- Analysis diff: "Version 2 resolved 3 security findings but introduced 1 new privacy concern"
-- Versions can be tagged: "v1-initial", "v2-post-security-review", "v3-approved"
-- Revert to any previous version with one click
+**New API endpoint:** `POST /api/reviews/live-analyze` in `src/context_graph/api/routes.py`
 
-**Key capabilities:**
-- **Text diff:** See exactly what requirements changed
-- **Analysis diff:** See how the risk profile changed across versions
-- **Blame view:** Who changed which requirement and when
-- **Branching (future):** Create variant PRDs ("PRD-123-option-A" vs "PRD-123-option-B") and compare analysis results
+This endpoint runs a lightweight analysis pipeline (parser → delta → pattern matching → quality score) — the **same pipeline** as `SecurityReviewEngine.review()` but skipping LLM calls. All pattern matchers and quality scoring already work without LLM.
 
-**Builds on:** Existing review storage, PRD parser, review diffing (ROADMAP Phase 4.4)
+```python
+@router.post("/reviews/live-analyze")
+async def live_analyze(request: LiveAnalyzeRequest) -> LiveAnalyzeResponse:
+    """Lightweight analysis for real-time feedback. No LLM calls."""
+    parser = MarkdownPRDParser()
+    intent = parser.parse(request.prd_content, "Live Preview")
+    
+    # Use cached state from last full analysis (or empty state)
+    delta = DeltaAnalyzer().analyze(intent, cached_state)
+    
+    # Run pattern matchers (fast, no LLM)
+    security_findings = ThreatPatternMatcher().match(delta)
+    privacy_findings = PrivacyPatternMatcher().match(delta)
+    # ... other dimension pattern matchers
+    
+    # Run quality scorer (fast, no LLM)  
+    quality = PRDQualityScorer().calculate_score([], request.prd_content)
+    
+    return LiveAnalyzeResponse(
+        quality_score=quality,
+        finding_counts={...},
+        dimension_summary={...},
+    )
+```
 
-### 2.2 PRD Branching & Merging
+**Frontend:** Debounced calls (2s delay) from the PRD editor textarea in `NewReview.tsx` to this endpoint. Results render in a sidebar with live-updating badges.
 
-**What:** Allow PMs to create "branches" of a PRD to explore alternative approaches, then compare analysis results side-by-side and merge the winner back.
-
-**Why:** PMs often evaluate multiple approaches to a feature (build vs. buy, phased rollout vs. big bang, different data models). Today, this means maintaining multiple documents and mentally tracking the tradeoffs. Branching makes this structured and analyzable.
-
-**How it works:**
-- PM creates a branch from an existing PRD: "PRD-123-branch: Payment via Stripe" vs "PRD-123-branch: Payment via internal"
-- Each branch gets its own analysis results
-- Comparison view: side-by-side analysis across all five dimensions
-- Merge: choose the winning branch and fold it back into the main PRD
-- Conflict detection: if both branches modified the same section, highlight for manual resolution
-
-### 2.3 Decision Log
-
-**What:** An append-only log attached to each PRD that captures key decisions, their rationale, who made them, and what information they were based on. Decisions link to specific review findings, comments, or analysis results.
-
-**Why:** Product decisions are often made in meetings, Slack threads, or hallway conversations and then forgotten. A structured decision log creates an audit trail and prevents re-litigating settled decisions.
-
-**How it works:**
-- Decisions can be logged manually or auto-captured from review actions (e.g., "Accepted risk: no rate limiting for internal API — decision by @alice on Jan 15, based on finding F-456")
-- Each decision has: title, rationale, alternatives considered, decision maker, date, linked findings
-- Decision log is searchable across all PRDs: "Show me all decisions about rate limiting"
-- Decisions feed into the pattern learner: accepted-risk decisions become patterns for future reviews
-
----
-
-## Theme 3: PRD Review Workflows (Pull Requests for PMs)
-
-> The "Pull Request" for product requirements — structured review cycles with approvals, gates, and tracked conversations.
-
-### 3.1 Formal PRD Review Requests
-
-**What:** PMs can submit a PRD for formal review, creating a structured review cycle with designated reviewers, deadlines, and approval gates. This is the PM equivalent of a GitHub Pull Request.
-
-**Why:** Today, PRD "reviews" happen informally: a Slack message, a meeting, or a drive-by comment. There's no structured way to request, track, and complete a review across multiple stakeholders. This feature creates that structure.
-
-**How it works:**
-- PM clicks "Request Review" on a PRD
-- Selects reviewers: individuals and/or teams (Security, Privacy, Engineering Lead, etc.)
-- Sets review type: lightweight (async comments) or formal (requires approval)
-- Sets deadline
-- System runs automated analysis and attaches results to the review request
-- Reviewers get notified and see the PRD + analysis in their review queue
-- Reviewers can: approve, request changes, or block
-- PM sees review status dashboard: "2/4 approvals, 1 change request pending"
-
-**Key capabilities:**
-- **Review queue:** Each reviewer sees their pending reviews (like GitHub's PR review queue)
-- **Required reviewers:** Configurable rules — "All PRDs touching PII require Privacy team sign-off"
-- **Auto-analysis attachment:** Every review request includes the latest multi-dimensional analysis
-- **Review summary:** After all reviews complete, a summary of all feedback, decisions, and changes
-
-**Builds on:** Existing collaboration features (validation, comments, assignments), review lifecycle
-
-### 3.2 Approval Gates & Policies
-
-**What:** Configurable policies that determine when a PRD can proceed to implementation. Gates enforce organizational standards automatically.
-
-**Why:** Organizations have compliance and governance requirements for product changes (SOC 2, HIPAA, internal policies). Manual enforcement is inconsistent. Automated gates ensure nothing slips through.
-
-**How it works:**
-- Organization configures gate policies:
-  - "No PRD with unresolved CRITICAL findings can be approved"
-  - "PRDs involving PII require Privacy team approval"
-  - "PRDs affecting payments require Security + Compliance sign-off"
-  - "PRD quality score must be above 70% to enter review"
-- Gates are evaluated automatically when reviewers attempt to approve
-- Blocked PRDs show clear reasons: "Blocked: 2 unresolved CRITICAL findings (F-123, F-456)"
-- Override mechanism for exceptional cases with audit trail
-
-**Builds on:** Existing review lifecycle, quality scoring, finding severity
-
-### 3.3 Review Analytics
-
-**What:** Analytics dashboard showing review cycle metrics: time to review, review throughput, common blockers, team responsiveness, and review quality over time.
-
-**Why:** Without measurement, review processes degrade. Analytics help PM leads and engineering managers identify bottlenecks and improve the process.
-
-**Key metrics:**
-- **Cycle time:** Average time from review request to approval
-- **Bottleneck analysis:** Which team/reviewer has the longest queue or response time?
-- **Finding resolution rate:** What percentage of findings are resolved before approval vs. accepted as risk?
-- **Quality trend:** Are PRDs improving over time? (Quality score trend)
-- **Pattern effectiveness:** Which learned patterns are most frequently applied?
-- **Top blockers:** Most common reasons PRDs get blocked at gates
+### Feature Flag
+`FEATURE_LIVE_ANALYSIS=true`
 
 ---
 
-## Theme 4: Product Intelligence Dashboard
+## Feature 3: PRD Version History & Diffing
 
-> The "GitHub Insights" for product decisions — org-wide visibility into product health, risk posture, and decision patterns.
+> **What:** Full version history for every PRD with diff views showing text changes and analysis deltas between versions.
 
-### 4.1 Product Health Overview
+### Grounding in Existing Code
 
-**What:** A high-level dashboard showing the current state of all product initiatives, their review status, risk profiles, and key metrics. Think of it as a "GitHub organization dashboard" but for product artifacts.
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `prd_history_store` | `src/context_graph/api/pm_routes.py` (line 33) | **Already exists** as `prd_history_store: dict[str, list[str]]` — stores PRD versions per review_id. Currently in-memory. |
+| `SideBySideDiffGenerator` | `src/context_graph/pm/diff_generator.py` | Already generates side-by-side diffs with word-level highlighting. Used for PRD change previews. |
+| `SQLiteReviewStorage` | `src/context_graph/storage/sqlite.py` | Already saves full `ReviewResult` including `original_prd_content`. |
+| `PRDFileInfo` model | `src/context_graph/core/models.py` (line 924) | Already has `original_content`, `current_content`, `backup_path`, `last_saved_at`. |
+| `prd_file_info_store` | `src/context_graph/api/pm_routes.py` (line 35) | **Already exists** — tracks PRD file state. Currently in-memory. |
 
-**Why:** Product leaders need a single view into what's being planned, what's been reviewed, where the risks are, and what's blocked. Today, this requires aggregating information from multiple tools.
+### Implementation
 
-**Dashboard views:**
-- **Active PRDs:** All PRDs in progress, their review status, and risk summary
-- **Risk heatmap:** Across all active PRDs, which dimensions have the most unresolved findings?
-- **Team workload:** Which teams have the most pending reviews?
-- **Recent decisions:** Latest decisions across all PRDs
-- **Trending patterns:** Most frequently triggered patterns and organizational blind spots
+The core pieces already exist but are in-memory. This feature:
 
-### 4.2 Impact Graph Visualization
+1. **New SQLite table:** `prd_versions` — stores each version with timestamp, author, content, and associated review_id.
 
-**What:** An interactive visualization of the context graph showing how product entities (services, APIs, data stores, teams) relate to each other. PMs can explore the graph to understand dependencies, data flows, and blast radius of proposed changes.
+```sql
+CREATE TABLE prd_versions (
+    id TEXT PRIMARY KEY,
+    review_id TEXT NOT NULL,
+    version_number INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    author TEXT,
+    change_summary TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (review_id) REFERENCES reviews(id)
+);
+```
 
-**Why:** The context graph is the most unique asset Intently builds. Visualizing it makes it accessible to non-technical stakeholders. A PM can see "if I change the user profile service, it affects these 5 downstream services" without reading code.
+2. **New methods on `SQLiteReviewStorage`:** `save_prd_version()`, `get_prd_versions()`, `get_prd_version_diff()`.
 
-**How it works:**
-- Interactive graph visualization (D3.js or similar)
-- Nodes: services, APIs, data stores, teams, PRDs
-- Edges: data flows, dependencies, ownership, references
-- Filters: show only PII paths, show only external-facing services, show only affected entities for a specific PRD
-- Drill-down: click a node to see its history, related findings, and current status
-- "Blast radius" mode: highlight all entities affected by a proposed PRD change
+3. **Extend `/api/reviews/{id}/versions` endpoint** to persist and retrieve version history from SQLite instead of `prd_history_store`.
 
-**Builds on:** Existing context graph, Phase 1 persistent graph (ROADMAP)
+4. **Version diff endpoint:** `GET /api/reviews/{id}/versions/{v1}/{v2}/diff` — uses existing `SideBySideDiffGenerator` to produce text diff, and compares `ReviewResult.all_findings` between versions for analysis diff.
 
-### 4.3 Predictive Risk Scoring
+5. **Frontend:** New `VersionHistory` component in `ReviewDetail.tsx` — timeline view with diff modal (reusing existing `SideBySideDiffModal.tsx`).
 
-**What:** Before a PM even writes a PRD, predict the likely risk profile based on the type of change, the entities involved, and historical patterns. "You're about to write a PRD that touches the payments API — based on 12 previous PRDs, expect 3-5 security findings and 2 compliance findings."
-
-**Why:** Helps PMs plan better: they can proactively involve the right reviewers, allocate more time for high-risk PRDs, and address known concerns in the first draft.
-
-**How it works:**
-- PM describes the feature in 1-2 sentences or selects affected systems
-- System queries historical reviews for similar features/entities
-- Returns a risk prediction: expected findings by dimension, estimated review time, suggested reviewers
-- Links to relevant past reviews: "See how the team handled a similar change in PRD-089"
-
-**Builds on:** Existing pattern learner, context graph, cross-review intelligence (ROADMAP Phase 4)
-
-### 4.4 Organizational Knowledge Base
-
-**What:** A searchable repository of all product decisions, patterns, and lessons learned across the organization. Unlike a wiki, this is automatically built from review activity — no manual curation required.
-
-**Why:** Organizational knowledge about "why we made that decision" or "what the standard approach is for X" is usually trapped in people's heads or buried in old documents. An automatically curated knowledge base surfaces it when relevant.
-
-**How it works:**
-- Auto-indexed from: review findings, expert feedback, decision logs, learned patterns
-- Search interface: full-text search + semantic search across all product knowledge
-- Contextual surfacing: when writing a PRD about authentication, relevant auth decisions and patterns appear automatically
-- "Ask the organization" feature: "What's our standard approach for handling GDPR consent?"
-
-**Builds on:** Pattern learner, decision log, semantic pattern matching (ROADMAP Phase 5)
+### Feature Flag
+`FEATURE_PRD_VERSION_HISTORY=true`
 
 ---
 
-## Theme 5: Integrations & Ecosystem
+## Feature 4: Formal PRD Review Requests
 
-> The "GitHub Apps & Integrations" for product workflows — connect Intently to the tools PMs already use.
+> **What:** PMs submit a PRD for structured review with designated reviewers, deadlines, and tracked status — the PM equivalent of a GitHub Pull Request.
 
-### 5.1 Jira / Linear / Shortcut Sync
+### Grounding in Existing Code
 
-**What:** Bidirectional sync between Intently and project management tools. When a PRD is approved, automatically create engineering tickets with the right context. When tickets are completed, update the PRD status.
+| Existing Component | File | What It Provides |
+|---|---|---|
+| Review lifecycle | `src/context_graph/api/collaboration_routes.py` | **Already has** lifecycle management: `POST /reviews/{id}/lifecycle` with states: `draft → in_review → team_review → awaiting_signoff → approved / blocked`. Feature flag: `FEATURE_REVIEW_LIFECYCLE`. |
+| Cross-team requests | `src/context_graph/api/collaboration_routes.py` | **Already has** `POST /reviews/{id}/requests` — requesting input from other teams with deadlines. Feature flag: `FEATURE_CROSS_TEAM_REQUESTS`. |
+| Team assignment | `src/context_graph/api/collaboration_routes.py` | **Already has** `POST /reviews/{id}/findings/{id}/assign` — routing to team queues. |
+| Consensus mode | `src/context_graph/api/collaboration_routes.py` | **Already has** multi-team approval voting: `POST /reviews/{id}/findings/{id}/consensus`. |
+| `TeamQueue` page | `frontend/src/pages/TeamQueue.tsx` | **Already exists** — shows team's assigned findings. |
+| `CollaborationStorage` | `src/context_graph/storage/base.py` | Abstract interface for all collaboration data (validations, comments, assignments, feedback). |
 
-**Why:** PMs live in project management tools. If Intently is separate from where work gets tracked, it becomes another tool to maintain. Deep integration makes it part of the existing workflow.
+### Implementation
 
-**How it works:**
-- **PRD → Tickets:** Approved PRD generates a set of engineering tickets:
-  - One epic for the feature
-  - Individual stories for each requirement
-  - Findings become tech debt tickets or acceptance criteria
-  - Effort estimates map to story points
-- **Tickets → PRD:** When tickets are completed, PRD status updates automatically
-- **Finding → Ticket:** Individual findings can be pushed as tickets with full context
-- Bidirectional linking: ticket links back to PRD, PRD links to tickets
+The building blocks exist across collaboration routes. This feature **wires them together** into a unified "Review Request" workflow:
 
-### 5.2 Slack / Teams Integration
+1. **New model:** `ReviewRequest` — wraps lifecycle + reviewer list + deadline + auto-analysis attachment.
 
-**What:** Deep integration with team messaging for notifications, quick actions, and conversational interaction.
+```python
+@dataclass
+class PRDReviewRequest:
+    id: UUID
+    review_id: str           # Links to existing ReviewResult
+    requested_by: str        # PM who submitted
+    reviewers: list[dict]    # [{team: "security", user_id: "...", required: True}]
+    deadline: datetime | None
+    status: str              # "open", "changes_requested", "approved", "blocked"
+    created_at: datetime
+```
 
-**Why:** PMs and reviewers live in Slack/Teams. Notifications pull them into Intently at the right time, and quick actions reduce context switching.
+2. **New SQLite table:** `review_requests` + `review_request_approvals`.
 
-**How it works:**
-- **Notifications:** Review requests, approvals, comments, and blocked PRDs trigger Slack messages
-- **Quick actions:** Approve, request changes, or comment directly from Slack
-- **Conversational analysis:** Post a PRD link in Slack and get an instant risk summary
-- **Daily digest:** Summary of review activity, pending items, and new findings
-- **Bot commands:** `/intently review <prd-url>`, `/intently status <prd-id>`, `/intently risk <feature-name>`
+3. **New API endpoints:**
+   - `POST /api/reviews/{id}/request-review` — creates request, auto-assigns findings to reviewer teams (using existing team assignment), advances lifecycle to `in_review`
+   - `GET /api/reviews/{id}/review-request` — status dashboard (how many approvals, who's pending)
+   - `POST /api/reviews/{id}/approve` — reviewer approves (writes to existing consensus/validation stores)
 
-### 5.3 GitHub / GitLab PR Integration
+4. **Frontend:** New `ReviewRequestPanel` component in `ReviewDetail.tsx` — shows reviewer status, approval progress. Extends existing `ReviewDetail` page.
 
-**What:** When a PRD has been approved and implementation begins, link PRD findings to code changes. When a PR is opened that addresses a PRD, surface relevant findings and requirements in the PR review.
-
-**Why:** This closes the loop between product intent and engineering implementation. Engineers see PRD context in their PR, and PMs see implementation progress linked to their requirements.
-
-**How it works:**
-- **PRD → PR comments:** When a PR references a PRD, Intently adds a comment summarizing relevant findings and requirements
-- **Requirement traceability:** Map PR code changes to specific PRD requirements: "This PR addresses requirements 1.1, 1.3, and finding F-456"
-- **Compliance evidence:** For regulated industries, maintain a traceable chain from requirement → review → approval → implementation → verification
-- **Post-implementation review:** After the PR is merged, re-run analysis to verify findings were addressed
-
-**Builds on:** Existing GitHub integration (codebase analysis, PR analysis)
-
-### 5.4 Document Import/Export
-
-**What:** Seamless import from and export to the tools PMs currently use for writing: Google Docs, Notion, Confluence, and Markdown.
-
-**Why:** Adoption barrier is lower if PMs can continue using their preferred writing tools and bring content into Intently for analysis. Over time, as the Intently editor matures, more authoring happens natively.
-
-**How it works:**
-- **Import:** Drag-and-drop or API-based import from Google Docs, Notion, Confluence, Markdown files
-- **Export:** One-click export of PRDs with analysis results to PDF, Markdown, Confluence page, or Notion page
-- **Sync (future):** Two-way sync with Google Docs or Notion — write in either place, analysis runs automatically
-- **Batch import:** Import an entire Confluence space or Notion database for bulk analysis
-
-**Builds on:** Existing parsers (Markdown, Notion, Confluence), bulk analysis
+### Feature Flag
+`FEATURE_REVIEW_REQUESTS=true` (activates the orchestration layer on top of existing `FEATURE_REVIEW_LIFECYCLE` + `FEATURE_TEAM_ASSIGNMENT`)
 
 ---
 
-## Theme 6: Team & Org-Wide Product Governance
+## Feature 5: Impact Graph Visualization
 
-> The "GitHub Organizations & Teams" for product management — structure, permissions, and governance at scale.
+> **What:** Interactive visualization of the context graph showing entities, relationships, data flows, and blast radius of proposed changes.
 
-### 6.1 Team Workspaces
+### Grounding in Existing Code
 
-**What:** Dedicated workspaces for product teams with shared context, team-specific patterns, and unified dashboards. Each workspace inherits organizational policies but can add team-specific configurations.
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `ContextGraph` | `src/context_graph/core/graph.py` | NetworkX directed graph with entities, relationships, traversal methods. |
+| `Entity` / `Relationship` models | `src/context_graph/core/models.py` | Full type system: EntityType (16 types), RelationshipType (16 types). |
+| `_build_graph()` | `src/context_graph/security/review_engine.py` (line 1214) | Already builds graph from Intent + State + Delta every review. |
+| `_analyze_graph()` | `src/context_graph/security/review_engine.py` (line 1391) | Already queries: unauthenticated paths, trust boundary crossings, high-risk entities. |
+| JSON report | `src/context_graph/reports/json_report.py` | Already serializes review data to JSON for the frontend. |
+| Dashboard page | `frontend/src/pages/Dashboard.tsx` | Already renders review data — graph visualization would be a new tab/component. |
 
-**Why:** Different product teams have different risk profiles, compliance requirements, and review standards. Team workspaces allow customization without losing organizational coherence.
+### Implementation
 
-**How it works:**
-- Each team gets a workspace with: their PRDs, their review queue, their patterns, their context graph
-- Team-specific analysis configuration: "The payments team always runs with HIPAA + PCI-DSS compliance checks"
-- Shared organizational patterns are inherited; team patterns are additive
-- Team dashboard: their active PRDs, pending reviews, recent decisions, team-specific metrics
-- Cross-team visibility: PM leads can see all team workspaces
+The context graph **already exists and is populated every review**. This feature just exposes it visually.
 
-### 6.2 Role-Based Access & Permissions
+1. **New API endpoint:** `GET /api/reviews/{id}/graph`
 
-**What:** Granular permissions for who can author, review, approve, and configure at each level (organization, team, individual).
+```python
+@router.get("/reviews/{review_id}/graph")
+async def get_review_graph(review_id: str) -> dict:
+    """Return graph data for visualization."""
+    # Reconstruct graph from review's intent + state + delta
+    # Return nodes (entities) and edges (relationships) in D3-compatible format
+    return {
+        "nodes": [{"id": str(e.id), "name": e.name, "type": e.entity_type.value, 
+                    "sensitive": e.is_sensitive, "risk_score": graph.compute_risk_score(e.id)} ...],
+        "edges": [{"source": str(r.source_id), "target": str(r.target_id), 
+                    "type": r.relationship_type.value, "crosses_boundary": r.crosses_trust_boundary} ...],
+        "stats": {"entities": len(nodes), "relationships": len(edges), ...}
+    }
+```
 
-**Why:** As adoption grows beyond a single team, governance requires access control. Not everyone should be able to approve a PRD touching payments, and not every PM needs access to every team's work.
+2. **Frontend:** New `ImpactGraph` component using D3.js force-directed layout:
+   - Nodes colored by `EntityType` (PII = red, API = blue, SERVICE = green)
+   - Edges colored by `RelationshipType` (trust boundary crossings = red dashed)
+   - Click node → show entity details + linked findings
+   - "Blast radius" toggle: highlight entities affected by the current PRD's delta (`delta.affected_components`)
+   - Filters: show only PII paths, show only external-facing, show only affected by this PRD
 
-**Roles:**
-- **PM Author:** Can create, edit, and submit PRDs for review
-- **Reviewer:** Can review, comment, and approve/block PRDs
-- **Team Lead:** Can configure team workspace, manage team patterns, view team analytics
-- **Org Admin:** Can configure organizational policies, gates, integrations, and see all analytics
-- **Observer:** Read-only access to PRDs and analysis results
+3. **Tab in `ReviewDetail.tsx`:** Add "Impact Graph" alongside existing "Findings", "PRD Changes", etc.
 
-### 6.3 Compliance & Audit Trail
+### Feature Flag
+`FEATURE_IMPACT_GRAPH=true`
 
-**What:** A complete, immutable audit trail of every product decision, review action, approval, and policy exception. Designed to satisfy SOC 2, HIPAA, and other compliance frameworks.
+---
 
-**Why:** Regulated industries need to prove that product changes went through proper review and approval. Today, this evidence is scattered across email, Slack, and meeting notes. An integrated audit trail is dramatically more efficient.
+## Feature 6: Approval Gates & Policies
 
-**How it works:**
-- Every action is logged: PRD creation, edits, review requests, comments, approvals, gate overrides, pattern applications
-- Audit log is immutable and tamper-evident
-- Export audit reports for compliance reviews: "Show all PRDs approved in Q1 2026 that involved PII"
-- Configurable retention policies
-- Integration with GRC tools (ServiceNow, Drata, Vanta)
+> **What:** Configurable policies that automatically block PRD approval when conditions aren't met (unresolved critical findings, missing team sign-offs).
 
-### 6.4 Org-Wide Product Standards
+### Grounding in Existing Code
 
-**What:** Define and enforce organization-wide product standards: required PRD sections, mandatory review dimensions, naming conventions, and quality thresholds.
+| Existing Component | File | What It Provides |
+|---|---|---|
+| Review lifecycle | `src/context_graph/api/collaboration_routes.py` | Already has state machine: `draft → in_review → ... → approved / blocked`. |
+| Consensus mode | `src/context_graph/api/collaboration_routes.py` | Already supports multi-team voting on findings. |
+| Finding validation | `src/context_graph/api/collaboration_routes.py` | Already tracks validation status per finding (pending, validated, rejected, etc.). |
+| `PRDQualityScore` | `src/context_graph/pm/quality_scorer.py` | Already calculates quality score and grade. |
+| `FeatureFlags` | `src/context_graph/config/features.py` | Existing pattern for feature-gated behavior. |
 
-**Why:** Consistency across teams reduces review friction and ensures organizational standards are met without manual policing.
+### Implementation
 
-**How it works:**
-- Org admins define standards: "All PRDs must include a Security Considerations section"
-- Standards are enforced in the editor (warnings) and at review gates (blockers)
-- Standards evolve based on pattern learning: "12 PRDs were blocked for missing rollback plans — add Rollback Plan as a required section?"
-- Standards can be versioned and rolled out incrementally
+1. **New file:** `src/context_graph/governance/gate_evaluator.py`
+
+```python
+@dataclass
+class ApprovalGate:
+    name: str
+    condition: str   # "no_unresolved_critical", "security_team_approved", "quality_score_above_70"
+    blocking: bool   # If True, blocks advancement to "approved" state
+
+class GateEvaluator:
+    def evaluate(self, review_id: str, gates: list[ApprovalGate]) -> GateResult:
+        """Check all gates against current review state."""
+        # Queries existing storage: findings, validations, quality scores
+```
+
+2. **New config section in `context-graph.yaml`:**
+
+```yaml
+approval_gates:
+  - name: "No unresolved critical findings"
+    condition: no_unresolved_critical
+    blocking: true
+  - name: "Security team sign-off"
+    condition: team_approved:security
+    blocking: true
+  - name: "PRD quality score above 70"
+    condition: quality_score_above:70
+    blocking: false
+```
+
+3. **Wire into lifecycle endpoint:** When `POST /reviews/{id}/lifecycle` attempts to advance to `approved`, run gate evaluation. Return gate failures in the response.
+
+4. **Frontend:** Gate status badges in `ReviewDetail.tsx` — green check / red X per gate.
+
+### Feature Flag
+`FEATURE_APPROVAL_GATES=true`
+
+---
+
+## Feature 7: Decision Log
+
+> **What:** Append-only log attached to each review capturing key decisions, rationale, and links to findings. Auto-populated from review actions.
+
+### Grounding in Existing Code
+
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `CollaborationStorage` | `src/context_graph/storage/base.py` | Abstract storage pattern — decision log follows same pattern as validations/comments. |
+| Finding validation | `src/context_graph/api/collaboration_routes.py` | When a finding is validated/rejected with notes, that's already a decision. |
+| Expert feedback | `src/context_graph/api/collaboration_routes.py` | Expert corrections are decisions. |
+| Lifecycle transitions | `src/context_graph/api/collaboration_routes.py` | State changes with notes are decisions. |
+| `SQLiteCollaborationStorage` | `src/context_graph/storage/sqlite.py` | All collaboration data already persists in SQLite. |
+
+### Implementation
+
+1. **New SQLite table:** `decision_log`
+
+```sql
+CREATE TABLE decision_log (
+    id TEXT PRIMARY KEY,
+    review_id TEXT NOT NULL,
+    decision_type TEXT NOT NULL,  -- "accepted_risk", "rejected_finding", "approved_prd", "scope_change"
+    title TEXT NOT NULL,
+    rationale TEXT,
+    decided_by TEXT NOT NULL,
+    linked_finding_ids TEXT,      -- JSON array
+    linked_comment_ids TEXT,      -- JSON array
+    alternatives_considered TEXT, -- JSON array
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (review_id) REFERENCES reviews(id)
+);
+```
+
+2. **Auto-populate from existing actions:** When `validate_finding()` is called with status `accepted_risk` or `rejected`, automatically create a decision log entry. When lifecycle advances to `approved`, create an approval decision entry.
+
+3. **New API endpoints:**
+   - `POST /api/reviews/{id}/decisions` — manual decision entry
+   - `GET /api/reviews/{id}/decisions` — list all decisions for a review
+   - `GET /api/decisions/search?q=rate+limiting` — search across all reviews
+
+4. **Frontend:** `DecisionLog` component in `ReviewDetail.tsx` — timeline view.
+
+### Feature Flag
+`FEATURE_DECISION_LOG=true`
+
+---
+
+## Feature 8: Predictive Risk Scoring
+
+> **What:** Before writing a PRD, predict the likely risk profile based on the type of change and historical patterns.
+
+### Grounding in Existing Code
+
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `SQLiteReviewStorage` | `src/context_graph/storage/sqlite.py` | `list_reviews()` returns all past reviews with findings. |
+| `PatternLearner` | `src/context_graph/pm/pattern_learner.py` | Learned patterns from expert feedback. |
+| `DeltaAnalysisResult` | `src/context_graph/security/delta_analyzer.py` | `introduces_pii`, `attack_surface_changes`, `auth_requirement_changes` — structured delta signals. |
+| `ReviewResult` | `src/context_graph/security/review_engine.py` | `findings_by_dimension`, `critical_count`, `high_count` — aggregated stats per review. |
+| `PRDQualityScorer` | `src/context_graph/pm/quality_scorer.py` | Already scores quality — can be extended with predictions. |
+
+### Implementation
+
+1. **New file:** `src/context_graph/pm/risk_predictor.py`
+
+```python
+class RiskPredictor:
+    def __init__(self, storage: SQLiteReviewStorage):
+        self.storage = storage
+    
+    async def predict(self, feature_description: str, affected_entities: list[str]) -> RiskPrediction:
+        """Predict risk profile based on historical reviews."""
+        # 1. Load all past reviews from storage
+        # 2. Find reviews that touched similar entities or had similar delta patterns
+        # 3. Aggregate finding counts by dimension across matching reviews
+        # 4. Return prediction with confidence interval and cited reviews
+```
+
+2. **New API endpoint:** `POST /api/predict-risk`
+
+```python
+@router.post("/predict-risk")
+async def predict_risk(request: PredictRiskRequest) -> PredictRiskResponse:
+    """Predict risk profile for a planned feature."""
+    return {
+        "predicted_findings": {"security": 3, "privacy": 2, "compliance": 1, ...},
+        "estimated_review_time": "2-3 hours",
+        "suggested_reviewers": ["security", "privacy"],
+        "similar_past_reviews": [{"id": "...", "title": "...", "findings": 8}],
+        "confidence": 0.72,
+    }
+```
+
+3. **Frontend:** New section in `NewReview.tsx` — before the PM starts writing, they describe the feature and get a risk prediction.
+
+### Feature Flag
+`FEATURE_RISK_PREDICTION=true`
+
+---
+
+## Feature 9: PRD Templates Library
+
+> **What:** Organization-specific PRD templates with required sections and pre-filled boilerplate, evolving based on review patterns.
+
+### Grounding in Existing Code
+
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `PRDGenerator` | `src/context_graph/pm/prd_generator.py` | Already generates PRD sections from codebase analysis. `GeneratedSection` model with title, content, subsections, source_files, confidence. |
+| `PRDQualityScorer` | `src/context_graph/pm/quality_scorer.py` | Already identifies gaps in PRDs — these gaps inform which template sections are required. |
+| `PRDGenerator` API | `src/context_graph/api/prd_generator_routes.py` | Already has `POST /api/prd-generator/generate` endpoint. |
+| PRDGenerator page | `frontend/src/pages/PRDGenerator.tsx` | Already has UI for generating PRDs from codebases. |
+| Feature flags | `src/context_graph/config/features.py` | `FEATURE_PRD_GENERATOR` already exists. |
+
+### Implementation
+
+1. **New file:** `src/context_graph/pm/template_library.py`
+
+```python
+@dataclass
+class PRDTemplate:
+    id: str
+    name: str            # "New Feature", "API Change", "Data Migration"
+    description: str
+    required_sections: list[str]  # ["Security Considerations", "Data Flow", "Rollback Plan"]
+    section_guidance: dict[str, str]  # Section name → guidance text
+    boilerplate: str     # Pre-filled markdown template
+
+class TemplateLibrary:
+    def get_templates(self) -> list[PRDTemplate]:
+        """Return built-in + org-specific templates."""
+    
+    def suggest_template(self, prd_content: str) -> PRDTemplate | None:
+        """Suggest a template based on PRD content keywords."""
+        # Uses same keyword extraction as PRDChangeGenerator._find_relevant_section()
+    
+    def generate_from_template(self, template_id: str, context: dict) -> str:
+        """Generate pre-filled PRD from template + codebase context."""
+        # Reuses PRDGenerator.generate() for section content
+```
+
+2. **New SQLite table:** `prd_templates` — stores org-specific templates.
+
+3. **Wire into PRDGenerator:** When `PRDGenerator` generates a PRD, it uses the best-matching template as the scaffold.
+
+4. **Extend `NewReview.tsx`:** Template picker before PRD input.
+
+### Feature Flag
+`FEATURE_PRD_TEMPLATES=true`
+
+---
+
+## Feature 10: Review Analytics Dashboard
+
+> **What:** Metrics dashboard showing review cycle times, finding resolution rates, team responsiveness, and quality trends.
+
+### Grounding in Existing Code
+
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `SQLiteReviewStorage` | `src/context_graph/storage/sqlite.py` | All reviews with timestamps, findings, dimensions analyzed. `list_reviews()` returns summaries. |
+| `SQLiteCollaborationStorage` | `src/context_graph/storage/sqlite.py` | Validations (with `validated_at`), comments, assignments, feedback — all timestamped. |
+| `Dashboard` page | `frontend/src/pages/Dashboard.tsx` | Already renders review summaries — analytics would extend this. |
+| `DashboardDataGenerator` | `src/context_graph/reports/json_report.py` | Already generates dashboard-formatted data per review. |
+
+### Implementation
+
+1. **New API endpoint:** `GET /api/analytics`
+
+```python
+@router.get("/analytics")
+async def get_analytics() -> dict:
+    """Aggregate analytics across all reviews."""
+    storage = get_review_storage()
+    reviews = await storage.list_reviews()
+    
+    collab_storage = get_collaboration_storage()
+    
+    return {
+        "total_reviews": len(reviews),
+        "avg_findings_per_review": ...,
+        "findings_by_dimension": {"security": 45, "privacy": 23, ...},
+        "findings_by_severity": {"critical": 5, "high": 18, ...},
+        "resolution_rate": ...,      # validated / total findings
+        "avg_review_cycle_time": ..., # From created_at to lifecycle "approved"
+        "quality_score_trend": [...],  # Quality scores over time
+        "top_finding_categories": [...],
+        "team_response_times": {...},  # Avg time from assignment to validation
+    }
+```
+
+All data is already in SQLite — this is purely aggregation queries over existing tables.
+
+2. **Frontend:** New `Analytics` page with charts (using existing charting patterns from `Dashboard.tsx`).
+
+### Feature Flag
+`FEATURE_REVIEW_ANALYTICS=true`
+
+---
+
+## Feature 11: GitHub PR Finding Sync
+
+> **What:** When an approved PRD is implemented, link findings to GitHub PRs. When a PR is opened referencing a PRD review, surface relevant findings as PR comments.
+
+### Grounding in Existing Code
+
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `GitHubIntegration` | `src/context_graph/integrations/github.py` | Already clones repos, analyzes branches, handles PR numbers. Has `clone()` with `pr` parameter. |
+| `CodebaseInput` | `src/context_graph/api/routes.py` | Already accepts `pr: Optional[int]` and `github_token`. |
+| Review engine | `src/context_graph/security/review_engine.py` | Already runs full analysis on PR-scoped code via `--pr` flag. |
+| `SecurityFinding` | `src/context_graph/core/models.py` | Has `source_reference` (file path), `recommendation`, `mitigations`. |
+| Markdown report | `src/context_graph/reports/markdown_report.py` | Already generates markdown reports — can be formatted as PR comments. |
+
+### Implementation
+
+1. **Extend `GitHubIntegration`:** Add `post_pr_comment()` method using GitHub API.
+
+```python
+class GitHubIntegration:
+    def post_pr_comment(self, repo: str, pr_number: int, body: str) -> None:
+        """Post a comment on a GitHub PR."""
+        # Uses existing self._session (requests session) + GitHub API
+    
+    def post_pr_review(self, repo: str, pr_number: int, findings: list[dict]) -> None:
+        """Post inline review comments on affected files."""
+        # Maps finding.source_reference to file paths in the PR diff
+```
+
+2. **New API endpoint:** `POST /api/reviews/{id}/sync-to-pr`
+
+```python
+@router.post("/reviews/{review_id}/sync-to-pr")
+async def sync_findings_to_pr(review_id: str, request: SyncToPRRequest) -> dict:
+    """Post review findings as comments on a GitHub PR."""
+    review = await storage.get_review(review_id)
+    github = GitHubIntegration(token=request.github_token)
+    
+    # Generate summary comment using existing MarkdownReportGenerator
+    summary = MarkdownReportGenerator().generate(review)
+    github.post_pr_comment(request.repo, request.pr_number, summary)
+    
+    # Post inline comments on specific files for high-severity findings
+    for finding in review.all_findings:
+        if finding.severity in (Severity.CRITICAL, Severity.HIGH) and finding.source_reference:
+            github.post_pr_review(...)
+```
+
+3. **Frontend:** "Sync to PR" button in `ReviewDetail.tsx` — opens modal for repo/PR number, then pushes findings.
+
+### Feature Flag
+`FEATURE_GITHUB_PR_SYNC=true`
+
+---
+
+## Feature 12: Inline PRD Authoring with AI Assist
+
+> **What:** A rich PRD editor with AI-powered inline suggestions — autocomplete entity names, surface existing APIs, warn about known patterns.
+
+### Grounding in Existing Code
+
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `State.api_endpoints` | `src/context_graph/core/models.py` | List of all API endpoints in codebase — can autocomplete endpoint names. |
+| `State.data_models` | `src/context_graph/core/models.py` | List of all data models — can autocomplete model names. |
+| `State.auth_patterns` | `src/context_graph/core/models.py` | Auth patterns — can suggest auth requirements. |
+| `ContextGraph` | `src/context_graph/core/graph.py` | All entities and relationships — can suggest related components. |
+| `PatternLearner` | `src/context_graph/pm/pattern_learner.py` | Learned patterns — can warn about known issues. |
+| `NewReview` page | `frontend/src/pages/NewReview.tsx` | Already has a PRD textarea — extend with autocomplete. |
+
+### Implementation
+
+1. **New API endpoint:** `POST /api/autocomplete`
+
+```python
+@router.post("/autocomplete")
+async def autocomplete(request: AutocompleteRequest) -> list[Suggestion]:
+    """Return context-aware suggestions based on what the PM is typing."""
+    # Query cached codebase State for matching entity/endpoint/model names
+    # Query context graph for related entities
+    # Query pattern learner for relevant warnings
+    return [
+        {"text": "user_preferences", "type": "data_model", "description": "Existing model in user_service"},
+        {"text": "Rate limiting required", "type": "warning", "source": "pattern:12 past reviews flagged this"},
+    ]
+```
+
+2. **Frontend:** Extend PRD textarea in `NewReview.tsx` with:
+   - Autocomplete dropdown (triggered by typing known entity names)
+   - Inline warning annotations (yellow underlines for pattern-matched concerns)
+   - "Explain" tooltip: hover over a component name → see its description from `State.entities`
+
+This is primarily a frontend enhancement backed by a lightweight API that queries existing cached `State` and `ContextGraph` data.
+
+### Feature Flag
+`FEATURE_PRD_AUTHORING_ASSIST=true`
+
+---
+
+## Feature 13: Compliance Audit Trail
+
+> **What:** Immutable log of every review action for compliance evidence (SOC 2, HIPAA). Exportable audit reports.
+
+### Grounding in Existing Code
+
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `SQLiteCollaborationStorage` | `src/context_graph/storage/sqlite.py` | Already stores validations, comments, assignments, feedback, lifecycle transitions — all with timestamps. |
+| `SQLiteReviewStorage` | `src/context_graph/storage/sqlite.py` | Already stores all reviews with findings, dimensions, results. |
+| Compliance dimension | `src/context_graph/security/compliance_analyzer.py` | Already maps to SOC 2, HIPAA, PCI-DSS controls. `ComplianceFinding` has `control_id`, `framework`. |
+| Markdown report | `src/context_graph/reports/markdown_report.py` | Already generates reports — extend with audit format. |
+
+### Implementation
+
+1. **New SQLite table:** `audit_log`
+
+```sql
+CREATE TABLE audit_log (
+    id TEXT PRIMARY KEY,
+    review_id TEXT,
+    action TEXT NOT NULL,       -- "review_created", "finding_validated", "lifecycle_advanced", etc.
+    actor TEXT NOT NULL,
+    details_json TEXT,          -- Action-specific details
+    created_at TEXT NOT NULL
+);
+CREATE INDEX idx_audit_log_review ON audit_log(review_id);
+CREATE INDEX idx_audit_log_action ON audit_log(action);
+CREATE INDEX idx_audit_log_created ON audit_log(created_at);
+```
+
+2. **Wire into existing endpoints:** Add audit log writes to existing collaboration routes. Every `validate_finding()`, `add_comment()`, `assign_finding()`, `submit_feedback()`, `update_lifecycle()` call already passes through `collaboration_routes.py` — add `audit_log.insert()` after each.
+
+3. **New API endpoints:**
+   - `GET /api/audit/reviews/{id}` — all actions for a review
+   - `GET /api/audit/export?from=2026-01-01&to=2026-03-31&framework=soc2` — filtered export
+   - `GET /api/audit/export/pdf` — PDF audit report
+
+4. **Frontend:** Audit log viewer (simple table) accessible from `ReviewDetail.tsx` and a new `AuditExport` page.
+
+### Feature Flag
+`FEATURE_AUDIT_TRAIL=true`
+
+---
+
+## Feature 14: Product Health Overview
+
+> **What:** Org-wide dashboard showing all active PRDs, aggregate risk posture, team workloads, and trending patterns.
+
+### Grounding in Existing Code
+
+| Existing Component | File | What It Provides |
+|---|---|---|
+| `list_reviews()` | `src/context_graph/api/routes.py` | Already returns all reviews with summary info. |
+| `DashboardDataGenerator` | `src/context_graph/reports/json_report.py` | Already generates per-review dashboard data. |
+| `Dashboard` page | `frontend/src/pages/Dashboard.tsx` | Already shows recent reviews — extend to org-wide view. |
+| Team queue | `src/context_graph/api/collaboration_routes.py` | Already has `GET /teams/{team}/queue` — provides team workload data. |
+| Collaboration stats | `src/context_graph/api/collaboration_routes.py` | Already has `GET /feedback/stats` — patterns, feedback counts. |
+
+### Implementation
+
+1. **New API endpoint:** `GET /api/overview`
+
+```python
+@router.get("/overview")
+async def get_product_overview() -> dict:
+    """Org-wide product health overview."""
+    storage = get_review_storage()
+    reviews = await storage.list_reviews()
+    
+    return {
+        "active_prds": [r for r in reviews if r["status"] != "completed"],
+        "risk_heatmap": {
+            "security": {"critical": 2, "high": 5, ...},
+            "privacy": {...},
+            ...
+        },
+        "team_workloads": {
+            "security": {"pending_reviews": 3, "pending_findings": 12},
+            ...
+        },
+        "recent_decisions": [...],  # From decision_log table
+        "trending_patterns": [...], # Most common finding categories
+        "quality_trend": [...],     # Average quality scores over time
+    }
+```
+
+All data comes from existing SQLite tables — this is aggregation and presentation.
+
+2. **Frontend:** Extend `Dashboard.tsx` with org-wide cards, or create a new `ProductOverview` page with charts.
+
+### Feature Flag
+`FEATURE_PRODUCT_OVERVIEW=true`
 
 ---
 
 ## Prioritization Matrix
 
-Features evaluated on: **Impact** (value to PM workflow), **Feasibility** (builds on existing capabilities), and **Differentiation** (uniqueness vs. existing tools).
+Scored on: **Impact** (PM workflow value), **Feasibility** (how much existing code is reused), **Effort** (estimated implementation days).
 
-| Feature | Impact | Feasibility | Differentiation | Priority |
-|---------|--------|-------------|-----------------|----------|
-| **1.1** Inline PRD Authoring with AI Assist | High | Medium | Very High | **P0** |
-| **1.3** Product-Aware Chat | High | High | Very High | **P0** |
-| **3.1** Formal PRD Review Requests | High | High | High | **P0** |
-| **2.1** PRD Version History & Diffing | High | High | Medium | **P1** |
-| **1.2** Real-Time Analysis While Writing | High | Medium | High | **P1** |
-| **4.2** Impact Graph Visualization | High | Medium | Very High | **P1** |
-| **5.2** Slack / Teams Integration | High | Medium | Medium | **P1** |
-| **3.2** Approval Gates & Policies | Medium | High | High | **P1** |
-| **4.1** Product Health Overview | Medium | High | Medium | **P1** |
-| **5.1** Jira / Linear Sync | High | Medium | Medium | **P2** |
-| **5.3** GitHub PR Integration | High | High | High | **P2** |
-| **1.4** PRD Templates Library | Medium | High | Medium | **P2** |
-| **2.3** Decision Log | Medium | Medium | High | **P2** |
-| **4.3** Predictive Risk Scoring | Medium | Medium | Very High | **P2** |
-| **2.2** PRD Branching & Merging | Medium | Low | Very High | **P3** |
-| **3.3** Review Analytics | Medium | Medium | Medium | **P3** |
-| **4.4** Organizational Knowledge Base | Medium | Low | High | **P3** |
-| **5.4** Document Import/Export | Medium | Medium | Low | **P3** |
-| **6.1** Team Workspaces | Medium | Low | Medium | **P3** |
-| **6.2** Role-Based Access | Medium | Low | Low | **P3** |
-| **6.3** Compliance Audit Trail | Medium | Medium | Medium | **P3** |
-| **6.4** Org-Wide Product Standards | Low | Medium | Medium | **P3** |
+| # | Feature | Extends | Impact | Feasibility | Effort | Priority |
+|---|---------|---------|--------|-------------|--------|----------|
+| 1 | Product-Aware Chat | graph, storage, LLM providers | High | High | 3-4 days | **P0** |
+| 4 | Formal PRD Review Requests | collaboration routes, lifecycle | High | Very High | 2-3 days | **P0** |
+| 5 | Impact Graph Visualization | ContextGraph, review engine | High | High | 3-4 days | **P0** |
+| 2 | Real-Time Analysis While Writing | parser, pattern matchers, quality scorer | High | Very High | 2-3 days | **P1** |
+| 3 | PRD Version History & Diffing | prd_history_store, SideBySideDiffGenerator | High | Very High | 2-3 days | **P1** |
+| 6 | Approval Gates & Policies | lifecycle, validation, quality scorer | Medium | Very High | 2 days | **P1** |
+| 10 | Review Analytics Dashboard | SQLite storage (aggregation only) | Medium | Very High | 2 days | **P1** |
+| 14 | Product Health Overview | list_reviews, team queues, feedback stats | Medium | Very High | 2 days | **P1** |
+| 7 | Decision Log | collaboration storage pattern | Medium | Very High | 1-2 days | **P2** |
+| 8 | Predictive Risk Scoring | review storage, pattern learner | Medium | High | 3-4 days | **P2** |
+| 11 | GitHub PR Finding Sync | GitHubIntegration, markdown report | High | High | 3-4 days | **P2** |
+| 9 | PRD Templates Library | PRDGenerator, quality scorer | Medium | High | 2-3 days | **P2** |
+| 12 | Inline PRD Authoring with AI Assist | State, ContextGraph, NewReview.tsx | High | Medium | 4-5 days | **P2** |
+| 13 | Compliance Audit Trail | collaboration routes, SQLite | Medium | High | 2-3 days | **P3** |
 
-### Recommended Starting Point (P0 Features)
+### Recommended Starting Point (P0)
 
-The three P0 features together create the core "Cursor + GitHub for PMs" experience:
+These three features create the core "Cursor + GitHub for PMs" experience and have the highest feasibility because they wire together existing components:
 
-1. **Inline PRD Authoring with AI Assist (1.1):** The "Cursor" part — intelligent, context-aware authoring
-2. **Product-Aware Chat (1.3):** The "Cmd+L" part — ask anything about your product and codebase
-3. **Formal PRD Review Requests (3.1):** The "GitHub PR" part — structured review workflows with approvals
-
-These three features transform Intently from a one-shot analysis tool into a **daily-use workspace** for product managers. They create the usage pattern (open Intently → write PRD → request review → get approval) that makes everything else valuable.
+1. **Product-Aware Chat (Feature 1):** Wraps existing `ContextGraph` queries + `SQLiteReviewStorage` queries + LLM providers into a conversational interface. ~90% existing code reuse.
+2. **Formal PRD Review Requests (Feature 4):** Orchestrates existing lifecycle, team assignment, consensus, and cross-team request features into a unified workflow. ~95% existing code reuse.
+3. **Impact Graph Visualization (Feature 5):** Exposes the existing NetworkX `ContextGraph` that's already built every review through a new D3.js frontend component. ~85% existing code reuse.
 
 ---
 
 ## Summary
 
-Intently already has the hardest-to-build components: multi-dimensional analysis, codebase understanding, context graph, pattern learning, and collaboration infrastructure. The features proposed here layer a PM-centric workflow and experience on top of these foundations.
+**All 14 features are grounded in existing code.** No feature requires a new storage backend, a new LLM integration, or a new analysis engine. Every feature either:
 
-The progression is:
+- **Wires together** existing modules that aren't yet connected (Features 4, 6, 7, 13)
+- **Adds a new API endpoint** that queries existing storage (Features 1, 8, 10, 14)
+- **Adds a new frontend visualization** of existing backend data (Features 2, 3, 5, 12)
+- **Extends an existing integration** with a complementary capability (Features 9, 11)
 
-1. **P0 — Core Workspace:** AI-powered editor + chat + review workflows (makes Intently a daily tool)
-2. **P1 — Enhanced Experience:** Version history, real-time analysis, graph visualization, messaging integration (makes it indispensable)
-3. **P2 — Ecosystem Integration:** PM tool sync, GitHub integration, templates, predictions (makes it the system of record)
-4. **P3 — Enterprise Scale:** Team workspaces, RBAC, compliance, org-wide standards (makes it enterprise-ready)
+The existing codebase provides: PRD parsing, multi-language codebase analysis, context graph (NetworkX), 5-dimension review engine, pattern matching, LLM analysis (OpenAI + Anthropic), collaboration features (validation, comments, assignments, feedback, lifecycle, consensus), PM tools (quality scoring, effort estimation, PRD changes, side-by-side diff, PRD generation, bulk analysis), SQLite persistence, GitHub integration, feature flags, React frontend, and Electron desktop app.
 
-Each layer builds on the previous one, and the existing Intently infrastructure provides a significant head start for all of them.
+These 14 features layer the PM-centric **workflow and experience** on top of that foundation — turning Intently from a powerful analysis tool into a daily-use workspace.
