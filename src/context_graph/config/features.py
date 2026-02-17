@@ -222,17 +222,18 @@ class FeatureFlags:
     
     # In parallel mode, the minimum number of strategies that must vote
     # "remove" to actually remove a finding.
-    # 1 = any strategy can remove (too aggressive with fast models)
-    # 2 = majority must agree (recommended default)
+    # 1 = any strategy can remove (default — matches sequential behaviour)
+    # 2 = majority must agree (recommended when using fast/cheap models)
     # 3 = unanimous (very conservative)
-    false_positive_removal_threshold: int = 2
+    false_positive_removal_threshold: int = 1
     
     # Use a faster/cheaper model for FP filtering (classification task).
     # Empty string = auto-detect the best fast model for the provider:
     #   OpenAI    → gpt-4.1-mini  (nano is too weak for FP evaluation)
     #   Anthropic → claude-haiku-4-5-20251001
     # Set explicitly to override (e.g. "gpt-4.1-nano" if cost is priority).
-    false_positive_model: str = ""
+    # Set to "disabled" to use the same model as the main analysis.
+    false_positive_model: str = "disabled"
     
     # ==================== Scan Tracing ====================
     # Real-time trace log streaming for scan observability
@@ -290,8 +291,8 @@ class FeatureFlags:
             false_positive_max_iterations=int(os.getenv("FALSE_POSITIVE_MAX_ITERATIONS", "3")),
             false_positive_min_findings=int(os.getenv("FALSE_POSITIVE_MIN_FINDINGS", "3")),
             false_positive_parallel=_env_bool("FALSE_POSITIVE_PARALLEL", True),
-            false_positive_removal_threshold=int(os.getenv("FALSE_POSITIVE_REMOVAL_THRESHOLD", "2")),
-            false_positive_model=os.getenv("FALSE_POSITIVE_MODEL", ""),
+            false_positive_removal_threshold=int(os.getenv("FALSE_POSITIVE_REMOVAL_THRESHOLD", "1")),
+            false_positive_model=os.getenv("FALSE_POSITIVE_MODEL", "disabled"),
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
         )
@@ -337,8 +338,8 @@ class FeatureFlags:
             false_positive_max_iterations=3,
             false_positive_min_findings=3,
             false_positive_parallel=True,
-            false_positive_removal_threshold=2,
-            false_positive_model="",
+            false_positive_removal_threshold=1,
+            false_positive_model="disabled",
             # Scan tracing
             enable_scan_tracing=True,
         )

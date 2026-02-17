@@ -483,9 +483,15 @@ class ParallelLLMAnalyzer:
 
         provider = self.providers[0]
 
-        # Resolve the fast model for FP filtering
-        fp_model: str | None = features.false_positive_model or None
-        if not fp_model:
+        # Resolve the fast model for FP filtering.
+        # "disabled" or falsy → use the provider's main model (no override).
+        # "" (empty) → auto-detect from _FP_FAST_MODELS.
+        # Anything else → use as explicit model name.
+        fp_model: str | None = None
+        fp_setting = features.false_positive_model
+        if fp_setting and fp_setting.lower() != "disabled":
+            fp_model = fp_setting
+        elif not fp_setting:
             fp_model = self._FP_FAST_MODELS.get(provider.provider_name)
 
         try:

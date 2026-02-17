@@ -284,7 +284,7 @@ class FalsePositiveFilter:
     # agree to remove a finding.  This prevents over-aggressive removal
     # when using fast/cheap models.  Use 1 for aggressive mode or 3 for
     # unanimous.
-    DEFAULT_REMOVAL_THRESHOLD = 2
+    DEFAULT_REMOVAL_THRESHOLD = 1
 
     def __init__(
         self,
