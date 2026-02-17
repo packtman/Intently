@@ -1,17 +1,24 @@
 """
 False Positive Filter - Multi-iteration LLM-based false positive removal.
 
-Runs multiple validation passes over scan findings to progressively remove
-false positives, each pass focusing on a different validation strategy:
+Supports two execution modes:
 
-  Round 1 - Context Validation:  Are findings already mitigated by existing
-            controls visible in the codebase state?
-  Round 2 - Specificity Check:   Are findings concrete and specific to this
-            PRD/codebase, or generic boilerplate?
-  Round 3 - Evidence Grounding:  Can each finding cite a real PRD quote,
-            endpoint, or code pattern, or is it speculative?
+  **parallel** (default) — All validation strategies run concurrently on the
+  same findings, then verdicts are merged by majority vote.  A finding is
+  removed only when 2+ of 3 strategies agree it should go.  This is ~3x
+  faster than sequential because LLM calls happen in one batch.
 
-Additional rounds (up to max_iterations) repeat with increasing strictness.
+  **sequential** — Strategies run one after another; each round filters the
+  output of the previous round.  More aggressive removal but slower.
+
+Validation strategies:
+
+  1. Context Validation:  Are findings already mitigated by existing controls
+     visible in the codebase state?
+  2. Specificity Check:   Are findings concrete and specific to this
+     PRD/codebase, or generic boilerplate?
+  3. Evidence Grounding:  Can each finding cite a real PRD quote, endpoint,
+     or code pattern, or is it speculative?
 
 Usage:
     from context_graph.llm.false_positive_filter import FalsePositiveFilter
@@ -19,6 +26,7 @@ Usage:
     fp_filter = FalsePositiveFilter(
         llm_provider=provider,
         max_iterations=3,
+        parallel=True,          # fan-out + majority-vote (default)
     )
     filtered = await fp_filter.filter_findings(
         findings=raw_findings,
@@ -31,6 +39,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import sys
@@ -38,6 +47,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from context_graph.llm.provider import LLMProvider
+from context_graph.tracing.collector import TraceCollector
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +249,9 @@ class FalsePositiveFilterResult:
     total_latency_ms: float = 0.0
     total_tokens: int = 0
 
+    # Execution mode ("parallel" or "sequential")
+    execution_mode: str = "parallel"
+
     @property
     def removal_rate(self) -> float:
         if self.original_count == 0:
@@ -255,9 +268,23 @@ class FalsePositiveFilter:
     """
     Multi-iteration LLM-based false positive removal for scan findings.
 
-    Each iteration applies a different validation strategy to progressively
-    filter out false positives while preserving true findings.
+    Supports two execution modes controlled by the ``parallel`` flag:
+
+    * **parallel=True** (default) — All validation strategies run at the same
+      time via ``asyncio.gather``.  Verdicts are merged by **majority vote**:
+      a finding is removed only when ``removal_threshold`` or more strategies
+      agree.  ~3x faster wall-clock time.
+
+    * **parallel=False** — Strategies run sequentially; each round filters the
+      output of the previous round (original behaviour).
     """
+
+    # Number of "remove" votes required to actually remove a finding in
+    # parallel mode.  Default of 2 means a majority of strategies must
+    # agree to remove a finding.  This prevents over-aggressive removal
+    # when using fast/cheap models.  Use 1 for aggressive mode or 3 for
+    # unanimous.
+    DEFAULT_REMOVAL_THRESHOLD = 2
 
     def __init__(
         self,
@@ -265,6 +292,10 @@ class FalsePositiveFilter:
         max_iterations: int = 3,
         min_findings_to_filter: int = 3,
         verbose: bool = True,
+        parallel: bool = True,
+        removal_threshold: int | None = None,
+        model_override: str | None = None,
+        trace_collector: TraceCollector | None = None,
     ) -> None:
         """
         Args:
@@ -274,11 +305,33 @@ class FalsePositiveFilter:
             min_findings_to_filter: Skip filtering if fewer than this many
                                      findings (not worth the LLM cost).
             verbose: Print progress to stderr.
+            parallel: If True (default) run all strategies concurrently
+                      and merge verdicts.  If False, run sequentially.
+            removal_threshold: In parallel mode, the minimum number of
+                               strategies that must vote "remove" to
+                               actually remove a finding.  Defaults to 2.
+            model_override: Use a different (faster) model for FP filter
+                            LLM calls.  Passed via AnalysisRequest context
+                            so the provider uses it instead of its default.
+                            None = use the provider's default model.
+            trace_collector: Optional trace collector for emitting events.
         """
         self.provider = llm_provider
         self.max_iterations = min(max_iterations, len(VALIDATION_STRATEGIES))
         self.min_findings_to_filter = min_findings_to_filter
         self.verbose = verbose
+        self.parallel = parallel
+        self.removal_threshold = (
+            removal_threshold
+            if removal_threshold is not None
+            else self.DEFAULT_REMOVAL_THRESHOLD
+        )
+        self.model_override = model_override or None
+        self.tc = trace_collector
+
+    # ==================================================================
+    # Public entry point
+    # ==================================================================
 
     async def filter_findings(
         self,
@@ -289,17 +342,10 @@ class FalsePositiveFilter:
         delta: dict[str, Any] | None = None,
     ) -> FalsePositiveFilterResult:
         """
-        Run the multi-iteration false positive filter pipeline.
+        Run the false positive filter pipeline.
 
-        Args:
-            findings: Raw findings (list of dicts) to validate.
-            dimension: Review dimension (security, privacy, compliance, etc.).
-            intent: PRD intent dict for context.
-            state: Codebase state dict for context.
-            delta: Delta dict for context.
-
-        Returns:
-            FalsePositiveFilterResult with filtered findings and stats.
+        Dispatches to either the parallel or sequential implementation
+        depending on the ``self.parallel`` flag.
         """
         result = FalsePositiveFilterResult(
             original_count=len(findings),
@@ -315,14 +361,208 @@ class FalsePositiveFilter:
             result.final_count = len(findings)
             return result
 
+        mode_label = "PARALLEL" if self.parallel else "SEQUENTIAL"
+        model_label = self.model_override or self.provider.model
         if self.verbose:
             self._log(f"\n{'='*60}")
-            self._log(f"FALSE POSITIVE FILTER — {dimension.upper()}")
+            self._log(
+                f"FALSE POSITIVE FILTER — {dimension.upper()} [{mode_label}]"
+            )
             self._log(f"Input findings: {len(findings)}")
-            self._log(f"Max iterations: {self.max_iterations}")
+            self._log(f"Strategies: {self.max_iterations}")
+            self._log(f"Model: {model_label}")
+            if self.parallel:
+                self._log(f"Removal threshold: {self.removal_threshold} votes")
             self._log(f"{'='*60}")
 
-        # Prepare context summaries (truncated for token budget)
+        result.execution_mode = "parallel" if self.parallel else "sequential"
+
+        if self.parallel:
+            return await self._run_parallel(findings, dimension, intent, state, delta, result)
+        return await self._run_sequential(findings, dimension, intent, state, delta, result)
+
+    # ==================================================================
+    # Parallel mode — fan-out + majority-vote merge
+    # ==================================================================
+
+    async def _run_parallel(
+        self,
+        findings: list[dict[str, Any]],
+        dimension: str,
+        intent: dict[str, Any] | None,
+        state: dict[str, Any] | None,
+        delta: dict[str, Any] | None,
+        result: FalsePositiveFilterResult,
+    ) -> FalsePositiveFilterResult:
+        """Fan-out all strategies concurrently, then merge verdicts."""
+
+        intent_summary = self._summarise_context(intent, "intent")
+        state_summary = self._summarise_context(state, "state")
+        delta_summary = self._summarise_context(delta, "delta")
+        prd_title = (intent or {}).get("title", "Unknown")
+        prd_features = ", ".join((intent or {}).get("features", [])[:10])
+
+        strategies = VALIDATION_STRATEGIES[: self.max_iterations]
+
+        strategy_names = [s["name"] for s in strategies]
+        if self.verbose:
+            self._log(
+                f"\nLaunching {len(strategies)} strategies in parallel: "
+                + ", ".join(strategy_names)
+            )
+        if self.tc:
+            self.tc.emit("info", "fp_filter",
+                          f"Launching {len(strategies)} strategies in parallel: {', '.join(strategy_names)}",
+                          strategies=strategy_names, dimension=dimension)
+
+        # Fan-out: run every strategy on the SAME findings simultaneously
+        tasks = [
+            self._run_iteration(
+                round_num=idx + 1,
+                strategy=strat,
+                findings=findings,
+                dimension=dimension,
+                intent_summary=intent_summary,
+                state_summary=state_summary,
+                delta_summary=delta_summary,
+                prd_title=prd_title,
+                prd_features=prd_features,
+            )
+            for idx, strat in enumerate(strategies)
+        ]
+
+        iter_results: list[FilterIterationResult] = await asyncio.gather(*tasks)
+
+        # Collect per-strategy verdicts keyed by finding id
+        # Structure: { finding_id: [ (strategy_name, verdict, entry), ... ] }
+        votes: dict[str, list[tuple[str, str, dict[str, Any]]]] = {}
+        for finding_idx, finding in enumerate(findings):
+            fid = str(finding.get("id", finding.get("title", f"__idx_{finding_idx}")))
+            votes[fid] = []
+
+        for ir in iter_results:
+            validated: list[dict[str, Any]] = getattr(ir, "_validated", [])
+            v_map: dict[str, dict[str, Any]] = {}
+            for i, item in enumerate(validated):
+                vid = str(item.get("id", item.get("title", f"__idx_{i}")))
+                v_map[vid] = item
+
+            for finding_idx, finding in enumerate(findings):
+                fid = str(finding.get("id", finding.get("title", f"__idx_{finding_idx}")))
+                entry = v_map.get(fid, {})
+                verdict = entry.get("fp_verdict", "keep").lower()
+                votes[fid].append((ir.strategy_name, verdict, entry))
+
+            result.iteration_results.append(ir)
+            result.total_latency_ms = max(result.total_latency_ms, ir.latency_ms)
+            result.total_tokens += ir.tokens_used
+
+        # Merge verdicts by majority vote
+        kept: list[dict[str, Any]] = []
+        removed: list[dict[str, Any]] = []
+        total_downgraded = 0
+
+        for finding_idx, finding in enumerate(findings):
+            fid = str(finding.get("id", finding.get("title", f"__idx_{finding_idx}")))
+            finding_votes = votes.get(fid, [])
+
+            remove_count = sum(1 for _, v, _ in finding_votes if v == "remove")
+            downgrade_count = sum(1 for _, v, _ in finding_votes if v == "downgrade")
+
+            if remove_count >= self.removal_threshold:
+                reasons = [
+                    e.get("fp_reason", "")
+                    for s, v, e in finding_votes
+                    if v == "remove" and e.get("fp_reason")
+                ]
+                strategies_that_removed = [
+                    s for s, v, _ in finding_votes if v == "remove"
+                ]
+                annotated = {
+                    **finding,
+                    "fp_removed_by": strategies_that_removed,
+                    "fp_vote_count": f"{remove_count}/{len(finding_votes)}",
+                    "fp_reasons": reasons,
+                }
+                removed.append(annotated)
+            elif downgrade_count > 0:
+                adjusted = {**finding}
+                dg_entries = [e for _, v, e in finding_votes if v == "downgrade"]
+                if dg_entries:
+                    best = dg_entries[0]
+                    if "adjusted_severity" in best:
+                        adjusted["severity"] = best["adjusted_severity"]
+                    if "adjusted_confidence" in best:
+                        adjusted["confidence"] = best["adjusted_confidence"]
+                adjusted["fp_downgraded_by"] = [
+                    s for s, v, _ in finding_votes if v == "downgrade"
+                ]
+                total_downgraded += 1
+                kept.append(adjusted)
+            else:
+                # All strategies agree: keep
+                adjusted = {**finding}
+                confidences = [
+                    e.get("adjusted_confidence")
+                    for _, _, e in finding_votes
+                    if "adjusted_confidence" in e
+                ]
+                if confidences:
+                    adjusted["confidence"] = max(
+                        finding.get("confidence", 0), *confidences
+                    )
+                kept.append(adjusted)
+
+        result.filtered_findings = kept
+        result.removed_findings = removed
+        result.final_count = len(kept)
+        result.total_removed = len(removed)
+        result.total_downgraded = total_downgraded
+        result.total_iterations = len(iter_results)
+
+        if self.verbose:
+            self._log(f"\n{'='*60}")
+            self._log("FALSE POSITIVE FILTER COMPLETE [PARALLEL]")
+            self._log(f"  {result.original_count} → {result.final_count} findings")
+            self._log(
+                f"  Removed: {result.total_removed} "
+                f"({result.removal_rate:.0%}) "
+                f"[threshold: {self.removal_threshold}/{len(strategies)} votes]"
+            )
+            self._log(f"  Downgraded: {result.total_downgraded}")
+            self._log(
+                f"  Wall-clock latency: {result.total_latency_ms:.0f} ms "
+                f"(parallel — max of {len(strategies)} calls)"
+            )
+            self._log(f"  Total tokens: {result.total_tokens}")
+            self._log(f"{'='*60}\n")
+
+        if self.tc:
+            self.tc.emit("info", "fp_filter",
+                          f"Majority vote: {result.final_count}/{result.original_count} kept, "
+                          f"{result.total_removed} removed ({result.removal_rate:.0%})",
+                          kept=result.final_count, removed=result.total_removed,
+                          downgraded=result.total_downgraded,
+                          latency_ms=round(result.total_latency_ms),
+                          tokens=result.total_tokens)
+
+        return result
+
+    # ==================================================================
+    # Sequential mode — original pipeline behaviour
+    # ==================================================================
+
+    async def _run_sequential(
+        self,
+        findings: list[dict[str, Any]],
+        dimension: str,
+        intent: dict[str, Any] | None,
+        state: dict[str, Any] | None,
+        delta: dict[str, Any] | None,
+        result: FalsePositiveFilterResult,
+    ) -> FalsePositiveFilterResult:
+        """Run strategies one after another, piping output to next round."""
+
         intent_summary = self._summarise_context(intent, "intent")
         state_summary = self._summarise_context(state, "state")
         delta_summary = self._summarise_context(delta, "delta")
@@ -342,6 +582,11 @@ class FalsePositiveFilter:
                 )
                 self._log(f"  {strategy['description']}")
                 self._log(f"  Input: {len(current_findings)} findings")
+            if self.tc:
+                self.tc.emit("info", "fp_filter",
+                              f"Strategy {round_num}/{self.max_iterations}: {strategy['name']} — {len(current_findings)} findings",
+                              round=round_num, strategy=strategy["name"],
+                              input_count=len(current_findings))
 
             iter_result = await self._run_iteration(
                 round_num=round_num,
@@ -371,6 +616,13 @@ class FalsePositiveFilter:
                     f"removed={iter_result.removed_count}, "
                     f"downgraded={iter_result.downgraded_count}"
                 )
+            if self.tc:
+                self.tc.emit("info", "fp_filter",
+                              f"Strategy {strategy['name']} complete: kept={len(kept)}, "
+                              f"removed={iter_result.removed_count}, downgraded={iter_result.downgraded_count}",
+                              strategy=strategy["name"],
+                              kept=len(kept), removed=iter_result.removed_count,
+                              downgraded=iter_result.downgraded_count)
 
             current_findings = kept
 
@@ -395,7 +647,7 @@ class FalsePositiveFilter:
 
         if self.verbose:
             self._log(f"\n{'='*60}")
-            self._log(f"FALSE POSITIVE FILTER COMPLETE")
+            self._log("FALSE POSITIVE FILTER COMPLETE [SEQUENTIAL]")
             self._log(f"  {result.original_count} → {result.final_count} findings")
             self._log(
                 f"  Removed: {result.total_removed} "
@@ -450,16 +702,20 @@ class FalsePositiveFilter:
             f"Return ONLY valid JSON."
         )
 
+        ctx: dict[str, Any] = {
+            "system_prompt_override": system_prompt,
+            "false_positive_filter": True,
+            "iteration": round_num,
+            "strategy": strategy["name"],
+            "dimension": dimension,
+        }
+        if self.model_override:
+            ctx["model_override"] = self.model_override
+
         request = AnalysisRequest(
             analysis_type=AnalysisType.SECURITY_REVIEW,
             content=prompt_content,
-            context={
-                "system_prompt_override": system_prompt,
-                "false_positive_filter": True,
-                "iteration": round_num,
-                "strategy": strategy["name"],
-                "dimension": dimension,
-            },
+            context=ctx,
         )
 
         try:

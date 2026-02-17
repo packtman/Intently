@@ -173,8 +173,12 @@ class JSONReportGenerator:
         if total_removed == 0 and total_downgraded == 0:
             return None
         
+        # Determine execution mode from the first stat entry
+        exec_mode = result.fp_filter_stats[0].execution_mode if result.fp_filter_stats else "unknown"
+
         return {
             "enabled": True,
+            "execution_mode": exec_mode,
             "total_original_findings": total_original,
             "total_final_findings": total_final,
             "total_removed": total_removed,
@@ -183,11 +187,12 @@ class JSONReportGenerator:
             "by_dimension": [
                 {
                     "dimension": stat.dimension,
+                    "execution_mode": stat.execution_mode,
                     "original_count": stat.original_count,
                     "final_count": stat.final_count,
                     "removed": stat.total_removed,
                     "downgraded": stat.total_downgraded,
-                    "iterations": stat.total_iterations,
+                    "strategies_run": stat.total_iterations,
                     "removal_rate": round(stat.removal_rate, 3),
                     "iteration_details": stat.iteration_details,
                 }

@@ -11,10 +11,12 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from context_graph.config.features import get_features
 from context_graph.core.models import ReviewDimension
+from context_graph.tracing import get_collector
 
 
 router = APIRouter(prefix="/bulk", tags=["bulk-prd-analysis"])
@@ -133,108 +135,139 @@ async def get_bulk_config() -> dict[str, Any]:
 @router.post("/analyze", response_model=BulkResultResponse)
 async def analyze_bulk_prds(
     request: BulkAnalysisRequest,
+    trace_id: str | None = None,
 ) -> BulkResultResponse:
     """
     Analyze multiple PRDs in bulk.
     
     This endpoint analyzes up to 20 PRD files in parallel across the specified
     review dimensions. Returns results synchronously (waits for completion).
+    
+    Pass ``trace_id`` query param to enable real-time trace streaming via
+    ``GET /api/bulk/traces/{trace_id}``.
     """
     features = get_features()
+    tc = get_collector(trace_id) if trace_id else None
     
-    # Check feature flag
-    if not features.enable_bulk_prd_analysis:
-        raise HTTPException(
-            status_code=403,
-            detail="Bulk PRD analysis is not enabled. Set FEATURE_BULK_PRD_ANALYSIS=true"
-        )
-    
-    # Validate PRD count
-    max_files = min(features.bulk_prd_max_files, 20)
-    if len(request.prds) > max_files:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Too many PRD files. Maximum allowed: {max_files}"
-        )
-    
-    if len(request.prds) == 0:
-        raise HTTPException(
-            status_code=400,
-            detail="No PRD files provided"
-        )
-    
-    # Parse dimensions
-    dimension_map = {
-        "security": ReviewDimension.SECURITY,
-        "privacy": ReviewDimension.PRIVACY,
-        "compliance": ReviewDimension.COMPLIANCE,
-        "engineering": ReviewDimension.ENGINEERING,
-        "architecture": ReviewDimension.ARCHITECTURE,
-    }
-    
-    dimensions = []
-    for dim_str in request.dimensions:
-        if dim_str.lower() in dimension_map:
-            dimensions.append(dimension_map[dim_str.lower()])
-    
-    if not dimensions:
-        dimensions = [ReviewDimension.SECURITY]
-    
-    # Get API keys
-    openai_key = request.openai_api_key or os.getenv("OPENAI_API_KEY")
-    anthropic_key = request.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
-    
-    # Import and run bulk analyzer
-    from context_graph.pm.bulk_prd_analyzer import (
-        BulkPRDAnalyzer,
-        BulkAnalysisRequest as InternalRequest,
-        PRDFile,
-    )
-    
-    # Create PRD file objects
-    prd_files = []
-    for prd_input in request.prds:
-        prd_files.append(PRDFile(
-            file_path=prd_input.file_path,
-            file_name=prd_input.file_name,
-            content=prd_input.content,
-            codebase_path=prd_input.codebase_path,
-            dimensions=dimensions,
-        ))
-    
-    # Create internal request
-    internal_request = InternalRequest(
-        prds=prd_files,
-        default_codebase_path=request.default_codebase_path,
-        default_dimensions=dimensions,
-        max_parallel_reviews=request.max_parallel_reviews,
-        use_llm=request.use_llm and bool(openai_key or anthropic_key),
-    )
-    
-    # Run analysis
-    analyzer = BulkPRDAnalyzer(
-        openai_api_key=openai_key,
-        anthropic_api_key=anthropic_key,
-    )
-    
-    result = await analyzer.analyze(internal_request)
-    
-    # Store results for individual PRD access using the storage backend
-    from context_graph.storage.config import get_review_storage
-    storage = get_review_storage()
-    
-    for prd_result in result.prd_results:
-        if prd_result.success and prd_result.review_result:
-            await storage.save_review(prd_result.review_id, prd_result.review_result)
-            await storage.update_review_status(
-                review_id=prd_result.review_id,
-                status="completed",
-                progress=1.0,
-                message=f"Review completed with {prd_result.total_findings} findings",
+    try:
+        # Check feature flag
+        if not features.enable_bulk_prd_analysis:
+            raise HTTPException(
+                status_code=403,
+                detail="Bulk PRD analysis is not enabled. Set FEATURE_BULK_PRD_ANALYSIS=true"
             )
-    
-    # Convert to response
-    return BulkResultResponse(
+        
+        # Validate PRD count
+        max_files = min(features.bulk_prd_max_files, 20)
+        if len(request.prds) > max_files:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Too many PRD files. Maximum allowed: {max_files}"
+            )
+        
+        if len(request.prds) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No PRD files provided"
+            )
+        
+        if tc:
+            tc.emit("info", "bulk", f"Bulk scan started — {len(request.prds)} PRDs")
+        
+        # Parse dimensions
+        dimension_map = {
+            "security": ReviewDimension.SECURITY,
+            "privacy": ReviewDimension.PRIVACY,
+            "compliance": ReviewDimension.COMPLIANCE,
+            "engineering": ReviewDimension.ENGINEERING,
+            "architecture": ReviewDimension.ARCHITECTURE,
+        }
+        
+        dimensions = []
+        for dim_str in request.dimensions:
+            if dim_str.lower() in dimension_map:
+                dimensions.append(dimension_map[dim_str.lower()])
+        
+        if not dimensions:
+            dimensions = [ReviewDimension.SECURITY]
+        
+        if tc:
+            dim_names = [d.value for d in dimensions]
+            tc.emit("info", "bulk", f"Dimensions: {', '.join(dim_names)}", dimensions=dim_names)
+        
+        # Get API keys
+        openai_key = request.openai_api_key or os.getenv("OPENAI_API_KEY")
+        anthropic_key = request.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+        
+        # Import and run bulk analyzer
+        from context_graph.pm.bulk_prd_analyzer import (
+            BulkPRDAnalyzer,
+            BulkAnalysisRequest as InternalRequest,
+            PRDFile,
+        )
+        
+        # Create PRD file objects
+        prd_files = []
+        for prd_input in request.prds:
+            prd_files.append(PRDFile(
+                file_path=prd_input.file_path,
+                file_name=prd_input.file_name,
+                content=prd_input.content,
+                codebase_path=prd_input.codebase_path,
+                dimensions=dimensions,
+            ))
+        
+        # Create internal request
+        internal_request = InternalRequest(
+            prds=prd_files,
+            default_codebase_path=request.default_codebase_path,
+            default_dimensions=dimensions,
+            max_parallel_reviews=request.max_parallel_reviews,
+            use_llm=request.use_llm and bool(openai_key or anthropic_key),
+        )
+        
+        # Run analysis
+        analyzer = BulkPRDAnalyzer(
+            openai_api_key=openai_key,
+            anthropic_api_key=anthropic_key,
+        )
+        
+        if tc:
+            tc.emit("info", "bulk", f"Starting analysis of {len(prd_files)} PRDs...")
+        result = await analyzer.analyze(internal_request)
+        
+        # Store results for individual PRD access using the storage backend
+        from context_graph.storage.config import get_review_storage
+        storage = get_review_storage()
+        
+        for idx, prd_result in enumerate(result.prd_results, 1):
+            if prd_result.success and prd_result.review_result:
+                await storage.save_review(prd_result.review_id, prd_result.review_result)
+                await storage.update_review_status(
+                    review_id=prd_result.review_id,
+                    status="completed",
+                    progress=1.0,
+                    message=f"Review completed with {prd_result.total_findings} findings",
+                )
+                if tc:
+                    tc.emit("info", "bulk",
+                            f"PRD {idx}/{result.total_prds} '{prd_result.prd_file_name}' complete — "
+                            f"{prd_result.total_findings} findings",
+                            prd=prd_result.prd_file_name, findings=prd_result.total_findings)
+            elif not prd_result.success and tc:
+                tc.emit("error", "bulk",
+                        f"PRD '{prd_result.prd_file_name}' failed: {prd_result.error_message}",
+                        prd=prd_result.prd_file_name)
+        
+        if tc:
+            tc.emit("info", "bulk",
+                    f"Bulk scan complete: {result.successful_prds}/{result.total_prds} successful, "
+                    f"{result.total_findings} total findings",
+                    successful=result.successful_prds, failed=result.failed_prds,
+                    total_findings=result.total_findings)
+        
+        # Convert to response
+        return BulkResultResponse(
         id=str(result.id),
         total_prds=result.total_prds,
         successful_prds=result.successful_prds,
@@ -266,6 +299,9 @@ async def analyze_bulk_prds(
         started_at=result.started_at.isoformat() if result.started_at else None,
         completed_at=result.completed_at.isoformat() if result.completed_at else None,
     )
+    finally:
+        if tc:
+            tc.close()
 
 
 @router.post("/analyze/async", response_model=BulkAnalysisResponse)
@@ -340,6 +376,44 @@ async def get_bulk_status(bulk_id: str) -> BulkStatusResponse:
     )
 
 
+@router.get("/traces/{bulk_id}")
+async def stream_bulk_traces(bulk_id: str):
+    """Stream trace events for a running bulk analysis via Server-Sent Events.
+
+    Requires the ``enable_scan_tracing`` feature flag.
+    """
+    if not get_features().enable_scan_tracing:
+        raise HTTPException(status_code=404, detail="Scan tracing is not enabled")
+
+    import json as _json
+
+    collector = get_collector(bulk_id)
+
+    async def _event_stream():
+        cursor = 0
+        while True:
+            new_events = collector.events_since(cursor)
+            for evt in new_events:
+                yield f"data: {_json.dumps(evt.to_dict())}\n\n"
+                cursor += 1
+
+            if collector.is_closed:
+                yield "event: done\ndata: {}\n\n"
+                return
+
+            await collector.wait_for_new(timeout=15.0)
+
+    return StreamingResponse(
+        _event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/results/{bulk_id}", response_model=BulkResultResponse)
 async def get_bulk_result(bulk_id: str) -> BulkResultResponse:
     """Get full results of a completed bulk analysis."""
@@ -400,10 +474,12 @@ async def _run_bulk_analysis_background(
 ) -> None:
     """Run bulk analysis in background."""
     import logging
+    tc = get_collector(bulk_id)
     
     try:
         bulk_status_store[bulk_id]["status"] = "running"
         bulk_status_store[bulk_id]["message"] = "Starting analysis..."
+        tc.emit("info", "bulk", f"Bulk scan {bulk_id} started — {len(request.prds)} PRDs")
         
         # Parse dimensions
         dimension_map = {
@@ -419,6 +495,9 @@ async def _run_bulk_analysis_background(
             for d in request.dimensions
             if d.lower() in dimension_map
         ] or [ReviewDimension.SECURITY]
+        
+        dim_names = [d.value for d in dimensions]
+        tc.emit("info", "bulk", f"Dimensions: {', '.join(dim_names)}", dimensions=dim_names)
         
         # Get API keys
         openai_key = request.openai_api_key or os.getenv("OPENAI_API_KEY")
@@ -455,6 +534,7 @@ async def _run_bulk_analysis_background(
             anthropic_api_key=anthropic_key,
         )
         
+        tc.emit("info", "bulk", f"Starting bulk analysis of {len(prd_files)} PRDs...")
         result = await analyzer.analyze(internal_request)
         
         # Store results
@@ -495,7 +575,7 @@ async def _run_bulk_analysis_background(
         from context_graph.storage.config import get_review_storage
         storage = get_review_storage()
         
-        for prd_result in result.prd_results:
+        for idx, prd_result in enumerate(result.prd_results, 1):
             if prd_result.success and prd_result.review_result:
                 await storage.save_review(prd_result.review_id, prd_result.review_result)
                 await storage.update_review_status(
@@ -504,6 +584,21 @@ async def _run_bulk_analysis_background(
                     progress=1.0,
                     message=f"Review completed",
                 )
+                tc.emit("info", "bulk",
+                          f"PRD {idx}/{result.total_prds} '{prd_result.prd_file_name}' complete — "
+                          f"{prd_result.total_findings} findings",
+                          prd=prd_result.prd_file_name, findings=prd_result.total_findings)
+            elif not prd_result.success:
+                tc.emit("error", "bulk",
+                          f"PRD '{prd_result.prd_file_name}' failed: {prd_result.error_message}",
+                          prd=prd_result.prd_file_name)
+        
+        tc.emit("info", "bulk",
+                  f"Bulk scan complete: {result.successful_prds}/{result.total_prds} successful, "
+                  f"{result.total_findings} total findings",
+                  successful=result.successful_prds, failed=result.failed_prds,
+                  total_findings=result.total_findings,
+                  duration_ms=result.total_duration_ms)
         
         bulk_status_store[bulk_id] = {
             "status": "completed",
@@ -516,6 +611,7 @@ async def _run_bulk_analysis_background(
         
     except Exception as e:
         logging.error(f"Bulk analysis failed: {e}")
+        tc.emit("error", "bulk", f"Bulk analysis failed: {str(e)}")
         bulk_status_store[bulk_id] = {
             "status": "failed",
             "progress": 0.0,
@@ -524,3 +620,5 @@ async def _run_bulk_analysis_background(
             "successful_prds": 0,
             "failed_prds": len(request.prds),
         }
+    finally:
+        tc.close()

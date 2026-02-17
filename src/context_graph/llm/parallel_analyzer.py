@@ -29,9 +29,21 @@ from context_graph.llm.false_positive_filter import (
     FalsePositiveFilterResult,
 )
 from context_graph.config.features import get_features
+from context_graph.tracing.collector import TraceCollector
 
 
 logger = logging.getLogger(__name__)
+
+# Sentinel no-op collector used when no real collector is provided
+_NOOP_COLLECTOR: TraceCollector | None = None
+
+
+def _noop_collector() -> TraceCollector:
+    """Return a shared no-op collector that silently discards events."""
+    global _NOOP_COLLECTOR
+    if _NOOP_COLLECTOR is None:
+        _NOOP_COLLECTOR = TraceCollector("__noop__")
+    return _NOOP_COLLECTOR
 
 
 @dataclass
@@ -72,8 +84,10 @@ class ParallelLLMAnalyzer:
         anthropic_api_key: str | None = None,
         openai_model: str = "gpt-5.2",
         anthropic_model: str = "claude-opus-4-5-20251101",
+        trace_collector: TraceCollector | None = None,
     ) -> None:
         self.providers: list[LLMProvider] = []
+        self.tc: TraceCollector = trace_collector or _noop_collector()
         
         if openai_api_key:
             self.providers.append(OpenAIProvider(
@@ -121,6 +135,11 @@ class ParallelLLMAnalyzer:
         """Perform security review using all providers in parallel."""
         import logging
         
+        provider_names = [p.provider_name for p in self.providers]
+        self.tc.emit("info", "llm_dispatch",
+                      f"Dispatching security review to {', '.join(provider_names)}",
+                      dimension="security", providers=provider_names)
+        
         tasks = [
             provider.security_review(intent, state, delta)
             for provider in self.providers
@@ -132,8 +151,15 @@ class ParallelLLMAnalyzer:
         for i, r in enumerate(responses):
             if isinstance(r, LLMResponse):
                 valid_responses.append(r)
-                logging.info(f"LLM provider {self.providers[i].provider_name} returned {len(r.structured_data.get('findings', []))} findings")
+                count = len(r.structured_data.get('findings', []))
+                self.tc.emit("info", "llm_dispatch",
+                              f"{self.providers[i].provider_name} returned {count} security findings",
+                              provider=self.providers[i].provider_name, findings=count)
+                logging.info(f"LLM provider {self.providers[i].provider_name} returned {count} findings")
             elif isinstance(r, Exception):
+                self.tc.emit("error", "llm_dispatch",
+                              f"{self.providers[i].provider_name} failed: {r}",
+                              provider=self.providers[i].provider_name)
                 logging.error(f"LLM provider {self.providers[i].provider_name} failed: {r}")
         
         if not valid_responses:
@@ -176,6 +202,11 @@ class ParallelLLMAnalyzer:
         """Perform privacy review using LINDDUN framework with all providers in parallel."""
         import logging
         
+        provider_names = [p.provider_name for p in self.providers]
+        self.tc.emit("info", "llm_dispatch",
+                      f"Dispatching privacy review to {', '.join(provider_names)}",
+                      dimension="privacy", providers=provider_names)
+        
         tasks = [
             provider.privacy_review(intent, state, delta)
             for provider in self.providers
@@ -187,8 +218,15 @@ class ParallelLLMAnalyzer:
         for i, r in enumerate(responses):
             if isinstance(r, LLMResponse):
                 valid_responses.append(r)
-                logging.info(f"LLM provider {self.providers[i].provider_name} returned {len(r.structured_data.get('findings', []))} privacy findings")
+                count = len(r.structured_data.get('findings', []))
+                self.tc.emit("info", "llm_dispatch",
+                              f"{self.providers[i].provider_name} returned {count} privacy findings",
+                              provider=self.providers[i].provider_name, findings=count)
+                logging.info(f"LLM provider {self.providers[i].provider_name} returned {count} privacy findings")
             elif isinstance(r, Exception):
+                self.tc.emit("error", "llm_dispatch",
+                              f"{self.providers[i].provider_name} privacy review failed: {r}",
+                              provider=self.providers[i].provider_name)
                 logging.error(f"LLM provider {self.providers[i].provider_name} privacy review failed: {r}")
         
         if not valid_responses:
@@ -210,6 +248,11 @@ class ParallelLLMAnalyzer:
         """Perform compliance review using all providers in parallel."""
         import logging
         
+        provider_names = [p.provider_name for p in self.providers]
+        self.tc.emit("info", "llm_dispatch",
+                      f"Dispatching compliance review to {', '.join(provider_names)}",
+                      dimension="compliance", providers=provider_names)
+        
         tasks = [
             provider.compliance_review(intent, state, delta, frameworks)
             for provider in self.providers
@@ -221,8 +264,15 @@ class ParallelLLMAnalyzer:
         for i, r in enumerate(responses):
             if isinstance(r, LLMResponse):
                 valid_responses.append(r)
-                logging.info(f"LLM provider {self.providers[i].provider_name} returned {len(r.structured_data.get('findings', []))} compliance findings")
+                count = len(r.structured_data.get('findings', []))
+                self.tc.emit("info", "llm_dispatch",
+                              f"{self.providers[i].provider_name} returned {count} compliance findings",
+                              provider=self.providers[i].provider_name, findings=count)
+                logging.info(f"LLM provider {self.providers[i].provider_name} returned {count} compliance findings")
             elif isinstance(r, Exception):
+                self.tc.emit("error", "llm_dispatch",
+                              f"{self.providers[i].provider_name} compliance review failed: {r}",
+                              provider=self.providers[i].provider_name)
                 logging.error(f"LLM provider {self.providers[i].provider_name} compliance review failed: {r}")
         
         if not valid_responses:
@@ -256,6 +306,11 @@ class ParallelLLMAnalyzer:
         """
         import logging
         
+        provider_names = [p.provider_name for p in self.providers]
+        self.tc.emit("info", "llm_dispatch",
+                      f"Dispatching engineering review to {', '.join(provider_names)}",
+                      dimension="engineering", providers=provider_names,
+                      has_metrics=bool(engineering_metrics))
         logging.info(f"Starting engineering review with metrics: {bool(engineering_metrics)}")
         if engineering_metrics:
             logging.info(f"Metrics summary: {engineering_metrics.get('source_files', 0)} files, "
@@ -273,12 +328,18 @@ class ParallelLLMAnalyzer:
         for i, r in enumerate(responses):
             if isinstance(r, LLMResponse):
                 valid_responses.append(r)
-                # Log more details about the response
                 findings_count = len(r.structured_data.get('findings', []))
                 feasibility = r.structured_data.get('feasibility_assessment', {}).get('overall_feasibility', 'N/A')
+                self.tc.emit("info", "llm_dispatch",
+                              f"{self.providers[i].provider_name} returned {findings_count} engineering findings (feasibility: {feasibility})",
+                              provider=self.providers[i].provider_name, findings=findings_count,
+                              feasibility=feasibility)
                 logging.info(f"LLM provider {self.providers[i].provider_name} returned "
                             f"{findings_count} findings, feasibility: {feasibility}")
             elif isinstance(r, Exception):
+                self.tc.emit("error", "llm_dispatch",
+                              f"{self.providers[i].provider_name} engineering review failed: {r}",
+                              provider=self.providers[i].provider_name)
                 logging.error(f"LLM provider {self.providers[i].provider_name} engineering review failed: {r}")
         
         if not valid_responses:
@@ -299,6 +360,11 @@ class ParallelLLMAnalyzer:
         """Perform architecture review using all providers in parallel."""
         import logging
         
+        provider_names = [p.provider_name for p in self.providers]
+        self.tc.emit("info", "llm_dispatch",
+                      f"Dispatching architecture review to {', '.join(provider_names)}",
+                      dimension="architecture", providers=provider_names)
+        
         tasks = [
             provider.architecture_review(intent, state, delta)
             for provider in self.providers
@@ -310,8 +376,15 @@ class ParallelLLMAnalyzer:
         for i, r in enumerate(responses):
             if isinstance(r, LLMResponse):
                 valid_responses.append(r)
-                logging.info(f"LLM provider {self.providers[i].provider_name} returned {len(r.structured_data.get('findings', []))} architecture findings")
+                count = len(r.structured_data.get('findings', []))
+                self.tc.emit("info", "llm_dispatch",
+                              f"{self.providers[i].provider_name} returned {count} architecture findings",
+                              provider=self.providers[i].provider_name, findings=count)
+                logging.info(f"LLM provider {self.providers[i].provider_name} returned {count} architecture findings")
             elif isinstance(r, Exception):
+                self.tc.emit("error", "llm_dispatch",
+                              f"{self.providers[i].provider_name} architecture review failed: {r}",
+                              provider=self.providers[i].provider_name)
                 logging.error(f"LLM provider {self.providers[i].provider_name} architecture review failed: {r}")
         
         if not valid_responses:
@@ -340,6 +413,9 @@ class ParallelLLMAnalyzer:
         # Pick the first available provider for refinement
         provider = self.providers[0]
         try:
+            self.tc.emit("info", "llm_dispatch",
+                          f"Refinement pass for {dimension}: {len(findings)} raw findings → {provider.provider_name}",
+                          dimension=dimension, raw_count=len(findings))
             logging.info(
                 "Refinement pass for %s: sending %d raw findings to %s",
                 dimension,
@@ -347,6 +423,9 @@ class ParallelLLMAnalyzer:
                 provider.provider_name,
             )
             refined = await provider.refine_findings(findings, dimension)
+            self.tc.emit("info", "llm_dispatch",
+                          f"Refinement pass for {dimension}: {len(findings)} → {len(refined)} findings",
+                          dimension=dimension, before=len(findings), after=len(refined))
             logging.info(
                 "Refinement pass for %s: %d → %d findings",
                 dimension,
@@ -355,12 +434,25 @@ class ParallelLLMAnalyzer:
             )
             return refined
         except Exception as e:
+            self.tc.emit("warn", "llm_dispatch",
+                          f"Refinement pass for {dimension} failed: {e}",
+                          dimension=dimension)
             logging.warning(
                 "Refinement pass for %s failed (%s) — keeping raw merged findings",
                 dimension,
                 e,
             )
             return findings
+
+    # Default fast models for FP filtering (classification task).
+    # Used when features.false_positive_model is empty (auto-detect).
+    # Note: gpt-4.1-nano is too weak — it votes "remove" on almost everything.
+    # gpt-4.1-mini is the sweet spot: 2x faster + 83% cheaper than GPT-4o,
+    # but strong enough reasoning to properly evaluate FP verdicts.
+    _FP_FAST_MODELS: dict[str, str] = {
+        "openai": "gpt-4.1-mini",
+        "anthropic": "claude-haiku-4-5-20251001",
+    }
 
     async def _filter_false_positives(
         self,
@@ -376,6 +468,9 @@ class ParallelLLMAnalyzer:
         validation, specificity check, evidence grounding) to progressively
         remove false positives while preserving true findings.
 
+        Uses a faster/cheaper model than the main analysis model since
+        FP filtering is essentially a classification task.
+
         Only runs when the ``enable_false_positive_filtering`` feature flag
         is enabled.  Falls back gracefully on error.
         """
@@ -387,12 +482,29 @@ class ParallelLLMAnalyzer:
             return findings
 
         provider = self.providers[0]
+
+        # Resolve the fast model for FP filtering
+        fp_model: str | None = features.false_positive_model or None
+        if not fp_model:
+            fp_model = self._FP_FAST_MODELS.get(provider.provider_name)
+
         try:
+            self.tc.emit("info", "fp_filter",
+                          f"FP filter started for {dimension}: {len(findings)} findings, "
+                          f"model={fp_model or provider.model}, "
+                          f"mode={'parallel' if features.false_positive_parallel else 'sequential'}",
+                          dimension=dimension, input_count=len(findings),
+                          model=fp_model or provider.model,
+                          mode="parallel" if features.false_positive_parallel else "sequential")
             fp_filter = FalsePositiveFilter(
                 llm_provider=provider,
                 max_iterations=features.false_positive_max_iterations,
                 min_findings_to_filter=features.false_positive_min_findings,
                 verbose=True,
+                parallel=features.false_positive_parallel,
+                removal_threshold=features.false_positive_removal_threshold,
+                model_override=fp_model,
+                trace_collector=self.tc,
             )
             fp_result = await fp_filter.filter_findings(
                 findings=findings,
@@ -402,6 +514,14 @@ class ParallelLLMAnalyzer:
                 delta=delta,
             )
             self.fp_filter_results[dimension] = fp_result
+            self.tc.emit("info", "fp_filter",
+                          f"FP filter for {dimension}: {fp_result.original_count} → {fp_result.final_count} "
+                          f"(removed {fp_result.total_removed}, {fp_result.removal_rate:.0%})",
+                          dimension=dimension,
+                          original=fp_result.original_count,
+                          final=fp_result.final_count,
+                          removed=fp_result.total_removed,
+                          removal_rate=round(fp_result.removal_rate, 3))
             logging.info(
                 "FP filter for %s: %d → %d findings (removed %d, %.0f%%)",
                 dimension,
@@ -412,6 +532,9 @@ class ParallelLLMAnalyzer:
             )
             return fp_result.filtered_findings
         except Exception as e:
+            self.tc.emit("warn", "fp_filter",
+                          f"FP filter for {dimension} failed: {e}",
+                          dimension=dimension)
             logging.warning(
                 "False positive filter for %s failed (%s) — keeping all findings",
                 dimension,

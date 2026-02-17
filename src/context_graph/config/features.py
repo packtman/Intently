@@ -216,6 +216,32 @@ class FeatureFlags:
     # (skip filtering for very small result sets — not worth the cost)
     false_positive_min_findings: int = 3
     
+    # Run FP filter strategies in parallel (fan-out + majority vote)
+    # instead of sequentially (pipeline).  ~3x faster wall-clock time.
+    false_positive_parallel: bool = True
+    
+    # In parallel mode, the minimum number of strategies that must vote
+    # "remove" to actually remove a finding.
+    # 1 = any strategy can remove (too aggressive with fast models)
+    # 2 = majority must agree (recommended default)
+    # 3 = unanimous (very conservative)
+    false_positive_removal_threshold: int = 2
+    
+    # Use a faster/cheaper model for FP filtering (classification task).
+    # Empty string = auto-detect the best fast model for the provider:
+    #   OpenAI    → gpt-4.1-mini  (nano is too weak for FP evaluation)
+    #   Anthropic → claude-haiku-4-5-20251001
+    # Set explicitly to override (e.g. "gpt-4.1-nano" if cost is priority).
+    false_positive_model: str = ""
+    
+    # ==================== Scan Tracing ====================
+    # Real-time trace log streaming for scan observability
+    
+    # Enable scan tracing (SSE trace log viewer in the frontend)
+    # When enabled, scans emit granular trace events that are streamed
+    # to the frontend via Server-Sent Events.
+    enable_scan_tracing: bool = True
+    
     # ==================== Utility Methods ====================
     
     @classmethod
@@ -263,6 +289,11 @@ class FeatureFlags:
             enable_false_positive_filtering=_env_bool("FEATURE_FALSE_POSITIVE_FILTERING", True),
             false_positive_max_iterations=int(os.getenv("FALSE_POSITIVE_MAX_ITERATIONS", "3")),
             false_positive_min_findings=int(os.getenv("FALSE_POSITIVE_MIN_FINDINGS", "3")),
+            false_positive_parallel=_env_bool("FALSE_POSITIVE_PARALLEL", True),
+            false_positive_removal_threshold=int(os.getenv("FALSE_POSITIVE_REMOVAL_THRESHOLD", "2")),
+            false_positive_model=os.getenv("FALSE_POSITIVE_MODEL", ""),
+            # Scan tracing
+            enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
         )
     
     @classmethod
@@ -305,6 +336,11 @@ class FeatureFlags:
             enable_false_positive_filtering=True,
             false_positive_max_iterations=3,
             false_positive_min_findings=3,
+            false_positive_parallel=True,
+            false_positive_removal_threshold=2,
+            false_positive_model="",
+            # Scan tracing
+            enable_scan_tracing=True,
         )
     
     def to_dict(self) -> dict[str, Any]:
@@ -346,6 +382,11 @@ class FeatureFlags:
             "false_positive_filtering": self.enable_false_positive_filtering,
             "false_positive_max_iterations": self.false_positive_max_iterations,
             "false_positive_min_findings": self.false_positive_min_findings,
+            "false_positive_parallel": self.false_positive_parallel,
+            "false_positive_removal_threshold": self.false_positive_removal_threshold,
+            "false_positive_model": self.false_positive_model,
+            # Scan tracing
+            "scan_tracing": self.enable_scan_tracing,
         }
     
     def get_enabled_features(self) -> list[str]:
@@ -406,6 +447,11 @@ class FeatureFlags:
         # False positive filtering
         if self.enable_false_positive_filtering:
             enabled.append("false_positive_filtering")
+        if self.false_positive_parallel:
+            enabled.append("false_positive_parallel")
+        # Scan tracing
+        if self.enable_scan_tracing:
+            enabled.append("scan_tracing")
         return enabled
 
 

@@ -50,10 +50,17 @@ class AnthropicProvider(LLMProvider):
         
         user_content = self._build_user_prompt(request)
         
+        # Allow per-request model override (e.g. faster model for FP filtering)
+        effective_model = (
+            request.context.get("model_override")
+            if request.context and request.context.get("model_override")
+            else self.model
+        )
+
         start_time = time.time()
         
         response = await self.client.messages.create(
-            model=self.model,
+            model=effective_model,
             max_tokens=self.max_tokens,
             system=system_prompt,
             messages=[
@@ -82,7 +89,7 @@ class AnthropicProvider(LLMProvider):
         
         return LLMResponse(
             provider=self.provider_name,
-            model=self.model,
+            model=effective_model,
             content=content,
             analysis_type=request.analysis_type,
             structured_data=structured_data,

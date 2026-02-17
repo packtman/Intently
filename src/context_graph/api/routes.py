@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from context_graph.parsers import MarkdownPRDParser, NotionPRDParser, GoogleDocsPRDParser
@@ -32,6 +33,8 @@ from context_graph.reports.markdown_report import MarkdownReportGenerator
 from context_graph.integrations.github import GitHubIntegration, ClonedRepo
 from context_graph.core.models import ReviewDimension, ComplianceFramework
 from context_graph.storage.config import get_review_storage
+from context_graph.tracing import get_collector
+from context_graph.config.features import get_features
 
 
 def _normalize_github_url(path: str) -> str:
@@ -181,6 +184,48 @@ async def get_review_status_endpoint(review_id: str) -> ReviewStatusResponse:
     )
 
 
+@router.get("/reviews/{review_id}/traces")
+async def stream_review_traces(review_id: str):
+    """Stream trace events for a running review via Server-Sent Events.
+
+    The client receives a stream of ``data: {json}`` messages.  Each
+    message is a ``TraceEvent`` dict.  When the scan finishes, a final
+    ``event: done`` message is sent and the stream closes.
+
+    Requires the ``enable_scan_tracing`` feature flag.
+    """
+    if not get_features().enable_scan_tracing:
+        raise HTTPException(status_code=404, detail="Scan tracing is not enabled")
+
+    import json as _json
+
+    collector = get_collector(review_id)
+
+    async def _event_stream():
+        cursor = 0
+        while True:
+            new_events = collector.events_since(cursor)
+            for evt in new_events:
+                yield f"data: {_json.dumps(evt.to_dict())}\n\n"
+                cursor += 1
+
+            if collector.is_closed:
+                yield "event: done\ndata: {}\n\n"
+                return
+
+            await collector.wait_for_new(timeout=15.0)
+
+    return StreamingResponse(
+        _event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/reviews/{review_id}")
 async def get_review(review_id: str) -> Dict[str, Any]:
     """Get the complete review result."""
@@ -309,13 +354,16 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
     import logging
     cloned_repo: ClonedRepo | None = None
     storage = get_review_storage()
+    tc = get_collector(review_id)
     
     try:
         # Parse dimensions from config
+        tc.emit("info", "init", f"Review {review_id} started")
         logging.info(f"=== REVIEW {review_id} STARTED ===")
         logging.info(f"Raw dimensions from request: {request.config.dimensions}")
         requested_dimensions = _parse_dimensions(request.config.dimensions)
         dimension_names = [d.value for d in requested_dimensions]
+        tc.emit("info", "init", f"Dimensions: {', '.join(dimension_names)}", dimensions=dimension_names)
         logging.info(f"Parsed dimensions: {dimension_names}")
         
         await storage.update_review_status(
@@ -327,8 +375,17 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
         )
         
         # Parse PRD
+        tc.emit("info", "prd_parse", "Parsing PRD...")
         parser = _get_parser(request.prd.source_type)
         intent = parser.parse(request.prd.content, request.prd.title or "API Upload")
+        tc.emit("info", "prd_parse",
+                f"Extracted {len(intent.features)} features, "
+                f"{len(intent.user_stories)} user stories, "
+                f"{len(intent.api_changes)} API changes",
+                title=intent.title,
+                features=len(intent.features),
+                user_stories=len(intent.user_stories),
+                api_changes=len(intent.api_changes))
         
         await storage.update_review_status(
             review_id=review_id,
@@ -342,6 +399,7 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
         codebase_path = _normalize_github_url(request.codebase.path)
         
         if _is_github_url(codebase_path):
+            tc.emit("info", "codebase_analysis", f"Cloning from GitHub: {codebase_path}")
             await storage.update_review_status(
                 review_id=review_id,
                 status="running",
@@ -358,6 +416,7 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
                 pr=request.codebase.pr,
             )
             path = cloned_repo.path
+            tc.emit("info", "codebase_analysis", "Clone complete", path=str(path))
         else:
             path = Path(codebase_path)
             if not path.exists():
@@ -373,16 +432,27 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
         
         # Use hybrid analyzer if requested (AST fast + LSP on-demand)
         if request.codebase.use_hybrid:
-            print(f"🚀 [Review {review_id}] Using HYBRID analyzer (AST fast + LSP on-demand)", flush=True)
+            tc.emit("info", "codebase_analysis", "Using HYBRID analyzer (AST fast + LSP on-demand)")
             state = _get_hybrid_state(path, request.codebase.languages)
             if hasattr(state, '_hybrid_analysis'):
                 meta = state._hybrid_analysis
-                print(f"   AST analysis: {meta['ast_time_ms']:.0f}ms, {meta['files_analyzed']} files", flush=True)
-                print(f"   Pending LSP queries: {meta['pending_lsp_queries']}", flush=True)
+                tc.emit("info", "codebase_analysis",
+                        f"AST analysis: {meta['ast_time_ms']:.0f}ms, {meta['files_analyzed']} files",
+                        ast_time_ms=meta['ast_time_ms'],
+                        files_analyzed=meta['files_analyzed'],
+                        pending_lsp_queries=meta['pending_lsp_queries'])
         else:
-            print(f"📊 [Review {review_id}] Using TRADITIONAL analyzer (regex + Python AST)", flush=True)
+            tc.emit("info", "codebase_analysis", "Using TRADITIONAL analyzer (regex + Python AST)")
             analyzer = _get_analyzer(request.codebase.languages)
             state = analyzer.analyze_codebase(path)
+        
+        tc.emit("info", "codebase_analysis",
+                f"Found {state.files_analyzed} files, {state.lines_of_code} lines, "
+                f"{len(state.api_endpoints)} endpoints, {len(state.data_models)} models",
+                files_analyzed=state.files_analyzed,
+                lines_of_code=state.lines_of_code,
+                api_endpoints=len(state.api_endpoints),
+                data_models=len(state.data_models))
         
         await storage.update_review_status(
             review_id=review_id,
@@ -408,18 +478,23 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
             openai_api_key=openai_key,
             anthropic_api_key=anthropic_key,
             use_llm=llm_enabled,
-            llm_only=llm_enabled,  # When LLM is enabled, only use LLM findings for detailed AI analysis
-            use_pattern_matching=not llm_enabled,  # Disable pattern matching when using LLM
-            use_graph_analysis=not llm_enabled,    # Disable graph analysis when using LLM
+            llm_only=llm_enabled,
+            use_pattern_matching=not llm_enabled,
+            use_graph_analysis=not llm_enabled,
             dimensions=requested_dimensions,
             compliance_frameworks=compliance_frameworks,
         )
         
+        tc.emit("info", "llm_dispatch",
+                f"LLM enabled: {llm_enabled}, dimensions: {dimension_names}",
+                llm_enabled=llm_enabled,
+                pattern_matching=config.use_pattern_matching)
         logging.info(f"Config created with dimensions: {[d.value for d in config.dimensions]}")
         logging.info(f"LLM enabled: {llm_enabled}, pattern_matching: {config.use_pattern_matching}")
         
         # Log status for debugging
         if use_llm_requested and not has_api_keys:
+            tc.emit("warn", "llm_dispatch", "LLM requested but no API keys found — using pattern-based analysis only")
             await storage.update_review_status(
                 review_id=review_id,
                 status="running",
@@ -428,6 +503,7 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
                 dimensions=dimension_names,
             )
         elif llm_enabled:
+            tc.emit("info", "llm_dispatch", f"Running AI-powered {', '.join(dimension_names)} analysis...")
             await storage.update_review_status(
                 review_id=review_id,
                 status="running",
@@ -436,7 +512,7 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
                 dimensions=dimension_names,
             )
         
-        engine = SecurityReviewEngine(config)
+        engine = SecurityReviewEngine(config, trace_collector=tc)
         
         await storage.update_review_status(
             review_id=review_id,
@@ -445,26 +521,19 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
             message="Generating findings across all dimensions...",
             dimensions=dimension_names,
         )
+        tc.emit("info", "llm_dispatch", "Generating findings across all dimensions...")
         
         # Run review
         result = await engine.review(intent, state)
         
         # Store config and original PRD on result for re-analysis
-        result.config = config  # Preserve original config for re-analysis
-        result.original_prd_content = intent.raw_content  # Preserve original PRD
+        result.config = config
+        result.original_prd_content = intent.raw_content
         
         # Store result in persistent storage
         await storage.save_review(review_id, result)
         
         # Build completion message with dimension breakdown
-        import logging
-        logging.info(f"Review completed. All findings: {len(result.all_findings)}")
-        logging.info(f"  Security: {len(result.security_findings)}")
-        logging.info(f"  Privacy: {len(result.privacy_findings)}")
-        logging.info(f"  Compliance: {len(result.compliance_findings)}")
-        logging.info(f"  Engineering: {len(result.engineering_findings)}")
-        logging.info(f"  Architecture: {len(result.architecture_findings)}")
-        
         breakdowns = []
         if ReviewDimension.SECURITY in requested_dimensions:
             breakdowns.append(f"{len(result.security_findings)} security")
@@ -478,6 +547,15 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
             breakdowns.append(f"{len(result.architecture_findings)} architecture")
         findings_summary = f"{len(result.all_findings)} findings ({', '.join(breakdowns)})"
         
+        tc.emit("info", "report_gen",
+                f"Review complete: {findings_summary}",
+                total_findings=len(result.all_findings),
+                security=len(result.security_findings),
+                privacy=len(result.privacy_findings),
+                compliance=len(result.compliance_findings),
+                engineering=len(result.engineering_findings),
+                architecture=len(result.architecture_findings))
+        
         await storage.update_review_status(
             review_id=review_id,
             status="completed",
@@ -487,6 +565,7 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
         )
         
     except Exception as e:
+        tc.emit("error", "init", f"Review failed: {str(e)}")
         await storage.update_review_status(
             review_id=review_id,
             status="failed",
@@ -496,7 +575,7 @@ async def run_review(review_id: str, request: ReviewRequest) -> None:
         )
     
     finally:
-        # Cleanup cloned repo if any
+        tc.close()
         if cloned_repo:
             cloned_repo.cleanup()
 

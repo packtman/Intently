@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -25,6 +25,7 @@ import {
   CheckCircle,
   XCircle,
 } from 'lucide-react'
+import TraceLogPanel from '../components/TraceLogPanel'
 
 interface PRDFile {
   id: string
@@ -65,6 +66,7 @@ export default function BulkAnalysis() {
   const [anthropicKey, setAnthropicKey] = useState('')
   const [showConfig, setShowConfig] = useState(false)
   const [result, setResult] = useState<BulkAnalysisResult | null>(null)
+  const traceIdRef = useRef<string>('')
 
   const addPRDFile = useCallback((fileName: string, content: string) => {
     const id = `prd-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -108,7 +110,11 @@ export default function BulkAnalysis() {
 
   const bulkAnalyze = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/bulk-prd/analyze', {
+      // Generate a trace_id so the SSE connection can start immediately
+      traceIdRef.current = `bulk-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+      const traceId = traceIdRef.current
+
+      const res = await fetch(`/api/bulk/analyze?trace_id=${encodeURIComponent(traceId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -544,6 +550,15 @@ export default function BulkAnalysis() {
               <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-red-400">{bulkAnalyze.error.message}</p>
             </div>
+          )}
+
+          {/* Trace log panel — visible while analyzing or after completion */}
+          {(bulkAnalyze.isPending || result) && traceIdRef.current && (
+            <TraceLogPanel
+              traceId={traceIdRef.current}
+              endpoint={`/api/bulk/traces/${traceIdRef.current}`}
+              isRunning={bulkAnalyze.isPending}
+            />
           )}
         </div>
       </div>

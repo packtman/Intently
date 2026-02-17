@@ -37,6 +37,7 @@ from context_graph.core.graph import ContextGraph
 from context_graph.security.delta_analyzer import DeltaAnalyzer, DeltaAnalysisResult
 from context_graph.security.threat_patterns import ThreatPatternMatcher
 from context_graph.llm.parallel_analyzer import ParallelLLMAnalyzer, ParallelAnalysisResult
+from context_graph.tracing.collector import TraceCollector
 
 
 # Type alias for any finding type
@@ -179,12 +180,17 @@ class SecurityReviewEngine:
     9. Generate report
     """
     
-    def __init__(self, config: ReviewConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: ReviewConfig | None = None,
+        trace_collector: TraceCollector | None = None,
+    ) -> None:
         self.config = config or ReviewConfig()
         self.delta_analyzer = DeltaAnalyzer()
         self.pattern_matcher = ThreatPatternMatcher()
         self._llm_analyzer: ParallelLLMAnalyzer | None = None
         self._graph = ContextGraph()
+        self._trace_collector = trace_collector
         
         # Multi-dimension analyzers (lazy init)
         self._privacy_matcher = None
@@ -198,6 +204,7 @@ class SecurityReviewEngine:
                 self._llm_analyzer = ParallelLLMAnalyzer(
                     openai_api_key=self.config.openai_api_key,
                     anthropic_api_key=self.config.anthropic_api_key,
+                    trace_collector=self._trace_collector,
                 )
         return self._llm_analyzer
     
@@ -264,6 +271,7 @@ class SecurityReviewEngine:
                     total_downgraded=fp_result.total_downgraded,
                     total_iterations=fp_result.total_iterations,
                     removal_rate=fp_result.removal_rate,
+                    execution_mode=fp_result.execution_mode,
                     iteration_details=[
                         {
                             "round": ir.round_num,
