@@ -280,8 +280,8 @@ class TestFalsePositiveFilterParallel:
         assert "evidence_grounding" in names
 
     @pytest.mark.asyncio
-    async def test_parallel_default_threshold_removes_any_vote(self):
-        """Default threshold=1: any single strategy can remove a finding."""
+    async def test_parallel_default_threshold_requires_majority(self):
+        """Default threshold=2: majority of strategies must agree to remove."""
         provider = _make_mock_provider_parallel()
         fp_filter = FalsePositiveFilter(
             llm_provider=provider,
@@ -302,15 +302,19 @@ class TestFalsePositiveFilterParallel:
         assert result.execution_mode == "parallel"
         assert result.original_count == 5
 
-        # F1 (1 remove from context_val), F2 (2 removes), F4 (2 removes) → 3 removed
-        assert result.total_removed == 3
+        # F2 (2 remove votes), F4 (2 remove votes) → removed
+        # F1 has 1 remove + 1 downgrade → kept but downgraded
+        assert result.total_removed == 2
         removed_ids = {f["id"] for f in result.removed_findings}
-        assert removed_ids == {"F1", "F2", "F4"}
+        assert removed_ids == {"F2", "F4"}
 
-        # F3, F5 → kept
-        assert result.final_count == 2
+        # F1 (downgraded), F3, F5 → kept
+        assert result.final_count == 3
         surviving_ids = {f["id"] for f in result.filtered_findings}
-        assert surviving_ids == {"F3", "F5"}
+        assert surviving_ids == {"F1", "F3", "F5"}
+
+        # F1 should be downgraded
+        assert result.total_downgraded == 1
 
         # All 3 strategies should have run
         assert result.total_iterations == 3
@@ -691,11 +695,11 @@ class TestFeatureFlagIntegration:
 
     @pytest.mark.asyncio
     async def test_parallel_flag_enabled_by_default(self):
-        """Verify parallel mode is enabled by default with threshold=1."""
+        """Verify parallel mode is enabled by default with threshold=2."""
         from context_graph.config.features import get_features
         features = get_features()
         assert features.false_positive_parallel is True
-        assert features.false_positive_removal_threshold == 1
+        assert features.false_positive_removal_threshold == 2
 
     @pytest.mark.asyncio
     async def test_feature_flag_disables_filtering(self):

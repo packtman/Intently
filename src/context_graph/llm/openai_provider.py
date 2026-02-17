@@ -55,10 +55,17 @@ class OpenAIProvider(LLMProvider):
         
         user_content = self._build_user_prompt(request)
         
+        # Allow per-request model override (e.g. faster model for FP filtering)
+        effective_model = (
+            request.context.get("model_override")
+            if request.context and request.context.get("model_override")
+            else self.model
+        )
+
         start_time = time.time()
 
         create_kwargs: dict[str, Any] = {
-            "model": self.model,
+            "model": effective_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content},
@@ -67,7 +74,7 @@ class OpenAIProvider(LLMProvider):
             "response_format": {"type": "json_object"},
             "seed": 42,
         }
-        if self._uses_max_completion_tokens(self.model):
+        if self._uses_max_completion_tokens(effective_model):
             create_kwargs["max_completion_tokens"] = self.max_tokens
         else:
             create_kwargs["max_tokens"] = self.max_tokens
@@ -117,7 +124,7 @@ class OpenAIProvider(LLMProvider):
         
         return LLMResponse(
             provider=self.provider_name,
-            model=self.model,
+            model=effective_model,
             content=content,
             analysis_type=request.analysis_type,
             structured_data=structured_data,

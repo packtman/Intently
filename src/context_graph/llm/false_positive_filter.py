@@ -47,6 +47,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from context_graph.llm.provider import LLMProvider
+from context_graph.tracing.collector import TraceCollector
 
 logger = logging.getLogger(__name__)
 
@@ -279,11 +280,11 @@ class FalsePositiveFilter:
     """
 
     # Number of "remove" votes required to actually remove a finding in
-    # parallel mode.  Default of 1 means any single strategy can remove
-    # a finding, which matches sequential behaviour where each strategy
-    # independently removes findings.  Use 2 for conservative mode
-    # (majority must agree) or 3 for unanimous.
-    DEFAULT_REMOVAL_THRESHOLD = 1
+    # parallel mode.  Default of 2 means a majority of strategies must
+    # agree to remove a finding.  This prevents over-aggressive removal
+    # when using fast/cheap models.  Use 1 for aggressive mode or 3 for
+    # unanimous.
+    DEFAULT_REMOVAL_THRESHOLD = 2
 
     def __init__(
         self,
@@ -293,6 +294,8 @@ class FalsePositiveFilter:
         verbose: bool = True,
         parallel: bool = True,
         removal_threshold: int | None = None,
+        model_override: str | None = None,
+        trace_collector: TraceCollector | None = None,
     ) -> None:
         """
         Args:
@@ -307,6 +310,11 @@ class FalsePositiveFilter:
             removal_threshold: In parallel mode, the minimum number of
                                strategies that must vote "remove" to
                                actually remove a finding.  Defaults to 2.
+            model_override: Use a different (faster) model for FP filter
+                            LLM calls.  Passed via AnalysisRequest context
+                            so the provider uses it instead of its default.
+                            None = use the provider's default model.
+            trace_collector: Optional trace collector for emitting events.
         """
         self.provider = llm_provider
         self.max_iterations = min(max_iterations, len(VALIDATION_STRATEGIES))
@@ -318,6 +326,8 @@ class FalsePositiveFilter:
             if removal_threshold is not None
             else self.DEFAULT_REMOVAL_THRESHOLD
         )
+        self.model_override = model_override or None
+        self.tc = trace_collector
 
     # ==================================================================
     # Public entry point
@@ -352,6 +362,7 @@ class FalsePositiveFilter:
             return result
 
         mode_label = "PARALLEL" if self.parallel else "SEQUENTIAL"
+        model_label = self.model_override or self.provider.model
         if self.verbose:
             self._log(f"\n{'='*60}")
             self._log(
@@ -359,6 +370,7 @@ class FalsePositiveFilter:
             )
             self._log(f"Input findings: {len(findings)}")
             self._log(f"Strategies: {self.max_iterations}")
+            self._log(f"Model: {model_label}")
             if self.parallel:
                 self._log(f"Removal threshold: {self.removal_threshold} votes")
             self._log(f"{'='*60}")
@@ -392,11 +404,16 @@ class FalsePositiveFilter:
 
         strategies = VALIDATION_STRATEGIES[: self.max_iterations]
 
+        strategy_names = [s["name"] for s in strategies]
         if self.verbose:
             self._log(
                 f"\nLaunching {len(strategies)} strategies in parallel: "
-                + ", ".join(s["name"] for s in strategies)
+                + ", ".join(strategy_names)
             )
+        if self.tc:
+            self.tc.emit("info", "fp_filter",
+                          f"Launching {len(strategies)} strategies in parallel: {', '.join(strategy_names)}",
+                          strategies=strategy_names, dimension=dimension)
 
         # Fan-out: run every strategy on the SAME findings simultaneously
         tasks = [
@@ -520,6 +537,15 @@ class FalsePositiveFilter:
             self._log(f"  Total tokens: {result.total_tokens}")
             self._log(f"{'='*60}\n")
 
+        if self.tc:
+            self.tc.emit("info", "fp_filter",
+                          f"Majority vote: {result.final_count}/{result.original_count} kept, "
+                          f"{result.total_removed} removed ({result.removal_rate:.0%})",
+                          kept=result.final_count, removed=result.total_removed,
+                          downgraded=result.total_downgraded,
+                          latency_ms=round(result.total_latency_ms),
+                          tokens=result.total_tokens)
+
         return result
 
     # ==================================================================
@@ -556,6 +582,11 @@ class FalsePositiveFilter:
                 )
                 self._log(f"  {strategy['description']}")
                 self._log(f"  Input: {len(current_findings)} findings")
+            if self.tc:
+                self.tc.emit("info", "fp_filter",
+                              f"Strategy {round_num}/{self.max_iterations}: {strategy['name']} — {len(current_findings)} findings",
+                              round=round_num, strategy=strategy["name"],
+                              input_count=len(current_findings))
 
             iter_result = await self._run_iteration(
                 round_num=round_num,
@@ -585,6 +616,13 @@ class FalsePositiveFilter:
                     f"removed={iter_result.removed_count}, "
                     f"downgraded={iter_result.downgraded_count}"
                 )
+            if self.tc:
+                self.tc.emit("info", "fp_filter",
+                              f"Strategy {strategy['name']} complete: kept={len(kept)}, "
+                              f"removed={iter_result.removed_count}, downgraded={iter_result.downgraded_count}",
+                              strategy=strategy["name"],
+                              kept=len(kept), removed=iter_result.removed_count,
+                              downgraded=iter_result.downgraded_count)
 
             current_findings = kept
 
@@ -664,16 +702,20 @@ class FalsePositiveFilter:
             f"Return ONLY valid JSON."
         )
 
+        ctx: dict[str, Any] = {
+            "system_prompt_override": system_prompt,
+            "false_positive_filter": True,
+            "iteration": round_num,
+            "strategy": strategy["name"],
+            "dimension": dimension,
+        }
+        if self.model_override:
+            ctx["model_override"] = self.model_override
+
         request = AnalysisRequest(
             analysis_type=AnalysisType.SECURITY_REVIEW,
             content=prompt_content,
-            context={
-                "system_prompt_override": system_prompt,
-                "false_positive_filter": True,
-                "iteration": round_num,
-                "strategy": strategy["name"],
-                "dimension": dimension,
-            },
+            context=ctx,
         )
 
         try:

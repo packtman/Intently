@@ -36,6 +36,7 @@ import {
 } from '../components/pm'
 import { api } from '../services/api'
 import type { Finding, CollaborationFeatures } from '../types'
+import TraceLogPanel from '../components/TraceLogPanel'
 import {
   PieChart,
   Pie,
@@ -773,26 +774,39 @@ function FindingsTabContent({
 
 function LoadingState({ status }: { status: ReviewStatus }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-        className="w-16 h-16 rounded-full border-4 border-primary-500/30 border-t-primary-500 mb-6"
-      />
-      <h2 className="text-xl font-semibold text-white mb-2">
-        {status.message}
-      </h2>
-      <div className="w-64 h-2 bg-surface-800 rounded-full overflow-hidden">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+      <div className="flex flex-col items-center">
         <motion.div
-          className="h-full bg-gradient-to-r from-primary-500 to-accent-500"
-          initial={{ width: 0 }}
-          animate={{ width: `${status.progress * 100}%` }}
-          transition={{ duration: 0.5 }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="w-16 h-16 rounded-full border-4 border-primary-500/30 border-t-primary-500 mb-6"
         />
+        <h2 className="text-xl font-semibold text-white mb-2">
+          {status.message}
+        </h2>
+        <div className="w-64 h-2 bg-surface-800 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-gradient-to-r from-primary-500 to-accent-500"
+            initial={{ width: 0 }}
+            animate={{ width: `${status.progress * 100}%` }}
+            transition={{ duration: 0.5 }}
+          />
+        </div>
+        <p className="text-surface-400 mt-2">
+          {Math.round(status.progress * 100)}% complete
+        </p>
       </div>
-      <p className="text-surface-400 mt-2">
-        {Math.round(status.progress * 100)}% complete
-      </p>
+
+      {/* Trace log panel */}
+      {status.review_id && (
+        <div className="w-full max-w-3xl px-4">
+          <TraceLogPanel
+            traceId={status.review_id}
+            endpoint={`/api/reviews/${status.review_id}/traces`}
+            isRunning={status.status === 'running' || status.status === 'pending'}
+          />
+        </div>
+      )}
     </div>
   )
 }
