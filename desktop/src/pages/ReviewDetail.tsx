@@ -42,6 +42,7 @@ import {
   EnhancedFindingDetails,
 } from '../components/security'
 import type { ReviewStatus, DashboardData, Finding, CollaborationFeatures, CrossFunctionalFinding } from '../types'
+import TraceLogPanel from '../components/TraceLogPanel'
 
 // Error Boundary to catch any React rendering errors
 interface ErrorBoundaryProps {
@@ -729,23 +730,47 @@ function ReviewDetailContent() {
 }
 
 function LoadingState({ status }: { status: ReviewStatus }) {
+  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:8000')
+
+  useEffect(() => {
+    async function fetchBaseUrl() {
+      if (window.electronAPI?.getBackendUrl) {
+        const url = await window.electronAPI.getBackendUrl()
+        setBaseUrl(url)
+      }
+    }
+    fetchBaseUrl()
+  }, [])
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-        className="w-20 h-20 rounded-full border-4 border-neon-500/30 border-t-neon-400 mb-6"
-      />
-      <h2 className="text-xl font-display font-semibold text-white mb-2">{status.message}</h2>
-      <div className="w-72 h-2 bg-void-800 rounded-full overflow-hidden">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+      <div className="flex flex-col items-center">
         <motion.div
-          className="h-full bg-gradient-to-r from-neon-500 to-aurora-500"
-          initial={{ width: 0 }}
-          animate={{ width: `${status.progress * 100}%` }}
-          transition={{ duration: 0.5 }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="w-20 h-20 rounded-full border-4 border-neon-500/30 border-t-neon-400 mb-6"
         />
+        <h2 className="text-xl font-display font-semibold text-white mb-2">{status.message}</h2>
+        <div className="w-72 h-2 bg-void-800 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-gradient-to-r from-neon-500 to-aurora-500"
+            initial={{ width: 0 }}
+            animate={{ width: `${status.progress * 100}%` }}
+            transition={{ duration: 0.5 }}
+          />
+        </div>
+        <p className="text-void-400 mt-2">{Math.round(status.progress * 100)}% complete</p>
       </div>
-      <p className="text-void-400 mt-2">{Math.round(status.progress * 100)}% complete</p>
+
+      {status.review_id && (
+        <div className="w-full max-w-3xl px-4">
+          <TraceLogPanel
+            traceId={status.review_id}
+            endpoint={`${baseUrl}/api/reviews/${status.review_id}/traces`}
+            isRunning={status.status === 'running' || status.status === 'pending'}
+          />
+        </div>
+      )}
     </div>
   )
 }
