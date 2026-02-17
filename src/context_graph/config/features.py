@@ -235,6 +235,23 @@ class FeatureFlags:
     # Set to "disabled" to use the same model as the main analysis.
     false_positive_model: str = "disabled"
     
+    # ==================== P1: Enhanced PM Experience ====================
+
+    # Enable live analysis while writing (no LLM, pattern-based)
+    enable_live_analysis: bool = False
+
+    # Enable PRD version history and diffing
+    enable_prd_version_history: bool = False
+
+    # Enable approval gates (configurable policies for PRD approval)
+    enable_approval_gates: bool = False
+
+    # Enable review analytics dashboard
+    enable_review_analytics: bool = False
+
+    # Enable product health overview
+    enable_product_overview: bool = False
+
     # ==================== Scan Tracing ====================
     # Real-time trace log streaming for scan observability
     
@@ -293,6 +310,12 @@ class FeatureFlags:
             false_positive_parallel=_env_bool("FALSE_POSITIVE_PARALLEL", True),
             false_positive_removal_threshold=int(os.getenv("FALSE_POSITIVE_REMOVAL_THRESHOLD", "1")),
             false_positive_model=os.getenv("FALSE_POSITIVE_MODEL", "disabled"),
+            # P1: Enhanced PM Experience
+            enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS"),
+            enable_prd_version_history=_env_bool("FEATURE_PRD_VERSION_HISTORY"),
+            enable_approval_gates=_env_bool("FEATURE_APPROVAL_GATES"),
+            enable_review_analytics=_env_bool("FEATURE_REVIEW_ANALYTICS"),
+            enable_product_overview=_env_bool("FEATURE_PRODUCT_OVERVIEW"),
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
         )
@@ -340,6 +363,12 @@ class FeatureFlags:
             false_positive_parallel=True,
             false_positive_removal_threshold=1,
             false_positive_model="disabled",
+            # P1: Enhanced PM Experience
+            enable_live_analysis=True,
+            enable_prd_version_history=True,
+            enable_approval_gates=True,
+            enable_review_analytics=True,
+            enable_product_overview=True,
             # Scan tracing
             enable_scan_tracing=True,
         )
@@ -386,6 +415,12 @@ class FeatureFlags:
             "false_positive_parallel": self.false_positive_parallel,
             "false_positive_removal_threshold": self.false_positive_removal_threshold,
             "false_positive_model": self.false_positive_model,
+            # P1: Enhanced PM Experience
+            "live_analysis": self.enable_live_analysis,
+            "prd_version_history": self.enable_prd_version_history,
+            "approval_gates": self.enable_approval_gates,
+            "review_analytics": self.enable_review_analytics,
+            "product_overview": self.enable_product_overview,
             # Scan tracing
             "scan_tracing": self.enable_scan_tracing,
         }
@@ -450,6 +485,17 @@ class FeatureFlags:
             enabled.append("false_positive_filtering")
         if self.false_positive_parallel:
             enabled.append("false_positive_parallel")
+        # P1: Enhanced PM Experience
+        if self.enable_live_analysis:
+            enabled.append("live_analysis")
+        if self.enable_prd_version_history:
+            enabled.append("prd_version_history")
+        if self.enable_approval_gates:
+            enabled.append("approval_gates")
+        if self.enable_review_analytics:
+            enabled.append("review_analytics")
+        if self.enable_product_overview:
+            enabled.append("product_overview")
         # Scan tracing
         if self.enable_scan_tracing:
             enabled.append("scan_tracing")
