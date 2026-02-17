@@ -235,6 +235,14 @@ class FeatureFlags:
     # Set to "disabled" to use the same model as the main analysis.
     false_positive_model: str = "disabled"
     
+    # ==================== P2: Ecosystem Integration ====================
+
+    enable_decision_log: bool = False
+    enable_risk_prediction: bool = False
+    enable_prd_templates: bool = False
+    enable_github_pr_sync: bool = False
+    enable_prd_authoring_assist: bool = False
+
     # ==================== Scan Tracing ====================
     # Real-time trace log streaming for scan observability
     
@@ -293,6 +301,12 @@ class FeatureFlags:
             false_positive_parallel=_env_bool("FALSE_POSITIVE_PARALLEL", True),
             false_positive_removal_threshold=int(os.getenv("FALSE_POSITIVE_REMOVAL_THRESHOLD", "1")),
             false_positive_model=os.getenv("FALSE_POSITIVE_MODEL", "disabled"),
+            # P2: Ecosystem Integration
+            enable_decision_log=_env_bool("FEATURE_DECISION_LOG"),
+            enable_risk_prediction=_env_bool("FEATURE_RISK_PREDICTION"),
+            enable_prd_templates=_env_bool("FEATURE_PRD_TEMPLATES"),
+            enable_github_pr_sync=_env_bool("FEATURE_GITHUB_PR_SYNC"),
+            enable_prd_authoring_assist=_env_bool("FEATURE_PRD_AUTHORING_ASSIST"),
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
         )
@@ -340,6 +354,12 @@ class FeatureFlags:
             false_positive_parallel=True,
             false_positive_removal_threshold=1,
             false_positive_model="disabled",
+            # P2: Ecosystem Integration
+            enable_decision_log=True,
+            enable_risk_prediction=True,
+            enable_prd_templates=True,
+            enable_github_pr_sync=True,
+            enable_prd_authoring_assist=True,
             # Scan tracing
             enable_scan_tracing=True,
         )
@@ -386,6 +406,12 @@ class FeatureFlags:
             "false_positive_parallel": self.false_positive_parallel,
             "false_positive_removal_threshold": self.false_positive_removal_threshold,
             "false_positive_model": self.false_positive_model,
+            # P2: Ecosystem Integration
+            "decision_log": self.enable_decision_log,
+            "risk_prediction": self.enable_risk_prediction,
+            "prd_templates": self.enable_prd_templates,
+            "github_pr_sync": self.enable_github_pr_sync,
+            "prd_authoring_assist": self.enable_prd_authoring_assist,
             # Scan tracing
             "scan_tracing": self.enable_scan_tracing,
         }
@@ -450,6 +476,17 @@ class FeatureFlags:
             enabled.append("false_positive_filtering")
         if self.false_positive_parallel:
             enabled.append("false_positive_parallel")
+        # P2: Ecosystem Integration
+        if self.enable_decision_log:
+            enabled.append("decision_log")
+        if self.enable_risk_prediction:
+            enabled.append("risk_prediction")
+        if self.enable_prd_templates:
+            enabled.append("prd_templates")
+        if self.enable_github_pr_sync:
+            enabled.append("github_pr_sync")
+        if self.enable_prd_authoring_assist:
+            enabled.append("prd_authoring_assist")
         # Scan tracing
         if self.enable_scan_tracing:
             enabled.append("scan_tracing")
