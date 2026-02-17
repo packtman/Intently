@@ -238,7 +238,7 @@ class FeatureFlags:
     # ==================== P0: Core PM Experience ====================
 
     # Enable product-aware chat (conversational AI grounded in reviews)
-    enable_product_chat: bool = False
+    enable_product_chat: bool = True
 
     # Enable formal review requests (PR-like review workflow)
     enable_review_requests: bool = False
@@ -305,7 +305,7 @@ class FeatureFlags:
             false_positive_removal_threshold=int(os.getenv("FALSE_POSITIVE_REMOVAL_THRESHOLD", "1")),
             false_positive_model=os.getenv("FALSE_POSITIVE_MODEL", "disabled"),
             # P0: Core PM Experience
-            enable_product_chat=_env_bool("FEATURE_PRODUCT_CHAT"),
+            enable_product_chat=_env_bool("FEATURE_PRODUCT_CHAT", True),
             enable_review_requests=_env_bool("FEATURE_REVIEW_REQUESTS"),
             enable_impact_graph=_env_bool("FEATURE_IMPACT_GRAPH"),
             # Scan tracing

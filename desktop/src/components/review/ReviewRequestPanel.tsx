@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { GitPullRequest, CheckCircle, XCircle, Clock, AlertTriangle, Send, Users } from 'lucide-react'
+import { useBackend } from '../../hooks/useBackend'
 
 interface Reviewer {
   id: string
@@ -42,7 +43,7 @@ const statusIcon = (status: string) => {
     case 'approved': return <CheckCircle className="w-4 h-4 text-green-400" />
     case 'blocked': return <XCircle className="w-4 h-4 text-red-400" />
     case 'changes_requested': return <AlertTriangle className="w-4 h-4 text-yellow-400" />
-    default: return <Clock className="w-4 h-4 text-surface-400" />
+    default: return <Clock className="w-4 h-4 text-void-400" />
   }
 }
 
@@ -52,11 +53,12 @@ const statusColor = (status: string) => {
     case 'blocked': return 'text-red-400 bg-red-500/10 border-red-500/30'
     case 'changes_requested': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30'
     case 'open': return 'text-blue-400 bg-blue-500/10 border-blue-500/30'
-    default: return 'text-surface-400 bg-surface-800 border-surface-700'
+    default: return 'text-void-400 bg-void-800 border-void-700'
   }
 }
 
 export default function ReviewRequestPanel({ reviewId }: ReviewRequestPanelProps) {
+  const { backendUrl } = useBackend()
   const [requestData, setRequestData] = useState<ReviewRequestData | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [selectedTeams, setSelectedTeams] = useState<string[]>(['security'])
@@ -69,7 +71,7 @@ export default function ReviewRequestPanel({ reviewId }: ReviewRequestPanelProps
 
   const fetchRequest = async () => {
     try {
-      const res = await fetch(`/api/reviews/${reviewId}/review-request`)
+      const res = await fetch(`${backendUrl}/api/reviews/${reviewId}/review-request`)
       if (res.ok) {
         const data = await res.json()
         setRequestData(data)
@@ -83,7 +85,7 @@ export default function ReviewRequestPanel({ reviewId }: ReviewRequestPanelProps
     setError(null)
 
     try {
-      const res = await fetch(`/api/reviews/${reviewId}/request-review`, {
+      const res = await fetch(`${backendUrl}/api/reviews/${reviewId}/request-review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -109,11 +111,11 @@ export default function ReviewRequestPanel({ reviewId }: ReviewRequestPanelProps
   // No request exists — show create button
   if (!requestData) {
     return (
-      <div className="bg-surface-800/50 border border-surface-700 rounded-xl p-4">
+      <div className="bg-void-800/50 border border-void-700 rounded-xl p-4">
         {!showCreateForm ? (
           <button
             onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500/20 border border-primary-500/30 text-primary-400 hover:bg-primary-500/30 transition-colors w-full justify-center"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-neon-500/20 border border-neon-500/30 text-neon-400 hover:bg-neon-500/30 transition-colors w-full justify-center"
           >
             <GitPullRequest className="w-4 h-4" />
             <span className="text-sm font-medium">Request Review</span>
@@ -121,7 +123,7 @@ export default function ReviewRequestPanel({ reviewId }: ReviewRequestPanelProps
         ) : (
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary-400" />
+              <Users className="w-4 h-4 text-neon-400" />
               Select Reviewers
             </h4>
             <div className="flex flex-wrap gap-2">
@@ -133,8 +135,8 @@ export default function ReviewRequestPanel({ reviewId }: ReviewRequestPanelProps
                   )}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     selectedTeams.includes(team)
-                      ? 'bg-primary-500/20 border-primary-500/40 text-primary-300'
-                      : 'bg-surface-800 border-surface-600 text-surface-400 hover:border-surface-500'
+                      ? 'bg-neon-500/20 border-neon-500/40 text-neon-300'
+                      : 'bg-void-800 border-void-600 text-void-400 hover:border-void-500'
                   }`}
                 >
                   {team}
@@ -146,14 +148,14 @@ export default function ReviewRequestPanel({ reviewId }: ReviewRequestPanelProps
               <button
                 onClick={createRequest}
                 disabled={selectedTeams.length === 0 || isSubmitting}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-50 text-white text-sm transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-neon-500 hover:bg-neon-400 disabled:opacity-50 text-void-950 text-sm transition-colors"
               >
                 <Send className="w-3.5 h-3.5" />
                 {isSubmitting ? 'Submitting...' : 'Submit for Review'}
               </button>
               <button
                 onClick={() => setShowCreateForm(false)}
-                className="px-3 py-2 rounded-lg bg-surface-700 text-surface-300 text-sm hover:bg-surface-600 transition-colors"
+                className="px-3 py-2 rounded-lg bg-void-700 text-void-300 text-sm hover:bg-void-600 transition-colors"
               >
                 Cancel
               </button>
@@ -171,11 +173,11 @@ export default function ReviewRequestPanel({ reviewId }: ReviewRequestPanelProps
     : 0
 
   return (
-    <div className="bg-surface-800/50 border border-surface-700 rounded-xl p-4 space-y-3">
+    <div className="bg-void-800/50 border border-void-700 rounded-xl p-4 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <GitPullRequest className="w-4 h-4 text-primary-400" />
+          <GitPullRequest className="w-4 h-4 text-neon-400" />
           <h4 className="text-sm font-semibold text-white">Review Request</h4>
         </div>
         <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor(requestData.status)}`}>
@@ -185,15 +187,15 @@ export default function ReviewRequestPanel({ reviewId }: ReviewRequestPanelProps
 
       {/* Progress bar */}
       <div>
-        <div className="flex justify-between text-xs text-surface-400 mb-1">
+        <div className="flex justify-between text-xs text-void-400 mb-1">
           <span>{progress.approved}/{progress.total} approved</span>
           <span>{progressPct}%</span>
         </div>
-        <div className="h-2 bg-surface-700 rounded-full overflow-hidden">
+        <div className="h-2 bg-void-700 rounded-full overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${progressPct}%` }}
-            className="h-full bg-gradient-to-r from-primary-500 to-green-500 rounded-full"
+            className="h-full bg-gradient-to-r from-neon-500 to-green-500 rounded-full"
             transition={{ duration: 0.5 }}
           />
         </div>
@@ -204,20 +206,20 @@ export default function ReviewRequestPanel({ reviewId }: ReviewRequestPanelProps
         {requestData.reviewers.map((reviewer) => (
           <div
             key={reviewer.id}
-            className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-800 border border-surface-700"
+            className="flex items-center justify-between px-3 py-2 rounded-lg bg-void-800 border border-void-700"
           >
             <div className="flex items-center gap-2">
               {statusIcon(reviewer.status)}
               <span className="text-sm text-white capitalize">{reviewer.team}</span>
               {reviewer.required && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-400">required</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-void-700 text-void-400">required</span>
               )}
             </div>
             <span className={`text-xs capitalize ${
               reviewer.status === 'approved' ? 'text-green-400' :
               reviewer.status === 'blocked' ? 'text-red-400' :
               reviewer.status === 'changes_requested' ? 'text-yellow-400' :
-              'text-surface-500'
+              'text-void-500'
             }`}>
               {reviewer.status}
             </span>

@@ -367,19 +367,42 @@ async def get_review_graph(review_id: str) -> Dict[str, Any]:
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
+    from context_graph.core.models import EntityType, RelationshipType
+
+    def _ensure_enum(val, enum_cls):
+        """Convert string to enum if needed (SQLite may store as plain string)."""
+        if isinstance(val, str):
+            try:
+                return enum_cls(val)
+            except ValueError:
+                return enum_cls(val.upper()) if hasattr(enum_cls, val.upper()) else val
+        return val
+
     # Rebuild graph from review data (mirrors review_engine._build_graph)
     graph = ContextGraph()
-    for entity in review.state.entities:
+
+    def _safe_add_entity(entity):
+        entity.entity_type = _ensure_enum(entity.entity_type, EntityType)
         graph.add_entity(entity)
-    for rel in review.state.relationships:
+
+    def _safe_add_relationship(rel):
+        rel.relationship_type = _ensure_enum(rel.relationship_type, RelationshipType)
         graph.add_relationship(rel)
+
+    for entity in review.state.entities:
+        _safe_add_entity(entity)
+    for rel in review.state.relationships:
+        _safe_add_relationship(rel)
     for entity in review.intent.data_entities:
-        graph.add_entity(entity)
+        _safe_add_entity(entity)
     new_entity_ids = set()
     if review.delta_result:
         for entity in review.delta_result.delta.new_entities:
-            graph.add_entity(entity)
+            _safe_add_entity(entity)
             new_entity_ids.add(entity.id)
+
+    def _type_str(val) -> str:
+        return val.value if hasattr(val, 'value') else str(val)
 
     # Serialize nodes
     nodes = []
@@ -388,7 +411,7 @@ async def get_review_graph(review_id: str) -> Dict[str, Any]:
         nodes.append({
             "id": str(entity.id),
             "name": entity.name,
-            "type": entity.entity_type.value,
+            "type": _type_str(entity.entity_type),
             "sensitive": entity.is_sensitive,
             "requires_auth": entity.requires_auth,
             "trust_level": entity.trust_level,
@@ -404,7 +427,7 @@ async def get_review_graph(review_id: str) -> Dict[str, Any]:
             "id": str(rel.id),
             "source": str(rel.source_id),
             "target": str(rel.target_id),
-            "type": rel.relationship_type.value,
+            "type": _type_str(rel.relationship_type),
             "crosses_boundary": rel.crosses_trust_boundary,
             "requires_encryption": rel.requires_encryption,
         })

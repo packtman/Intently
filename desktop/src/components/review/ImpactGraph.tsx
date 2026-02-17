@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Network, ZoomIn, ZoomOut, Filter, AlertTriangle, Shield, Database, Globe, Code, Users } from 'lucide-react'
+import { useBackend } from '../../hooks/useBackend'
 
 interface GraphNode {
   id: string
@@ -76,6 +77,7 @@ const TYPE_ICONS: Record<string, typeof Shield> = {
 }
 
 export default function ImpactGraph({ reviewId }: ImpactGraphProps) {
+  const { backendUrl } = useBackend()
   const [graphData, setGraphData] = useState<GraphData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -92,7 +94,7 @@ export default function ImpactGraph({ reviewId }: ImpactGraphProps) {
   const fetchGraph = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/reviews/${reviewId}/graph`)
+      const res = await fetch(`${backendUrl}/api/reviews/${reviewId}/graph`)
       if (!res.ok) {
         if (res.status === 403) throw new Error('Enable FEATURE_IMPACT_GRAPH=true')
         throw new Error(`HTTP ${res.status}`)
@@ -283,8 +285,8 @@ export default function ImpactGraph({ reviewId }: ImpactGraphProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-surface-400">
-        <div className="animate-spin w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full" />
+      <div className="flex items-center justify-center h-64 text-void-400">
+        <div className="animate-spin w-6 h-6 border-2 border-neon-500 border-t-transparent rounded-full" />
       </div>
     )
   }
@@ -292,8 +294,8 @@ export default function ImpactGraph({ reviewId }: ImpactGraphProps) {
   if (error) {
     return (
       <div className="text-center py-8">
-        <Network className="w-8 h-8 text-surface-600 mx-auto mb-2" />
-        <p className="text-sm text-surface-400">{error}</p>
+        <Network className="w-8 h-8 text-void-600 mx-auto mb-2" />
+        <p className="text-sm text-void-400">{error}</p>
       </div>
     )
   }
@@ -306,7 +308,7 @@ export default function ImpactGraph({ reviewId }: ImpactGraphProps) {
     <div className="space-y-4">
       {/* Stats bar */}
       <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-4 text-xs text-surface-400">
+        <div className="flex items-center gap-4 text-xs text-void-400">
           <span>{stats.total_entities} entities</span>
           <span>{stats.total_relationships} relationships</span>
           {stats.new_entities > 0 && (
@@ -319,15 +321,15 @@ export default function ImpactGraph({ reviewId }: ImpactGraphProps) {
 
         {/* Filters */}
         <div className="ml-auto flex items-center gap-1">
-          <Filter className="w-3.5 h-3.5 text-surface-500" />
+          <Filter className="w-3.5 h-3.5 text-void-500" />
           {['all', 'sensitive', 'new', 'high_risk'].map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`px-2 py-1 rounded text-xs transition-colors ${
                 filter === f
-                  ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                  : 'text-surface-400 hover:text-white hover:bg-surface-800'
+                  ? 'bg-neon-500/20 text-neon-400 border border-neon-500/30'
+                  : 'text-void-400 hover:text-white hover:bg-void-800'
               }`}
             >
               {f === 'all' ? 'All' : f === 'high_risk' ? 'High Risk' : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -337,7 +339,7 @@ export default function ImpactGraph({ reviewId }: ImpactGraphProps) {
       </div>
 
       {/* Canvas */}
-      <div className="relative bg-surface-900 border border-surface-700 rounded-xl overflow-hidden">
+      <div className="relative bg-void-900 border border-void-700 rounded-xl overflow-hidden">
         <canvas
           ref={canvasRef}
           width={700}
@@ -347,12 +349,12 @@ export default function ImpactGraph({ reviewId }: ImpactGraphProps) {
         />
 
         {/* Legend */}
-        <div className="absolute bottom-3 left-3 bg-surface-800/90 backdrop-blur-sm rounded-lg p-2 border border-surface-700">
+        <div className="absolute bottom-3 left-3 bg-void-800/90 backdrop-blur-sm rounded-lg p-2 border border-void-700">
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             {Object.entries(stats.entity_types).slice(0, 6).map(([type, count]) => (
               <div key={type} className="flex items-center gap-1">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[type] || '#6b7280' }} />
-                <span className="text-[10px] text-surface-400">{type} ({count})</span>
+                <span className="text-[10px] text-void-400">{type} ({count})</span>
               </div>
             ))}
           </div>
@@ -364,32 +366,32 @@ export default function ImpactGraph({ reviewId }: ImpactGraphProps) {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-surface-800 border border-surface-700 rounded-xl p-4"
+          className="bg-void-800 border border-void-700 rounded-xl p-4"
         >
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-semibold text-white">{selectedNode.name}</h4>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-surface-700 text-surface-300 capitalize">{selectedNode.type}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-void-700 text-void-300 capitalize">{selectedNode.type}</span>
           </div>
           <div className="grid grid-cols-3 gap-3 text-xs">
             <div>
-              <span className="text-surface-500">Risk Score</span>
+              <span className="text-void-500">Risk Score</span>
               <p className={`font-medium ${selectedNode.risk_score > 70 ? 'text-red-400' : selectedNode.risk_score > 40 ? 'text-yellow-400' : 'text-green-400'}`}>
                 {selectedNode.risk_score}/100
               </p>
             </div>
             <div>
-              <span className="text-surface-500">Sensitive</span>
-              <p className={`font-medium ${selectedNode.sensitive ? 'text-red-400' : 'text-surface-300'}`}>
+              <span className="text-void-500">Sensitive</span>
+              <p className={`font-medium ${selectedNode.sensitive ? 'text-red-400' : 'text-void-300'}`}>
                 {selectedNode.sensitive ? 'Yes' : 'No'}
               </p>
             </div>
             <div>
-              <span className="text-surface-500">Auth Required</span>
-              <p className="font-medium text-surface-300">{selectedNode.requires_auth ? 'Yes' : 'No'}</p>
+              <span className="text-void-500">Auth Required</span>
+              <p className="font-medium text-void-300">{selectedNode.requires_auth ? 'Yes' : 'No'}</p>
             </div>
           </div>
           {selectedNode.source && (
-            <p className="text-xs text-surface-500 mt-2 truncate">Source: {selectedNode.source}</p>
+            <p className="text-xs text-void-500 mt-2 truncate">Source: {selectedNode.source}</p>
           )}
         </motion.div>
       )}
