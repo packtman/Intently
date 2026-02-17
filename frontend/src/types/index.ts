@@ -101,6 +101,25 @@ export interface DashboardData {
       expands_attack_surface: boolean
     }
   }
+  false_positive_filter?: {
+    enabled: boolean
+    execution_mode: string
+    total_original: number
+    total_final: number
+    total_removed: number
+    total_downgraded: number
+    removal_rate: number
+    by_dimension: Array<{
+      dimension: string
+      execution_mode: string
+      original_count: number
+      final_count: number
+      removed: number
+      downgraded: number
+      removal_rate: number
+      strategies_run: number
+    }>
+  }
   llm_analysis?: {
     used: boolean
     providers: string[]

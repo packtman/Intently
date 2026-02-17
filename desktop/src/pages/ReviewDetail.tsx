@@ -42,6 +42,7 @@ import {
   EnhancedFindingDetails,
 } from '../components/security'
 import type { ReviewStatus, DashboardData, Finding, CollaborationFeatures, CrossFunctionalFinding } from '../types'
+import TraceLogPanel from '../components/TraceLogPanel'
 
 // Error Boundary to catch any React rendering errors
 interface ErrorBoundaryProps {
@@ -492,6 +493,11 @@ function ReviewDetailContent() {
         <DeepThreatSection threatModel={dashboard.deep_threat_model} />
       )}
 
+      {/* False Positive Filter Stats */}
+      {dashboard.false_positive_filter && (
+        <FPFilterStatsSection fpStats={dashboard.false_positive_filter} />
+      )}
+
       {/* Cross-Functional Findings Section */}
       {dashboard.cross_functional_findings && dashboard.cross_functional_findings.length > 0 && (
         <CrossFunctionalSection
@@ -724,23 +730,47 @@ function ReviewDetailContent() {
 }
 
 function LoadingState({ status }: { status: ReviewStatus }) {
+  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:8000')
+
+  useEffect(() => {
+    async function fetchBaseUrl() {
+      if (window.electronAPI?.getBackendUrl) {
+        const url = await window.electronAPI.getBackendUrl()
+        setBaseUrl(url)
+      }
+    }
+    fetchBaseUrl()
+  }, [])
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-        className="w-20 h-20 rounded-full border-4 border-neon-500/30 border-t-neon-400 mb-6"
-      />
-      <h2 className="text-xl font-display font-semibold text-white mb-2">{status.message}</h2>
-      <div className="w-72 h-2 bg-void-800 rounded-full overflow-hidden">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+      <div className="flex flex-col items-center">
         <motion.div
-          className="h-full bg-gradient-to-r from-neon-500 to-aurora-500"
-          initial={{ width: 0 }}
-          animate={{ width: `${status.progress * 100}%` }}
-          transition={{ duration: 0.5 }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="w-20 h-20 rounded-full border-4 border-neon-500/30 border-t-neon-400 mb-6"
         />
+        <h2 className="text-xl font-display font-semibold text-white mb-2">{status.message}</h2>
+        <div className="w-72 h-2 bg-void-800 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-gradient-to-r from-neon-500 to-aurora-500"
+            initial={{ width: 0 }}
+            animate={{ width: `${status.progress * 100}%` }}
+            transition={{ duration: 0.5 }}
+          />
+        </div>
+        <p className="text-void-400 mt-2">{Math.round(status.progress * 100)}% complete</p>
       </div>
-      <p className="text-void-400 mt-2">{Math.round(status.progress * 100)}% complete</p>
+
+      {status.review_id && (
+        <div className="w-full max-w-3xl px-4">
+          <TraceLogPanel
+            traceId={status.review_id}
+            endpoint={`${baseUrl}/api/reviews/${status.review_id}/traces`}
+            isRunning={status.status === 'running' || status.status === 'pending'}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -1374,6 +1404,87 @@ function DimensionTab({
       {Icon && <Icon className="w-4 h-4" />}
       {label} ({count})
     </button>
+  )
+}
+
+function FPFilterStatsSection({
+  fpStats,
+}: {
+  fpStats: NonNullable<DashboardData['false_positive_filter']>
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="card-glass rounded-2xl p-6"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-display font-semibold text-white flex items-center gap-2">
+          <Shield className="w-5 h-5 text-yellow-400" />
+          False Positive Filter
+        </h3>
+        <span className="px-2 py-0.5 rounded-full bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-xs font-medium">
+          {fpStats.execution_mode === 'parallel' ? 'Parallel (Majority Vote)' : 'Sequential'}
+        </span>
+      </div>
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-4 gap-4 mb-4">
+        <div className="p-3 rounded-xl bg-void-800/50 border border-void-700 text-center">
+          <p className="text-2xl font-display font-bold text-white">{fpStats.total_original}</p>
+          <p className="text-xs text-void-400 mt-1">Raw Findings</p>
+        </div>
+        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
+          <p className="text-2xl font-display font-bold text-red-400">{fpStats.total_removed}</p>
+          <p className="text-xs text-void-400 mt-1">Removed</p>
+        </div>
+        <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-center">
+          <p className="text-2xl font-display font-bold text-yellow-400">{fpStats.total_downgraded}</p>
+          <p className="text-xs text-void-400 mt-1">Downgraded</p>
+        </div>
+        <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-center">
+          <p className="text-2xl font-display font-bold text-green-400">{fpStats.total_final}</p>
+          <p className="text-xs text-void-400 mt-1">Final Findings</p>
+        </div>
+      </div>
+
+      {/* Removal rate bar */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between text-sm mb-1">
+          <span className="text-void-400">Noise Removal Rate</span>
+          <span className="text-white font-medium">{Math.round(fpStats.removal_rate * 100)}%</span>
+        </div>
+        <div className="w-full h-2 bg-void-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-yellow-500 to-green-500 rounded-full transition-all"
+            style={{ width: `${Math.round(fpStats.removal_rate * 100)}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Per-dimension breakdown */}
+      {fpStats.by_dimension.length > 1 && (
+        <div className="space-y-2">
+          <p className="text-xs text-void-500 font-medium uppercase tracking-wide">By Dimension</p>
+          {fpStats.by_dimension.map((dim) => (
+            <div
+              key={dim.dimension}
+              className="flex items-center justify-between p-2 rounded-lg bg-void-800/30 text-sm"
+            >
+              <span className="text-void-300 capitalize font-medium w-28">{dim.dimension}</span>
+              <span className="text-void-400">
+                {dim.original_count} &rarr; {dim.final_count}
+              </span>
+              <span className="text-red-400 text-xs">-{dim.removed} removed</span>
+              {dim.downgraded > 0 && (
+                <span className="text-yellow-400 text-xs">{dim.downgraded} downgraded</span>
+              )}
+              <span className="text-void-500 text-xs">{dim.strategies_run} strategies</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
   )
 }
 
