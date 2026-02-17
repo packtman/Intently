@@ -214,7 +214,7 @@ async def stream_review_traces(review_id: str):
                 yield "event: done\ndata: {}\n\n"
                 return
 
-            await collector.wait_for_new(timeout=15.0)
+            await collector.wait_for_new(timeout=2.0)
 
     return StreamingResponse(
         _event_stream(),

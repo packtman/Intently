@@ -55,6 +55,9 @@ class TraceCollector:
         # event is appended.  Created lazily because the collector may
         # be instantiated outside an event loop.
         self._notify: asyncio.Event | None = None
+        # Reference to the event loop that owns ``_notify`` so that
+        # background threads can call ``loop.call_soon_threadsafe``.
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._closed = False
 
     # ------------------------------------------------------------------
@@ -68,7 +71,13 @@ class TraceCollector:
         message: str,
         **metadata: Any,
     ) -> TraceEvent:
-        """Record a trace event and notify any waiting SSE consumers."""
+        """Record a trace event and notify any waiting SSE consumers.
+
+        Thread-safe: may be called from background threads (e.g. LLM
+        executor pools).  The asyncio.Event notification is dispatched
+        via ``call_soon_threadsafe`` so it correctly wakes SSE consumers
+        on the event loop.
+        """
         event = TraceEvent(
             timestamp=datetime.now(timezone.utc).isoformat(),
             elapsed_ms=round((time.monotonic() - self._start_time) * 1000, 1),
@@ -79,10 +88,31 @@ class TraceCollector:
         )
         with self._lock:
             self._events.append(event)
-        # Wake up SSE listener (if any)
-        if self._notify is not None:
-            self._notify.set()
+        # Wake up SSE listener (if any) — thread-safe dispatch
+        self._safe_notify()
         return event
+
+    def _safe_notify(self) -> None:
+        """Signal the asyncio.Event from any thread."""
+        if self._notify is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is not None and loop.is_running():
+            # We're on the event-loop thread — set directly
+            self._notify.set()
+        else:
+            # Called from a background thread — schedule on the loop
+            # that owns the Event
+            if self._loop is not None:
+                self._loop.call_soon_threadsafe(self._notify.set)
+            else:
+                # Best-effort: set directly (may not wake the waiter
+                # but events_since() will pick it up on next poll)
+                self._notify.set()
 
     def events_since(self, cursor: int = 0) -> list[TraceEvent]:
         """Return events from *cursor* onwards (non-blocking)."""
@@ -94,13 +124,22 @@ class TraceCollector:
         with self._lock:
             return len(self._events)
 
-    async def wait_for_new(self, timeout: float = 30.0) -> bool:
+    async def wait_for_new(self, timeout: float = 2.0) -> bool:
         """Block until a new event is emitted or *timeout* seconds pass.
 
         Returns ``True`` if woken by a new event, ``False`` on timeout.
+
+        The default timeout is intentionally short (2 s) so the SSE
+        endpoint delivers events promptly even when ``emit()`` is called
+        from a non-event-loop thread where the asyncio notification
+        cannot be delivered synchronously.
         """
         if self._notify is None:
             self._notify = asyncio.Event()
+            try:
+                self._loop = asyncio.get_running_loop()
+            except RuntimeError:
+                self._loop = None
         self._notify.clear()
         try:
             await asyncio.wait_for(self._notify.wait(), timeout=timeout)
@@ -111,8 +150,7 @@ class TraceCollector:
     def close(self) -> None:
         """Mark the collector as closed (scan finished)."""
         self._closed = True
-        if self._notify is not None:
-            self._notify.set()
+        self._safe_notify()
 
     @property
     def is_closed(self) -> bool:
@@ -133,6 +171,7 @@ class NullTraceCollector(TraceCollector):
         self._lock = threading.Lock()
         self._start_time = time.monotonic()
         self._notify = None
+        self._loop = None
         self._closed = True  # always closed so SSE exits immediately
 
     def emit(self, level: str, phase: str, message: str, **metadata: Any) -> TraceEvent:  # type: ignore[override]

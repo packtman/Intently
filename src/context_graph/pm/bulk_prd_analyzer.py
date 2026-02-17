@@ -306,9 +306,11 @@ class BulkPRDAnalyzer:
         self,
         openai_api_key: str | None = None,
         anthropic_api_key: str | None = None,
+        trace_collector: Any | None = None,
     ) -> None:
         self.openai_api_key = openai_api_key
         self.anthropic_api_key = anthropic_api_key
+        self._trace_collector = trace_collector
         self._codebase_tracker = get_codebase_tracker()
     
     async def analyze(self, request: BulkAnalysisRequest) -> BulkAnalysisResult:
@@ -463,11 +465,15 @@ class BulkPRDAnalyzer:
         """Analyze a single PRD file."""
         import time
         
+        tc = self._trace_collector
+        tag = prd.display_name
         start_time = time.time()
         prd.status = "analyzing"
         
         try:
             # Parse PRD content
+            if tc:
+                tc.emit("info", "prd_parse", f"[{tag}] Parsing PRD...", prd=tag)
             from context_graph.parsers import MarkdownPRDParser
             parser = MarkdownPRDParser()
             intent = parser.parse(prd.content, prd.file_name)
@@ -484,8 +490,22 @@ class BulkPRDAnalyzer:
                 # Title case it for better display
                 intent.title = clean_name.title() if clean_name else prd.display_name
             
+            if tc:
+                tc.emit("info", "prd_parse",
+                        f"[{tag}] Extracted {len(intent.features)} features, "
+                        f"{len(intent.user_stories)} user stories",
+                        prd=tag, features=len(intent.features))
+            
             # Build codebase state
+            if tc:
+                tc.emit("info", "codebase_analysis", f"[{tag}] Analyzing codebase...", prd=tag)
             state = await self._build_codebase_state(prd.codebase_path)
+            if tc:
+                tc.emit("info", "codebase_analysis",
+                        f"[{tag}] {state.files_analyzed} files, "
+                        f"{len(state.api_endpoints)} endpoints, "
+                        f"{len(state.data_models)} models",
+                        prd=tag, files=state.files_analyzed)
             
             # Configure review engine
             from context_graph.security.review_engine import SecurityReviewEngine, ReviewConfig
@@ -493,17 +513,24 @@ class BulkPRDAnalyzer:
             # Determine if LLM analysis is available
             llm_enabled = request.use_llm and bool(self.openai_api_key or self.anthropic_api_key)
             
+            dim_names = [d.value for d in prd.dimensions]
+            if tc:
+                tc.emit("info", "llm_dispatch",
+                        f"[{tag}] Running {'AI-powered' if llm_enabled else 'pattern-based'} "
+                        f"{', '.join(dim_names)} analysis...",
+                        prd=tag, llm=llm_enabled, dimensions=dim_names)
+            
             config = ReviewConfig(
                 dimensions=prd.dimensions,
                 use_llm=llm_enabled,
-                llm_only=llm_enabled,  # When LLM is enabled, only use LLM findings (consistent with regular review)
-                use_pattern_matching=not llm_enabled,  # Disable pattern matching when using LLM
-                use_graph_analysis=not llm_enabled,    # Disable graph analysis when using LLM
+                llm_only=llm_enabled,
+                use_pattern_matching=not llm_enabled,
+                use_graph_analysis=not llm_enabled,
                 openai_api_key=self.openai_api_key,
                 anthropic_api_key=self.anthropic_api_key,
             )
             
-            engine = SecurityReviewEngine(config)
+            engine = SecurityReviewEngine(config, trace_collector=tc)
             review_result = await engine.review(intent, state)
             
             # Extract findings summary
@@ -520,6 +547,14 @@ class BulkPRDAnalyzer:
                 findings_by_dimension[dimension_key] = findings_by_dimension.get(dimension_key, 0) + 1
             
             prd.status = "completed"
+            duration_ms = (time.time() - start_time) * 1000
+            
+            if tc:
+                tc.emit("info", "report_gen",
+                        f"[{tag}] Complete — {len(review_result.all_findings)} findings "
+                        f"in {duration_ms:.0f}ms",
+                        prd=tag, findings=len(review_result.all_findings),
+                        duration_ms=duration_ms)
             
             return SinglePRDResult(
                 prd_id=prd.id,
@@ -530,8 +565,8 @@ class BulkPRDAnalyzer:
                 findings_by_severity=findings_by_severity,
                 findings_by_dimension=findings_by_dimension,
                 review_id=str(review_result.review_id),
-                review_result=review_result,  # Store full result for dashboard integration
-                duration_ms=(time.time() - start_time) * 1000,
+                review_result=review_result,
+                duration_ms=duration_ms,
                 completed_at=datetime.now(),
             )
             
@@ -539,6 +574,8 @@ class BulkPRDAnalyzer:
             prd.status = "failed"
             prd.error_message = str(e)
             logger.error(f"Failed to analyze PRD {prd.display_name}: {e}")
+            if tc:
+                tc.emit("error", "report_gen", f"[{tag}] Failed: {e}", prd=tag)
             
             return SinglePRDResult(
                 prd_id=prd.id,

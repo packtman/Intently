@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -24,6 +24,8 @@ import {
   Star,
 } from 'lucide-react'
 import { api } from '../services/api'
+import { useBackend } from '../hooks/useBackend'
+import TraceLogPanel from '../components/TraceLogPanel'
 import type { BulkPRDFile, BulkAnalysisResult, SinglePRDResult } from '../types'
 
 interface UploadedFile {
@@ -37,11 +39,13 @@ interface UploadedFile {
 
 export default function BulkAnalysis() {
   const navigate = useNavigate()
+  const { backendUrl } = useBackend()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [codebasePath, setCodebasePath] = useState('')
   const [dimensions, setDimensions] = useState<string[]>(['security', 'privacy', 'compliance', 'engineering', 'architecture'])
   const [useLLM, setUseLLM] = useState(true)
   const [result, setResult] = useState<BulkAnalysisResult | null>(null)
+  const [traceId, setTraceId] = useState<string | null>(null)
 
   // Fetch config to check if feature is enabled
   const { data: config, isLoading: configLoading, error: configError } = useQuery({
@@ -67,6 +71,10 @@ export default function BulkAnalysis() {
       const openaiApiKey = rawOpenai?.trim() || undefined
       const anthropicApiKey = rawAnthropic?.trim() || undefined
 
+      // Generate a trace ID so the TraceLogPanel can stream events
+      const newTraceId = crypto.randomUUID()
+      setTraceId(newTraceId)
+
       return api.analyzeBulkPRDs({
         prds,
         default_codebase_path: codebasePath || null,
@@ -75,10 +83,13 @@ export default function BulkAnalysis() {
         use_pattern_matching: true,
         openai_api_key: openaiApiKey,
         anthropic_api_key: anthropicApiKey,
-      })
+      }, newTraceId)
     },
     onSuccess: (data) => {
       setResult(data)
+    },
+    onSettled: () => {
+      // Keep traceId so the panel can show final state until results render
     },
   })
 
@@ -449,6 +460,15 @@ export default function BulkAnalysis() {
             <p className="text-sm text-red-300">{analyzeMutation.error.message}</p>
           </div>
         </div>
+      )}
+
+      {/* Trace Log Panel — visible while bulk analysis is running */}
+      {traceId && analyzeMutation.isPending && (
+        <TraceLogPanel
+          traceId={traceId}
+          endpoint={`${backendUrl}/api/bulk/traces/${traceId}`}
+          isRunning={analyzeMutation.isPending}
+        />
       )}
 
       {/* Actions */}

@@ -230,6 +230,7 @@ async def analyze_bulk_prds(
         analyzer = BulkPRDAnalyzer(
             openai_api_key=openai_key,
             anthropic_api_key=anthropic_key,
+            trace_collector=tc,
         )
         
         if tc:
@@ -401,7 +402,7 @@ async def stream_bulk_traces(bulk_id: str):
                 yield "event: done\ndata: {}\n\n"
                 return
 
-            await collector.wait_for_new(timeout=15.0)
+            await collector.wait_for_new(timeout=2.0)
 
     return StreamingResponse(
         _event_stream(),

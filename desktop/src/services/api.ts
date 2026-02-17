@@ -425,9 +425,11 @@ class ApiService {
 
   /**
    * Analyze multiple PRD files in parallel.
+   * Pass traceId to enable real-time SSE trace streaming via GET /api/bulk/traces/{traceId}.
    */
-  async analyzeBulkPRDs(request: BulkAnalysisRequest): Promise<BulkAnalysisResult> {
-    return this.fetch('/api/bulk/analyze', {
+  async analyzeBulkPRDs(request: BulkAnalysisRequest, traceId?: string): Promise<BulkAnalysisResult> {
+    const qs = traceId ? `?trace_id=${encodeURIComponent(traceId)}` : ''
+    return this.fetch(`/api/bulk/analyze${qs}`, {
       method: 'POST',
       body: JSON.stringify(request),
     })

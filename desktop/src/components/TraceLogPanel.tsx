@@ -82,8 +82,15 @@ export default function TraceLogPanel({
   useEffect(() => {
     if (!traceId || !endpoint) return
 
+    let closed = false
+    let fallbackTimer: ReturnType<typeof setInterval> | null = null
+
     const es = new EventSource(endpoint)
     eventSourceRef.current = es
+
+    es.onopen = () => {
+      console.log('[TraceLog] SSE connected:', endpoint)
+    }
 
     es.onmessage = (e) => {
       try {
@@ -99,16 +106,50 @@ export default function TraceLogPanel({
       es.close()
     })
 
-    es.onerror = () => {
+    es.onerror = (err) => {
+      console.warn('[TraceLog] SSE error, readyState:', es.readyState, err)
+
       if (!isRunningRef.current) {
         setDone(true)
         es.close()
+        return
+      }
+
+      // If the EventSource is fully closed (readyState === 2) and
+      // won't auto-reconnect, fall back to polling the endpoint
+      // via regular fetch so we still surface events.
+      if (es.readyState === EventSource.CLOSED && !fallbackTimer && !closed) {
+        console.log('[TraceLog] SSE closed, falling back to polling')
+        let cursor = 0
+        fallbackTimer = setInterval(async () => {
+          if (closed) {
+            if (fallbackTimer) clearInterval(fallbackTimer)
+            return
+          }
+          try {
+            const res = await fetch(endpoint, {
+              headers: { Accept: 'application/json' },
+            })
+            if (!res.ok) return
+            const text = await res.text()
+            const lines = text.split('\n').filter((l) => l.startsWith('data: '))
+            for (const line of lines.slice(cursor)) {
+              try {
+                const evt: TraceEvent = JSON.parse(line.replace('data: ', ''))
+                setEvents((prev) => [...prev, evt])
+                cursor++
+              } catch { /* skip */ }
+            }
+          } catch { /* network error, will retry */ }
+        }, 2000)
       }
     }
 
     return () => {
+      closed = true
       es.close()
       eventSourceRef.current = null
+      if (fallbackTimer) clearInterval(fallbackTimer)
     }
   }, [traceId, endpoint])
 
