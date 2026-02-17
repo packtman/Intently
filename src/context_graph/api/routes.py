@@ -348,6 +348,96 @@ async def list_reviews() -> List[Dict[str, Any]]:
     return await storage.list_reviews()
 
 
+@router.get("/reviews/{review_id}/graph")
+async def get_review_graph(review_id: str) -> Dict[str, Any]:
+    """Return the context graph for a review as D3-compatible nodes and edges.
+
+    Reconstructs the graph from the review's Intent + State + Delta
+    and returns entity nodes and relationship edges for visualization.
+    Requires FEATURE_IMPACT_GRAPH=true.
+    """
+    from context_graph.config.features import get_features
+    if not get_features().enable_impact_graph:
+        raise HTTPException(status_code=403, detail="Feature 'impact_graph' is not enabled. Set FEATURE_IMPACT_GRAPH=true.")
+
+    from context_graph.core.graph import ContextGraph
+
+    storage = get_review_storage()
+    review = await storage.get_review(review_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+
+    # Rebuild graph from review data (mirrors review_engine._build_graph)
+    graph = ContextGraph()
+    for entity in review.state.entities:
+        graph.add_entity(entity)
+    for rel in review.state.relationships:
+        graph.add_relationship(rel)
+    for entity in review.intent.data_entities:
+        graph.add_entity(entity)
+    new_entity_ids = set()
+    if review.delta_result:
+        for entity in review.delta_result.delta.new_entities:
+            graph.add_entity(entity)
+            new_entity_ids.add(entity.id)
+
+    # Serialize nodes
+    nodes = []
+    for entity in graph.iter_entities():
+        risk = graph.compute_risk_score(entity.id)
+        nodes.append({
+            "id": str(entity.id),
+            "name": entity.name,
+            "type": entity.entity_type.value,
+            "sensitive": entity.is_sensitive,
+            "requires_auth": entity.requires_auth,
+            "trust_level": entity.trust_level,
+            "source": entity.source,
+            "risk_score": risk,
+            "is_new": entity.id in new_entity_ids,
+        })
+
+    # Serialize edges
+    edges = []
+    for rel_id, rel in graph._relationships.items():
+        edges.append({
+            "id": str(rel.id),
+            "source": str(rel.source_id),
+            "target": str(rel.target_id),
+            "type": rel.relationship_type.value,
+            "crosses_boundary": rel.crosses_trust_boundary,
+            "requires_encryption": rel.requires_encryption,
+        })
+
+    # Graph analysis summary
+    unauth_paths = graph.find_unauthenticated_paths()
+    boundary_crossings = graph.find_trust_boundary_crossings()
+    high_risk = [str(e.id) for e in graph.iter_entities()
+                 if graph.compute_risk_score(e.id) > 70]
+
+    # Entity type breakdown
+    type_counts: Dict[str, int] = {}
+    for n in nodes:
+        t = n["type"]
+        type_counts[t] = type_counts.get(t, 0) + 1
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "analysis": {
+            "unauthenticated_paths": len(unauth_paths),
+            "trust_boundary_crossings": len(boundary_crossings),
+            "high_risk_entity_ids": high_risk,
+        },
+        "stats": {
+            "total_entities": len(nodes),
+            "total_relationships": len(edges),
+            "entity_types": type_counts,
+            "new_entities": len(new_entity_ids),
+        },
+    }
+
+
 # Background task
 
 async def run_review(review_id: str, request: ReviewRequest) -> None:
