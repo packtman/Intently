@@ -262,19 +262,19 @@ class FeatureFlags:
     # ==================== P1: Enhanced PM Experience ====================
 
     # Enable live analysis while writing (no LLM, pattern-based)
-    enable_live_analysis: bool = False
+    enable_live_analysis: bool = True
 
     # Enable PRD version history and diffing
-    enable_prd_version_history: bool = False
+    enable_prd_version_history: bool = True
 
     # Enable approval gates (configurable policies for PRD approval)
-    enable_approval_gates: bool = False
+    enable_approval_gates: bool = True
 
     # Enable review analytics dashboard
-    enable_review_analytics: bool = False
+    enable_review_analytics: bool = True
 
     # Enable product health overview
-    enable_product_overview: bool = False
+    enable_product_overview: bool = True
 
     # ==================== Scan Tracing ====================
     # Real-time trace log streaming for scan observability
@@ -335,17 +335,17 @@ class FeatureFlags:
             false_positive_removal_threshold=int(os.getenv("FALSE_POSITIVE_REMOVAL_THRESHOLD", "1")),
             false_positive_model=os.getenv("FALSE_POSITIVE_MODEL", "disabled"),
             # Prompt repetition
-            enable_prompt_repetition=_env_bool("FEATURE_PROMPT_REPETITION"),
+            enable_prompt_repetition=_env_bool("FEATURE_PROMPT_REPETITION", True),
             # P0: Core PM Experience
             enable_product_chat=_env_bool("FEATURE_PRODUCT_CHAT", True),
             enable_review_requests=_env_bool("FEATURE_REVIEW_REQUESTS"),
             enable_impact_graph=_env_bool("FEATURE_IMPACT_GRAPH"),
             # P1: Enhanced PM Experience
-            enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS"),
-            enable_prd_version_history=_env_bool("FEATURE_PRD_VERSION_HISTORY"),
-            enable_approval_gates=_env_bool("FEATURE_APPROVAL_GATES"),
-            enable_review_analytics=_env_bool("FEATURE_REVIEW_ANALYTICS"),
-            enable_product_overview=_env_bool("FEATURE_PRODUCT_OVERVIEW"),
+            enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS", True),
+            enable_prd_version_history=_env_bool("FEATURE_PRD_VERSION_HISTORY", True),
+            enable_approval_gates=_env_bool("FEATURE_APPROVAL_GATES", True),
+            enable_review_analytics=_env_bool("FEATURE_REVIEW_ANALYTICS", True),
+            enable_product_overview=_env_bool("FEATURE_PRODUCT_OVERVIEW", True),
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
         )

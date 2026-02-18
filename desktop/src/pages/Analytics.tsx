@@ -35,14 +35,21 @@ export default function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:8000')
+
+  useEffect(() => {
+    if (window.electronAPI?.getBackendUrl) {
+      window.electronAPI.getBackendUrl().then(setBaseUrl)
+    }
+  }, [])
 
   useEffect(() => {
     fetchAnalytics()
-  }, [])
+  }, [baseUrl])
 
   const fetchAnalytics = async () => {
     try {
-      const res = await fetch('/api/analytics')
+      const res = await fetch(`${baseUrl}/api/analytics`)
       if (!res.ok) {
         if (res.status === 403) throw new Error('Enable FEATURE_REVIEW_ANALYTICS=true')
         throw new Error(`HTTP ${res.status}`)

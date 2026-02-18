@@ -1,0 +1,35 @@
+---
+description: Feature flag conventions — defaults must match in class AND from_env()
+globs: src/context_graph/config/features.py
+alwaysApply: false
+---
+
+# Feature Flags
+
+The `FeatureFlags` dataclass has TWO places where defaults are set. Both MUST agree:
+
+1. **Class field default**: `enable_foo: bool = True`
+2. **`from_env()` call**: `enable_foo=_env_bool("FEATURE_FOO", True)`
+
+The runtime ALWAYS uses `from_env()`. The class default is ignored at runtime.
+
+```python
+# ❌ BAD — class says True but from_env() defaults to False
+enable_live_analysis: bool = True
+
+# in from_env():
+enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS"),  # defaults to False!
+
+# ✅ GOOD — both agree
+enable_live_analysis: bool = True
+
+# in from_env():
+enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS", True),
+```
+
+When adding or changing a feature flag, update ALL FOUR locations:
+1. Class field default
+2. `from_env()` call (with matching default)
+3. `all_enabled()` return
+4. `to_dict()` return
+5. `get_enabled_features()` method

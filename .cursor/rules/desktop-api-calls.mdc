@@ -1,0 +1,31 @@
+---
+description: Desktop (Electron) app must use backend base URL for all API calls
+globs: desktop/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Desktop API Calls
+
+The desktop app runs in Electron. Relative URLs like `fetch('/api/...')` resolve to the Electron app origin, NOT the Python backend. This returns HTML and causes JSON parse errors.
+
+Always use the backend base URL for API calls:
+
+```tsx
+// ❌ BAD — hits Electron origin, returns HTML
+const res = await fetch('/api/analytics')
+
+// ✅ GOOD — hits the Python backend
+const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:8000')
+
+useEffect(() => {
+  if (window.electronAPI?.getBackendUrl) {
+    window.electronAPI.getBackendUrl().then(setBaseUrl)
+  }
+}, [])
+
+const res = await fetch(`${baseUrl}/api/analytics`)
+```
+
+For pages with many API calls, use the existing `ApiService` from `desktop/src/services/api.ts` which handles this automatically.
+
+The frontend app (non-Electron) uses Vite proxy so relative URLs work there — this rule is desktop-only.

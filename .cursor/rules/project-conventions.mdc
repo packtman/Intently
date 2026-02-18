@@ -1,0 +1,30 @@
+---
+description: Core project conventions and architecture awareness
+alwaysApply: true
+---
+
+# Intently Project Conventions
+
+## Architecture
+- **Backend**: Python FastAPI at `src/context_graph/`, runs on port 8000
+- **Frontend (web)**: React + Vite at `frontend/`, uses Vite proxy for API calls
+- **Desktop**: Electron + React at `desktop/`, must use explicit backend URL (see desktop-api-calls rule)
+
+## Branches
+- `main` — production branch
+- `intently_cloud_hosted` — Cursor cloud agents branch, keep in sync with main
+- Feature branches: `feature/p1-*`, `feature/p2-*`, etc.
+
+## Feature Flags
+- All new features must be behind feature flags in `src/context_graph/config/features.py`
+- See the feature-flags rule for the 5-location checklist
+- Feature flags are loaded once at server startup and cached — server restart required after changes
+
+## Testing Changes
+- Backend: restart the uvicorn server after Python changes
+- Frontend: HMR handles it automatically
+- Desktop: HMR for renderer, full restart for main process changes
+
+## Git Workflow
+- Work on branches, merge to main via PRs
+- After merging to main, sync `intently_cloud_hosted`: `git push origin main:intently_cloud_hosted`
