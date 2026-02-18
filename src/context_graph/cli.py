@@ -82,6 +82,7 @@ def review(
     branch: Optional[str] = typer.Option(None, "--branch", "-b", help="GitHub branch to analyze"),
     pr: Optional[int] = typer.Option(None, "--pr", help="GitHub PR number to analyze"),
     github_token: Optional[str] = typer.Option(None, "--github-token", envvar="GITHUB_TOKEN", help="GitHub token for private repos"),
+    prompt_repetition: bool = typer.Option(False, "--prompt-repetition", help="Repeat user prompt for enhanced LLM accuracy (second attention pass)"),
 ) -> None:
     """
     Run a security review on a PRD against a codebase.
@@ -163,6 +164,7 @@ def review(
                 use_llm=use_llm,
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
                 anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+                prompt_repetition=prompt_repetition if prompt_repetition else None,
             )
             
             engine = SecurityReviewEngine(config)

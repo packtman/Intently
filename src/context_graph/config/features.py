@@ -52,6 +52,9 @@ Environment Variables:
     FEATURE_FALSE_POSITIVE_FILTERING=true
     FALSE_POSITIVE_MAX_ITERATIONS=3
     FALSE_POSITIVE_MIN_FINDINGS=3
+    
+    # Prompt Repetition (repeat user prompt for second attention pass)
+    FEATURE_PROMPT_REPETITION=true
 """
 
 from __future__ import annotations
@@ -235,6 +238,16 @@ class FeatureFlags:
     # Set to "disabled" to use the same model as the main analysis.
     false_positive_model: str = "disabled"
     
+    # ==================== Prompt Repetition ====================
+    # Repeat the user prompt so the model gets a second attention pass.
+    # Every token in the repeated copy can attend to the first copy,
+    # giving the model de-facto bidirectional context over the input.
+    # Accuracy improves across models/benchmarks with negligible
+    # latency overhead (input tokens are processed in parallel).
+    
+    # Enable prompt repetition globally for all LLM calls
+    enable_prompt_repetition: bool = False
+    
     # ==================== Scan Tracing ====================
     # Real-time trace log streaming for scan observability
     
@@ -293,6 +306,8 @@ class FeatureFlags:
             false_positive_parallel=_env_bool("FALSE_POSITIVE_PARALLEL", True),
             false_positive_removal_threshold=int(os.getenv("FALSE_POSITIVE_REMOVAL_THRESHOLD", "1")),
             false_positive_model=os.getenv("FALSE_POSITIVE_MODEL", "disabled"),
+            # Prompt repetition
+            enable_prompt_repetition=_env_bool("FEATURE_PROMPT_REPETITION"),
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
         )
@@ -340,6 +355,8 @@ class FeatureFlags:
             false_positive_parallel=True,
             false_positive_removal_threshold=1,
             false_positive_model="disabled",
+            # Prompt repetition
+            enable_prompt_repetition=True,
             # Scan tracing
             enable_scan_tracing=True,
         )
@@ -386,6 +403,8 @@ class FeatureFlags:
             "false_positive_parallel": self.false_positive_parallel,
             "false_positive_removal_threshold": self.false_positive_removal_threshold,
             "false_positive_model": self.false_positive_model,
+            # Prompt repetition
+            "prompt_repetition": self.enable_prompt_repetition,
             # Scan tracing
             "scan_tracing": self.enable_scan_tracing,
         }
@@ -450,6 +469,9 @@ class FeatureFlags:
             enabled.append("false_positive_filtering")
         if self.false_positive_parallel:
             enabled.append("false_positive_parallel")
+        # Prompt repetition
+        if self.enable_prompt_repetition:
+            enabled.append("prompt_repetition")
         # Scan tracing
         if self.enable_scan_tracing:
             enabled.append("scan_tracing")

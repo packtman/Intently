@@ -80,6 +80,45 @@ class LLMProvider(ABC):
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.prompt_repetition_override: bool | None = None
+
+    def _resolve_prompt_repetition(self, request_context: dict[str, Any] | None) -> bool:
+        """Resolve effective prompt repetition setting.
+
+        Priority: per-request context > provider-level override > global feature flag.
+        """
+        from context_graph.config.features import get_features
+
+        if request_context and "prompt_repetition" in request_context:
+            return bool(request_context["prompt_repetition"])
+        if self.prompt_repetition_override is not None:
+            return self.prompt_repetition_override
+        return get_features().enable_prompt_repetition
+
+    @staticmethod
+    def _apply_prompt_repetition(user_content: str, enabled: bool = False) -> str:
+        """Repeat the user prompt so the model gets a second attention pass.
+
+        When enabled, the full user content is appended a second time,
+        separated by a clear delimiter.  This lets every token in the
+        repeated copy attend to every token in the first copy, giving
+        the model *de facto* bidirectional context over the input —
+        improving accuracy on many benchmarks with no extra output
+        tokens and negligible latency increase (input tokens are
+        processed in parallel by the hardware).
+
+        See: "Repeat the Prompt" (2025) — accuracy gains across seven
+        models and seven benchmarks from pure input repetition.
+        """
+        if not enabled:
+            return user_content
+        return (
+            user_content
+            + "\n\n"
+            + "--- REPEATED PROMPT FOR ENHANCED ATTENTION ---"
+            + "\n\n"
+            + user_content
+        )
     
     @property
     @abstractmethod
