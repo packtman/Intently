@@ -112,13 +112,7 @@ class LLMProvider(ABC):
         """
         if not enabled:
             return user_content
-        return (
-            user_content
-            + "\n\n"
-            + "--- REPEATED PROMPT FOR ENHANCED ATTENTION ---"
-            + "\n\n"
-            + user_content
-        )
+        return user_content + "\n\n---\n\n" + user_content
     
     @property
     @abstractmethod

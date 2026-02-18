@@ -382,6 +382,7 @@ export interface ReviewConfig {
   openai_api_key?: string
   anthropic_api_key?: string
   model_override?: string
+  prompt_repetition?: boolean
 }
 
 export interface ReviewRequest {

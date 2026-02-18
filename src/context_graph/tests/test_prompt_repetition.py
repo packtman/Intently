@@ -83,19 +83,18 @@ class TestApplyPromptRepetition:
         content = "Analyze this code for security issues."
         result = LLMProvider._apply_prompt_repetition(content, enabled=True)
         assert result.count(content) == 2
-        assert "--- REPEATED PROMPT FOR ENHANCED ATTENTION ---" in result
 
     def test_separator_between_copies(self):
         content = "Short prompt."
         result = LLMProvider._apply_prompt_repetition(content, enabled=True)
-        parts = result.split("--- REPEATED PROMPT FOR ENHANCED ATTENTION ---")
+        parts = result.split("\n\n---\n\n")
         assert len(parts) == 2
-        assert parts[0].strip() == content
-        assert parts[1].strip() == content
+        assert parts[0] == content
+        assert parts[1] == content
 
     def test_empty_content(self):
         result = LLMProvider._apply_prompt_repetition("", enabled=True)
-        assert "--- REPEATED PROMPT FOR ENHANCED ATTENTION ---" in result
+        assert "\n\n---\n\n" in result
 
     def test_multiline_content(self):
         content = "Line 1\nLine 2\nLine 3"
@@ -271,3 +270,61 @@ class TestAPIModel:
         from context_graph.api.routes import ReviewConfigInput
         config = ReviewConfigInput()
         assert config.prompt_repetition is None
+
+
+# ---------------------------------------------------------------------------
+# Post-processing calls explicitly disable prompt repetition
+# ---------------------------------------------------------------------------
+
+class TestPostProcessingSkipsRepetition:
+    """Refinement and FP-filter calls inject prompt_repetition=False in context."""
+
+    def test_openai_refine_findings_context(self):
+        from context_graph.llm.openai_provider import OpenAIProvider
+        from context_graph.llm.provider import AnalysisRequest, AnalysisType, REFINEMENT_PROMPT
+        import json
+
+        provider = OpenAIProvider(api_key="test-key", model="test-model")
+
+        captured = {}
+        original_analyze = provider.analyze
+
+        async def _mock_analyze(request: AnalysisRequest):
+            captured["context"] = request.context
+            from context_graph.llm.provider import LLMResponse
+            return LLMResponse(
+                provider="openai", model="test", content='{"findings": []}',
+                analysis_type=AnalysisType.SECURITY_REVIEW,
+                structured_data={"findings": []},
+            )
+
+        provider.analyze = _mock_analyze
+        import asyncio
+        asyncio.get_event_loop().run_until_complete(
+            provider.refine_findings([{"id": "F1", "title": "test"}], "security")
+        )
+        assert captured["context"]["prompt_repetition"] is False
+
+    def test_anthropic_refine_findings_context(self):
+        from context_graph.llm.anthropic_provider import AnthropicProvider
+        from context_graph.llm.provider import AnalysisRequest, AnalysisType
+
+        provider = AnthropicProvider(api_key="test-key", model="test-model")
+
+        captured = {}
+
+        async def _mock_analyze(request: AnalysisRequest):
+            captured["context"] = request.context
+            from context_graph.llm.provider import LLMResponse
+            return LLMResponse(
+                provider="anthropic", model="test", content='{"findings": []}',
+                analysis_type=AnalysisType.SECURITY_REVIEW,
+                structured_data={"findings": []},
+            )
+
+        provider.analyze = _mock_analyze
+        import asyncio
+        asyncio.get_event_loop().run_until_complete(
+            provider.refine_findings([{"id": "F1", "title": "test"}], "security")
+        )
+        assert captured["context"]["prompt_repetition"] is False

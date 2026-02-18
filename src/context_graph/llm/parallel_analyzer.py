@@ -111,6 +111,12 @@ class ParallelLLMAnalyzer:
         
         if not self.providers:
             raise ValueError("At least one API key must be provided")
+
+        if prompt_repetition:
+            self.tc.emit("info", "init",
+                          "Prompt repetition enabled — user prompts will be "
+                          "duplicated for a second attention pass",
+                          prompt_repetition=True)
         
         # Track false positive filter results per dimension (populated after each review)
         self.fp_filter_results: dict[str, FalsePositiveFilterResult] = {}

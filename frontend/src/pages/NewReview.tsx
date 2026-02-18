@@ -56,6 +56,7 @@ export default function NewReview() {
   const [openaiKey, setOpenaiKey] = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
   const [modelOverride, setModelOverride] = useState('')
+  const [promptRepetition, setPromptRepetition] = useState(false)
 
   const createReview = useMutation({
     mutationFn: async () => {
@@ -78,6 +79,7 @@ export default function NewReview() {
             openai_api_key: openaiKey || undefined,
             anthropic_api_key: anthropicKey || undefined,
             model_override: modelOverride || undefined,
+            prompt_repetition: promptRepetition || undefined,
           },
         }),
       })
@@ -209,11 +211,13 @@ export default function NewReview() {
               openaiKey={openaiKey}
               anthropicKey={anthropicKey}
               modelOverride={modelOverride}
+              promptRepetition={promptRepetition}
               onUseLLMChange={setUseLLM}
               onDimensionsChange={setDimensions}
               onOpenaiKeyChange={setOpenaiKey}
               onAnthropicKeyChange={setAnthropicKey}
               onModelOverrideChange={setModelOverride}
+              onPromptRepetitionChange={setPromptRepetition}
               onNext={() => setStep('review')}
               onBack={() => setStep('codebase')}
             />
@@ -662,11 +666,13 @@ function StepConfig({
   openaiKey,
   anthropicKey,
   modelOverride,
+  promptRepetition,
   onUseLLMChange,
   onDimensionsChange,
   onOpenaiKeyChange,
   onAnthropicKeyChange,
   onModelOverrideChange,
+  onPromptRepetitionChange,
   onNext,
   onBack,
 }: {
@@ -675,11 +681,13 @@ function StepConfig({
   openaiKey: string
   anthropicKey: string
   modelOverride: string
+  promptRepetition: boolean
   onUseLLMChange: (v: boolean) => void
   onDimensionsChange: (v: string[]) => void
   onOpenaiKeyChange: (v: string) => void
   onAnthropicKeyChange: (v: string) => void
   onModelOverrideChange: (v: string) => void
+  onPromptRepetitionChange: (v: boolean) => void
   onNext: () => void
   onBack: () => void
 }) {
@@ -928,6 +936,31 @@ function StepConfig({
               <p className="text-xs text-surface-600 mt-1">
                 Override the default model for faster or cheaper analysis.
               </p>
+            </div>
+
+            {/* Prompt Repetition */}
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <label className="block text-xs font-medium text-surface-400">
+                  Prompt Repetition
+                </label>
+                <p className="text-xs text-surface-600 mt-0.5">
+                  Repeat prompt for a second attention pass — improves accuracy with no extra output tokens.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onPromptRepetitionChange(!promptRepetition)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  promptRepetition ? 'bg-primary-500' : 'bg-surface-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    promptRepetition ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
             </div>
 
             <p className="text-xs text-surface-500">

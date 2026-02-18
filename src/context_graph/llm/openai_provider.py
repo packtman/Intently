@@ -338,6 +338,7 @@ class OpenAIProvider(LLMProvider):
             context={
                 "custom_prompt": REFINEMENT_PROMPT,
                 "dimension": dimension,
+                "prompt_repetition": False,
             },
         )
         response = await self.analyze(request)
