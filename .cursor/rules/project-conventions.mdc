@@ -9,21 +9,47 @@ alwaysApply: true
 - **Backend**: Python FastAPI at `src/context_graph/`, runs on port 8000
 - **Frontend (web)**: React + Vite at `frontend/`, uses Vite proxy for API calls
 - **Desktop**: Electron + React at `desktop/`, must use explicit backend URL (see desktop-api-calls rule)
+- Frontend and desktop are SEPARATE apps with mirrored components — changes must be applied to BOTH
 
-## Branches
-- `main` — production branch
-- `intently_cloud_hosted` — Cursor cloud agents branch, keep in sync with main
-- Feature branches: `feature/p1-*`, `feature/p2-*`, etc.
+## Dual-App Requirement (CRITICAL)
+
+This project has two frontend apps: `frontend/` (web) and `desktop/` (Electron).
+Most pages and components exist in both. When making UI changes:
+
+1. ALWAYS check if the same file exists in both `frontend/src/` and `desktop/src/`
+2. Apply the change to BOTH apps
+3. Desktop components must use backend base URL (not relative URLs)
+
+## Feature Implementation Checklist
+
+When adding a new feature, ALL of these must be completed — not just the backend:
+
+1. **Backend route** — add the API endpoint
+2. **Frontend page/component** — create or update the UI in `frontend/src/`
+3. **Desktop page/component** — mirror the UI in `desktop/src/` (with base URL)
+4. **Wire it in** — import and render the component in the appropriate page
+5. **Feature flag** — add flag in `features.py` (see feature-flags rule for 5-location checklist)
+6. **Route registration** — add `app.include_router()` in `src/context_graph/api/main.py`
+
+A component that exists but is never imported/rendered is NOT complete.
+A backend route that exists but has no frontend calling it is NOT complete.
+
+## Common Wiring Locations
+
+- New API routes → register in `src/context_graph/api/main.py`
+- New components on review detail → add to `frontend/src/pages/ReviewDetail.tsx` AND `desktop/src/pages/ReviewDetail.tsx`
+- New components on new review → add to `frontend/src/pages/NewReview.tsx` AND `desktop/src/pages/NewReview.tsx`
+- New nav items → add to `frontend/src/components/Layout.tsx` AND `desktop/src/components/Layout.tsx`
 
 ## Feature Flags
 - All new features must be behind feature flags in `src/context_graph/config/features.py`
 - See the feature-flags rule for the 5-location checklist
 - Feature flags are loaded once at server startup and cached — server restart required after changes
 
-## Testing Changes
-- Backend: restart the uvicorn server after Python changes
-- Frontend: HMR handles it automatically
-- Desktop: HMR for renderer, full restart for main process changes
+## Branches
+- `main` — production branch
+- `intently_cloud_hosted` — Cursor cloud agents branch, keep in sync with main
+- Feature branches: `feature/p1-*`, `feature/p2-*`, etc.
 
 ## Git Workflow
 - Work on branches, merge to main via PRs

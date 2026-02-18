@@ -8,11 +8,12 @@ alwaysApply: false
 
 The desktop app runs in Electron. Relative URLs like `fetch('/api/...')` resolve to the Electron app origin, NOT the Python backend. This returns HTML and causes JSON parse errors.
 
-Always use the backend base URL for API calls:
+EVERY `fetch()` call in desktop must use the backend base URL:
 
 ```tsx
 // ❌ BAD — hits Electron origin, returns HTML
 const res = await fetch('/api/analytics')
+const res = await fetch(`/api/reviews/${reviewId}/gates`)
 
 // ✅ GOOD — hits the Python backend
 const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:8000')
@@ -24,8 +25,11 @@ useEffect(() => {
 }, [])
 
 const res = await fetch(`${baseUrl}/api/analytics`)
+const res = await fetch(`${baseUrl}/api/reviews/${reviewId}/gates`)
 ```
 
-For pages with many API calls, use the existing `ApiService` from `desktop/src/services/api.ts` which handles this automatically.
+For pages with many API calls, use the existing `ApiService` from `desktop/src/services/api.ts`.
+
+When creating a NEW component for desktop, search the file for ANY `fetch(` call and verify it uses `${baseUrl}` — not a bare `/api/` path. This applies to GET, POST, PUT, DELETE — all HTTP methods.
 
 The frontend app (non-Electron) uses Vite proxy so relative URLs work there — this rule is desktop-only.
