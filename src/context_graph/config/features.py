@@ -259,6 +259,22 @@ class FeatureFlags:
     # Enable impact graph visualization (D3.js entity graph)
     enable_impact_graph: bool = False
 
+    # ==================== P1: Enhanced PM Experience ====================
+
+    # Enable live analysis while writing (no LLM, pattern-based)
+    enable_live_analysis: bool = False
+
+    # Enable PRD version history and diffing
+    enable_prd_version_history: bool = False
+
+    # Enable approval gates (configurable policies for PRD approval)
+    enable_approval_gates: bool = False
+
+    # Enable review analytics dashboard
+    enable_review_analytics: bool = False
+
+    # Enable product health overview
+    enable_product_overview: bool = False
 
     # ==================== Scan Tracing ====================
     # Real-time trace log streaming for scan observability
@@ -324,6 +340,12 @@ class FeatureFlags:
             enable_product_chat=_env_bool("FEATURE_PRODUCT_CHAT", True),
             enable_review_requests=_env_bool("FEATURE_REVIEW_REQUESTS"),
             enable_impact_graph=_env_bool("FEATURE_IMPACT_GRAPH"),
+            # P1: Enhanced PM Experience
+            enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS"),
+            enable_prd_version_history=_env_bool("FEATURE_PRD_VERSION_HISTORY"),
+            enable_approval_gates=_env_bool("FEATURE_APPROVAL_GATES"),
+            enable_review_analytics=_env_bool("FEATURE_REVIEW_ANALYTICS"),
+            enable_product_overview=_env_bool("FEATURE_PRODUCT_OVERVIEW"),
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
         )
@@ -377,6 +399,12 @@ class FeatureFlags:
             enable_product_chat=True,
             enable_review_requests=True,
             enable_impact_graph=True,
+            # P1: Enhanced PM Experience
+            enable_live_analysis=True,
+            enable_prd_version_history=True,
+            enable_approval_gates=True,
+            enable_review_analytics=True,
+            enable_product_overview=True,
             # Scan tracing
             enable_scan_tracing=True,
         )
@@ -429,6 +457,12 @@ class FeatureFlags:
             "product_chat": self.enable_product_chat,
             "review_requests": self.enable_review_requests,
             "impact_graph": self.enable_impact_graph,
+            # P1: Enhanced PM Experience
+            "live_analysis": self.enable_live_analysis,
+            "prd_version_history": self.enable_prd_version_history,
+            "approval_gates": self.enable_approval_gates,
+            "review_analytics": self.enable_review_analytics,
+            "product_overview": self.enable_product_overview,
             # Scan tracing
             "scan_tracing": self.enable_scan_tracing,
         }
@@ -503,6 +537,17 @@ class FeatureFlags:
             enabled.append("review_requests")
         if self.enable_impact_graph:
             enabled.append("impact_graph")
+        # P1: Enhanced PM Experience
+        if self.enable_live_analysis:
+            enabled.append("live_analysis")
+        if self.enable_prd_version_history:
+            enabled.append("prd_version_history")
+        if self.enable_approval_gates:
+            enabled.append("approval_gates")
+        if self.enable_review_analytics:
+            enabled.append("review_analytics")
+        if self.enable_product_overview:
+            enabled.append("product_overview")
         # Scan tracing
         if self.enable_scan_tracing:
             enabled.append("scan_tracing")
