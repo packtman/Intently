@@ -2,8 +2,10 @@
 Product-Aware Chat — conversational AI grounded in product context.
 
 Answers PM questions using the context graph, review history,
-collaboration data, and learned patterns. Provides citations
-back to specific reviews, findings, and entities.
+collaboration data, learned patterns, and (optionally) the actual
+codebase files.  When codebase-aware chat is enabled and a review
+is scoped, the chat can read relevant source files to ground its
+answers in real code.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -25,7 +28,7 @@ logger = logging.getLogger(__name__)
 class Citation:
     """A reference to an existing piece of data used to answer the question."""
 
-    type: str  # "review", "finding", "entity", "pattern", "feedback"
+    type: str  # "review", "finding", "entity", "pattern", "feedback", "code"
     id: str
     text: str  # Human-readable snippet
     url: str = ""  # Deep-link in the frontend (e.g. /reviews/{id})
@@ -83,13 +86,27 @@ class ProductChat:
         question: str,
         review_id: str | None = None,
         conversation_id: str | None = None,
+        finding_id: str | None = None,
+        codebase_path: str | None = None,
     ) -> ChatResponse:
-        """Answer a product question using existing data + LLM."""
+        """Answer a product question using existing data + LLM.
+
+        Args:
+            question: The user's question.
+            review_id: Scope to a specific review for grounded answers.
+            conversation_id: Continue an existing conversation.
+            finding_id: Focus on a specific finding (drill-down chat).
+            codebase_path: Explicit codebase path for standalone chat
+                (when no review_id is provided). Ignored if review_id
+                is set — the review's codebase_path is used instead.
+        """
 
         conv_id = conversation_id or str(uuid4())
 
-        # 1. Gather grounded context from storage
-        context, citations = await self._gather_context(question, review_id)
+        # 1. Gather grounded context from storage + codebase
+        context, citations = await self._gather_context(
+            question, review_id, finding_id=finding_id, codebase_path=codebase_path,
+        )
 
         # 2. Build conversation messages
         history = self._conversations.get(conv_id, [])
@@ -131,12 +148,16 @@ class ProductChat:
         self,
         question: str,
         review_id: str | None,
+        *,
+        finding_id: str | None = None,
+        codebase_path: str | None = None,
     ) -> tuple[dict[str, Any], list[Citation]]:
         """Query existing storage for context relevant to the question."""
 
         context: dict[str, Any] = {}
         citations: list[Citation] = []
         q_lower = question.lower()
+        review = None
 
         # Always include recent reviews summary
         try:
@@ -206,6 +227,24 @@ class ProductChat:
             except Exception as exc:
                 logger.warning("Failed to load review %s: %s", review_id, exc)
 
+        # ---- Finding drill-down ----
+        if finding_id and review:
+            self._inject_finding_context(context, citations, review, finding_id, review_id or "")
+
+        # ---- Codebase-aware context (Layer 1 + Layer 2) ----
+        resolved_codebase = None
+        if review and getattr(review, "state", None) and review.state.codebase_path:
+            resolved_codebase = review.state.codebase_path
+        elif codebase_path:
+            resolved_codebase = codebase_path
+
+        if resolved_codebase:
+            self._inject_codebase_context(
+                context, citations, question, resolved_codebase,
+                state=review.state if review else None,
+                finding_components=self._get_finding_components(review, finding_id),
+            )
+
         # Load collaboration stats if question is about feedback/patterns
         if any(kw in q_lower for kw in [
             "feedback", "pattern", "learned", "expert", "false positive",
@@ -220,13 +259,152 @@ class ProductChat:
         return context, citations
 
     # ------------------------------------------------------------------
+    # Codebase-aware context injection
+    # ------------------------------------------------------------------
+
+    def _inject_codebase_context(
+        self,
+        context: dict[str, Any],
+        citations: list[Citation],
+        question: str,
+        codebase_path: str,
+        *,
+        state: Any | None = None,
+        finding_components: list[str] | None = None,
+    ) -> None:
+        """Inject codebase structure and relevant code snippets into context."""
+        from context_graph.config.features import get_features
+
+        if not get_features().enable_codebase_chat:
+            return
+
+        cb_path = Path(codebase_path)
+        if not cb_path.exists():
+            logger.debug("Codebase path does not exist: %s", codebase_path)
+            return
+
+        from context_graph.chat.codebase_reader import CodebaseReader
+
+        reader = CodebaseReader(cb_path, state)
+
+        # Layer 1: structural summary (always)
+        context["codebase_structure"] = reader.get_structure_summary()
+
+        # Layer 2: smart file retrieval based on the question
+        snippets = reader.search(question, max_results=5)
+
+        # Also read files for focused finding's affected components
+        if finding_components:
+            for comp in finding_components[:3]:
+                entity_snippet = reader.read_entity(comp)
+                if entity_snippet and not any(s.file == entity_snippet.file and s.start_line == entity_snippet.start_line for s in snippets):
+                    snippets.append(entity_snippet)
+
+        if snippets:
+            context["code_snippets"] = []
+            for s in snippets[:8]:
+                context["code_snippets"].append({
+                    "file": s.file,
+                    "lines": f"{s.start_line}-{s.end_line}",
+                    "symbol": s.symbol_name,
+                    "type": s.symbol_type,
+                    "code": s.text,
+                })
+                citations.append(Citation(
+                    type="code",
+                    id=s.file,
+                    text=f"{s.file}:{s.start_line}-{s.end_line} ({s.symbol_name})" if s.symbol_name else f"{s.file}:{s.start_line}-{s.end_line}",
+                    url="",
+                ))
+
+    def _inject_finding_context(
+        self,
+        context: dict[str, Any],
+        citations: list[Citation],
+        review: Any,
+        finding_id: str,
+        review_id: str,
+    ) -> None:
+        """Inject a specific finding's full details into context."""
+        for f in review.all_findings:
+            if str(f.id) == finding_id:
+                context["focused_finding"] = {
+                    "title": f.title,
+                    "severity": f.severity.value,
+                    "dimension": f.dimension.value,
+                    "category": f.category.value if hasattr(f.category, "value") else str(f.category),
+                    "description": getattr(f, "description", "") or "",
+                    "technical_details": getattr(f, "technical_details", "") or "",
+                    "attack_scenario": getattr(f, "attack_scenario", "") or "",
+                    "business_impact": getattr(f, "business_impact", "") or "",
+                    "affected_components": getattr(f, "affected_components", []) or [],
+                    "recommendation": getattr(f, "recommendation", "") or "",
+                    "implementation_guidance": getattr(f, "implementation_guidance", "") or "",
+                    "references": getattr(f, "references", []) or [],
+                }
+                citations.append(Citation(
+                    type="finding",
+                    id=str(f.id),
+                    text=f"FOCUSED: {f.severity.value.upper()}: {f.title}",
+                    url=f"/reviews/{review_id}#finding-{f.id}",
+                ))
+                break
+
+    @staticmethod
+    def _get_finding_components(review: Any | None, finding_id: str | None) -> list[str]:
+        """Extract affected_components from a specific finding."""
+        if not review or not finding_id:
+            return []
+        for f in review.all_findings:
+            if str(f.id) == finding_id:
+                return getattr(f, "affected_components", []) or []
+        return []
+
+    # ------------------------------------------------------------------
     # LLM interaction
     # ------------------------------------------------------------------
 
     def _build_system_prompt(self, context: dict[str, Any]) -> str:
         """Build a grounded system prompt from gathered context."""
 
+        has_code = "code_snippets" in context or "codebase_structure" in context
+        has_finding_focus = "focused_finding" in context
+
+        # Build context in sections to stay within token limits
+        # Keep code snippets separate so they render cleanly
+        code_snippets = context.pop("code_snippets", None)
+        codebase_structure = context.pop("codebase_structure", None)
+
         context_block = json.dumps(context, indent=2, default=str)
+
+        code_section = ""
+        if codebase_structure:
+            code_section += "\n\nCODEBASE STRUCTURE:\n```json\n"
+            code_section += json.dumps(codebase_structure, indent=2, default=str)
+            code_section += "\n```"
+
+        if code_snippets:
+            code_section += "\n\nRELEVANT CODE SNIPPETS:"
+            for snippet in code_snippets:
+                code_section += f"\n\n--- {snippet['file']}:{snippet['lines']}"
+                if snippet.get("symbol"):
+                    code_section += f" ({snippet['type']}: {snippet['symbol']})"
+                code_section += f" ---\n```\n{snippet['code']}\n```"
+
+        finding_instruction = ""
+        if has_finding_focus:
+            finding_instruction = """
+- A specific finding is FOCUSED. Give priority to answering about this finding.
+- Explain the finding in practical terms the PM can act on.
+- If code snippets are available, reference the actual code when explaining the issue."""
+
+        code_instruction = ""
+        if has_code:
+            code_instruction = """
+- You have access to the codebase structure and relevant code snippets.
+- When answering questions about the code, reference specific files and line numbers.
+- Explain code in PM-friendly language — avoid jargon, focus on what it does and why it matters.
+- If the code snippets don't contain what's needed, say so and suggest what to look for."""
 
         return f"""You are an AI assistant for Intently, a product analysis platform that helps PMs bridge PRDs to code. You answer questions about the product, codebase, reviews, and organizational patterns.
 
@@ -235,14 +413,14 @@ GROUNDING RULES:
 - When you reference a review, finding, or entity, mention it by name/ID so the frontend can link to it.
 - If you don't have enough context to answer confidently, say so and suggest what the user could do (e.g., "Run a review on this PRD" or "Check the security findings for review X").
 - Be concise but thorough. Use bullet points for lists.
-- Do NOT hallucinate data. If the context doesn't contain information about something, say so.
+- Do NOT hallucinate data. If the context doesn't contain information about something, say so.{finding_instruction}{code_instruction}
 
 PRODUCT CONTEXT:
 ```json
 {context_block}
-```
+```{code_section}
 
-Answer the user's question using the above context. Cite specific reviews, findings, and entities when relevant."""
+Answer the user's question using the above context. Cite specific files, reviews, findings, and entities when relevant."""
 
     async def _call_llm(self, messages: list[dict[str, str]]) -> str:
         """Call the LLM provider. Prefers OpenAI, falls back to Anthropic."""
@@ -319,7 +497,11 @@ Answer the user's question using the above context. Cite specific reviews, findi
         suggestions: list[str] = []
         q_lower = question.lower()
 
-        if context.get("current_review"):
+        if context.get("focused_finding"):
+            suggestions.append("Explain this in simpler business terms")
+            suggestions.append("What's the minimum fix to unblock shipping?")
+            suggestions.append("Write me a ticket description for this issue")
+        elif context.get("current_review"):
             review = context["current_review"]
             if review.get("security_findings", 0) > 0:
                 suggestions.append("What are the most critical security findings?")
@@ -328,11 +510,19 @@ Answer the user's question using the above context. Cite specific reviews, findi
             if review.get("quality_score"):
                 suggestions.append("How can I improve the PRD quality score?")
             suggestions.append("What entities are affected by this change?")
-        else:
+
+        if context.get("codebase_structure") or context.get("code_snippets"):
+            if "auth" not in q_lower:
+                suggestions.append("How does authentication work in this codebase?")
+            if "endpoint" not in q_lower:
+                suggestions.append("What are the main API endpoints?")
+            if "pii" not in q_lower and "sensitive" not in q_lower:
+                suggestions.append("Which data models handle sensitive/PII data?")
+        elif not context.get("current_review"):
             suggestions.append("Show me a summary of the latest review.")
             suggestions.append("What are the most common finding categories?")
 
-        if "security" not in q_lower:
+        if "security" not in q_lower and not context.get("focused_finding"):
             suggestions.append("What security patterns should I be aware of?")
 
         return suggestions[:4]
