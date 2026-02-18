@@ -246,7 +246,7 @@ class FeatureFlags:
     # latency overhead (input tokens are processed in parallel).
     
     # Enable prompt repetition globally for all LLM calls
-    enable_prompt_repetition: bool = False
+    enable_prompt_repetition: bool = True
     
     # ==================== P0: Core PM Experience ====================
 

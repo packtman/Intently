@@ -23,7 +23,7 @@ llm:
   # Prompt repetition: repeat the user prompt so the model gets a second
   # attention pass over the entire input, improving accuracy with negligible
   # latency overhead.  Disabled by default; also controllable per-request.
-  prompt_repetition: false
+  prompt_repetition: true
 
 # Codebase Analysis Settings
 codebase:
