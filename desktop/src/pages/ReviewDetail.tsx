@@ -123,6 +123,8 @@ function ReviewDetailContent() {
   const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool' | 'impact-graph'>('findings')
   const [expertAskModal, setExpertAskModal] = useState<{ isOpen: boolean; predictionId: string; question: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
+  const [chatFindingId, setChatFindingId] = useState<string | undefined>(undefined)
+  const [chatFindingTitle, setChatFindingTitle] = useState<string | undefined>(undefined)
   
   // Track if we've triggered a manual refetch to avoid infinite loops
   const [manualRefetchTriggered, setManualRefetchTriggered] = useState(false)
@@ -764,7 +766,11 @@ function ReviewDetailContent() {
       {/* Floating Chat Button */}
       {chatEnabled && (
         <button
-          onClick={() => setChatOpen(true)}
+          onClick={() => {
+            setChatFindingId(undefined)
+            setChatFindingTitle(undefined)
+            setChatOpen(true)
+          }}
           className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-neon-500 text-void-950 shadow-lg 
                      hover:bg-neon-400 transition-all flex items-center justify-center z-40
                      hover:scale-105 active:scale-95 shadow-neon-500/20"
@@ -778,8 +784,14 @@ function ReviewDetailContent() {
       {chatEnabled && (
         <ChatPanel
           reviewId={id}
+          findingId={chatFindingId}
+          findingTitle={chatFindingTitle}
           isOpen={chatOpen}
-          onClose={() => setChatOpen(false)}
+          onClose={() => {
+            setChatOpen(false)
+            setChatFindingId(undefined)
+            setChatFindingTitle(undefined)
+          }}
         />
       )}
 

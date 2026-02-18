@@ -9,6 +9,7 @@ import TeamQueue from './pages/TeamQueue'
 import BulkAnalysis from './pages/BulkAnalysis'
 import PRDGenerator from './pages/PRDGenerator'
 import Analytics from './pages/Analytics'
+import Chat from './pages/Chat'
 import Settings from './pages/Settings'
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
         <Route path="/teams/:team/queue" element={<TeamQueue />} />
         <Route path="/bulk-analysis" element={<BulkAnalysis />} />
         <Route path="/prd-generator" element={<PRDGenerator />} />
+        <Route path="/chat" element={<Chat />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
