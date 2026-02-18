@@ -46,6 +46,8 @@ import TraceLogPanel from '../components/TraceLogPanel'
 import ChatPanel from '../components/chat/ChatPanel'
 import ReviewRequestPanel from '../components/review/ReviewRequestPanel'
 import ImpactGraph from '../components/review/ImpactGraph'
+import VersionHistory from '../components/review/VersionHistory'
+import GateStatus from '../components/review/GateStatus'
 
 // Error Boundary to catch any React rendering errors
 interface ErrorBoundaryProps {
@@ -511,6 +513,12 @@ function ReviewDetailContent() {
           findings={dashboard.cross_functional_findings}
         />
       )}
+
+      {/* Approval Gates */}
+      {id && <GateStatus reviewId={id} />}
+
+      {/* Version History */}
+      {id && <VersionHistory reviewId={id} />}
 
       {/* Review Request Panel */}
       {reviewRequestsEnabled && id && <ReviewRequestPanel reviewId={id} />}

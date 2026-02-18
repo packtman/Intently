@@ -262,7 +262,7 @@ class FeatureFlags:
     # ==================== P1: Enhanced PM Experience ====================
 
     # Enable live analysis while writing (no LLM, pattern-based)
-    enable_live_analysis: bool = True
+    enable_live_analysis: bool = False
 
     # Enable PRD version history and diffing
     enable_prd_version_history: bool = True
@@ -341,7 +341,7 @@ class FeatureFlags:
             enable_review_requests=_env_bool("FEATURE_REVIEW_REQUESTS"),
             enable_impact_graph=_env_bool("FEATURE_IMPACT_GRAPH"),
             # P1: Enhanced PM Experience
-            enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS", True),
+            enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS"),
             enable_prd_version_history=_env_bool("FEATURE_PRD_VERSION_HISTORY", True),
             enable_approval_gates=_env_bool("FEATURE_APPROVAL_GATES", True),
             enable_review_analytics=_env_bool("FEATURE_REVIEW_ANALYTICS", True),

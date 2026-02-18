@@ -21,14 +21,21 @@ export default function GateStatus({ reviewId }: GateStatusProps) {
   const [blockingFailures, setBlockingFailures] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:8000')
+
+  useEffect(() => {
+    if (window.electronAPI?.getBackendUrl) {
+      window.electronAPI.getBackendUrl().then(setBaseUrl)
+    }
+  }, [])
 
   useEffect(() => {
     fetchGates()
-  }, [reviewId])
+  }, [reviewId, baseUrl])
 
   const fetchGates = async () => {
     try {
-      const res = await fetch(`/api/reviews/${reviewId}/gates`)
+      const res = await fetch(`${baseUrl}/api/reviews/${reviewId}/gates`)
       if (!res.ok) {
         if (res.status === 403) return // Feature not enabled, silently skip
         throw new Error(`HTTP ${res.status}`)

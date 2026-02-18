@@ -25,6 +25,7 @@ import {
   Key,
   AlertTriangle,
 } from 'lucide-react'
+import LiveAnalysisSidebar from '../components/pm/LiveAnalysisSidebar'
 
 type Step = 'prd' | 'codebase' | 'config' | 'review'
 
@@ -297,14 +298,15 @@ function StepPRD({
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-surface-300 mb-2">
-          PRD Content (Markdown)
-        </label>
-        <textarea
-          value={content}
-          onChange={(e) => onContentChange(e.target.value)}
-          placeholder={`# Feature Overview
+      <div className="flex gap-4">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-surface-300 mb-2">
+            PRD Content (Markdown)
+          </label>
+          <textarea
+            value={content}
+            onChange={(e) => onContentChange(e.target.value)}
+            placeholder={`# Feature Overview
 
 ## Summary
 Describe the feature...
@@ -320,11 +322,15 @@ Describe the feature...
 ## Security Considerations
 - Authentication required
 - PII handling`}
-          rows={15}
-          className="w-full px-4 py-3 bg-surface-800 border border-surface-700 rounded-lg
-                     text-white placeholder-surface-500 focus:border-primary-500 focus:ring-1 
-                     focus:ring-primary-500 transition-all font-mono text-sm resize-none"
-        />
+            rows={15}
+            className="w-full px-4 py-3 bg-surface-800 border border-surface-700 rounded-lg
+                       text-white placeholder-surface-500 focus:border-primary-500 focus:ring-1 
+                       focus:ring-primary-500 transition-all font-mono text-sm resize-none"
+          />
+        </div>
+        <div className="w-72 flex-shrink-0">
+          <LiveAnalysisSidebar prdContent={content} />
+        </div>
       </div>
 
       {/* Intent Preview Button */}

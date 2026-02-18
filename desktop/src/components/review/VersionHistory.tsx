@@ -24,14 +24,21 @@ export default function VersionHistory({ reviewId }: VersionHistoryProps) {
   const [diffing, setDiffing] = useState(false)
   const [selectedVersions, setSelectedVersions] = useState<[number, number] | null>(null)
   const [diffResult, setDiffResult] = useState<any>(null)
+  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:8000')
+
+  useEffect(() => {
+    if (window.electronAPI?.getBackendUrl) {
+      window.electronAPI.getBackendUrl().then(setBaseUrl)
+    }
+  }, [])
 
   useEffect(() => {
     fetchVersions()
-  }, [reviewId])
+  }, [reviewId, baseUrl])
 
   const fetchVersions = async () => {
     try {
-      const res = await fetch(`/api/reviews/${reviewId}/versions`)
+      const res = await fetch(`${baseUrl}/api/reviews/${reviewId}/versions`)
       if (res.ok) {
         setVersions(await res.json())
       }
@@ -41,7 +48,7 @@ export default function VersionHistory({ reviewId }: VersionHistoryProps) {
 
   const saveVersion = async () => {
     try {
-      const res = await fetch(`/api/reviews/${reviewId}/versions`, {
+      const res = await fetch(`${baseUrl}/api/reviews/${reviewId}/versions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ author: 'current-user', change_summary: '' }),
@@ -56,7 +63,7 @@ export default function VersionHistory({ reviewId }: VersionHistoryProps) {
     setDiffing(true)
     setSelectedVersions([v1, v2])
     try {
-      const res = await fetch(`/api/reviews/${reviewId}/versions/${v1}/${v2}/diff`)
+      const res = await fetch(`${baseUrl}/api/reviews/${reviewId}/versions/${v1}/${v2}/diff`)
       if (res.ok) {
         setDiffResult(await res.json())
       }

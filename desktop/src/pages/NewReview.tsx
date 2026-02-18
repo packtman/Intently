@@ -32,6 +32,7 @@ import {
 import { api } from '../services/api'
 import { useBackend } from '../hooks/useBackend'
 import type { ParsedIntent, ReviewRequest, CollaborationFeatures } from '../types'
+import LiveAnalysisSidebar from '../components/pm/LiveAnalysisSidebar'
 
 type Step = 'prd' | 'codebase' | 'config' | 'review'
 
@@ -397,12 +398,13 @@ function StepPRD({
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-void-300 mb-2">PRD Content (Markdown)</label>
-        <textarea
-          value={content}
-          onChange={(e) => onContentChange(e.target.value)}
-          placeholder={`# Feature Overview
+      <div className="flex gap-4">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-void-300 mb-2">PRD Content (Markdown)</label>
+          <textarea
+            value={content}
+            onChange={(e) => onContentChange(e.target.value)}
+            placeholder={`# Feature Overview
 
 ## Summary
 Describe the feature...
@@ -418,9 +420,13 @@ Describe the feature...
 ## Security Considerations
 - Authentication required
 - PII handling`}
-          rows={12}
-          className="input-field font-mono text-sm resize-none"
-        />
+            rows={12}
+            className="input-field font-mono text-sm resize-none"
+          />
+        </div>
+        <div className="w-72 flex-shrink-0">
+          <LiveAnalysisSidebar prdContent={content} />
+        </div>
       </div>
 
       {/* Intent Preview Button */}

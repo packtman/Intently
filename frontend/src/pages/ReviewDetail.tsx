@@ -40,6 +40,8 @@ import TraceLogPanel from '../components/TraceLogPanel'
 import ChatPanel from '../components/chat/ChatPanel'
 import ReviewRequestPanel from '../components/review/ReviewRequestPanel'
 import ImpactGraph from '../components/review/ImpactGraph'
+import VersionHistory from '../components/review/VersionHistory'
+import GateStatus from '../components/review/GateStatus'
 import {
   PieChart,
   Pie,
@@ -498,6 +500,12 @@ export default function ReviewDetail() {
       {dashboard.false_positive_filter && (
         <FPFilterStatsSection fpStats={dashboard.false_positive_filter} />
       )}
+
+      {/* Approval Gates */}
+      {id && <GateStatus reviewId={id} />}
+
+      {/* Version History */}
+      {id && <VersionHistory reviewId={id} />}
 
       {/* Review Request Panel */}
       {reviewRequestsEnabled && id && <ReviewRequestPanel reviewId={id} />}
