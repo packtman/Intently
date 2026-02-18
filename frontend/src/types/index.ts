@@ -172,6 +172,10 @@ export interface CollaborationFeatures {
   pm_pattern_learning?: boolean
   prd_save_to_file?: boolean
   side_by_side_diff?: boolean
+  // P0: Core PM Experience
+  product_chat?: boolean
+  review_requests?: boolean
+  impact_graph?: boolean
 }
 
 export interface ValidationStats {

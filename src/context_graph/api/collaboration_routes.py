@@ -137,6 +137,10 @@ class FeatureFlagsResponse(BaseModel):
     pm_pattern_learning: bool = False
     prd_save_to_file: bool = False
     side_by_side_diff: bool = False
+    # P0: Core PM Experience
+    product_chat: bool = False
+    review_requests: bool = False
+    impact_graph: bool = False
 
 
 # ==================== Feature Flags Endpoint ====================

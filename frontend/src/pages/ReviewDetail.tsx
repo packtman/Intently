@@ -37,6 +37,9 @@ import {
 import { api } from '../services/api'
 import type { Finding, CollaborationFeatures } from '../types'
 import TraceLogPanel from '../components/TraceLogPanel'
+import ChatPanel from '../components/chat/ChatPanel'
+import ReviewRequestPanel from '../components/review/ReviewRequestPanel'
+import ImpactGraph from '../components/review/ImpactGraph'
 import {
   PieChart,
   Pie,
@@ -180,8 +183,9 @@ export default function ReviewDetail() {
   const [aiOnlyFilter, setAiOnlyFilter] = useState(true) // Default to AI-only for cross-functional reviews
   const [filterInitialized, setFilterInitialized] = useState(false)
   const [selectedDimension, setSelectedDimension] = useState<string | 'all'>('all')
-  const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool'>('findings')
+  const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool' | 'impact-graph'>('findings')
   const [expertAskModal, setExpertAskModal] = useState<{ isOpen: boolean; predictionId: string; question: string } | null>(null)
+  const [chatOpen, setChatOpen] = useState(false)
 
   // Fetch collaboration features (to know which features are enabled)
   const { data: collaborationFeatures } = useQuery<CollaborationFeatures>({
@@ -196,6 +200,9 @@ export default function ReviewDetail() {
   const commentsEnabled = collaborationFeatures?.comments ?? false
   const teamAssignmentEnabled = collaborationFeatures?.team_assignment ?? false
   const expertFeedbackEnabled = collaborationFeatures?.expert_feedback ?? false
+  const chatEnabled = collaborationFeatures?.product_chat ?? false
+  const reviewRequestsEnabled = collaborationFeatures?.review_requests ?? false
+  const impactGraphEnabled = collaborationFeatures?.impact_graph ?? false
 
   // Poll for status while pending/running
   const { data: status } = useQuery<ReviewStatus>({
@@ -492,6 +499,9 @@ export default function ReviewDetail() {
         <FPFilterStatsSection fpStats={dashboard.false_positive_filter} />
       )}
 
+      {/* Review Request Panel */}
+      {reviewRequestsEnabled && id && <ReviewRequestPanel reviewId={id} />}
+
       {/* PM Tool Section - Tab Navigation */}
       <div className="bg-surface-900/50 rounded-2xl border border-surface-800 overflow-hidden">
         {/* Tabs */}
@@ -520,10 +530,27 @@ export default function ReviewDetail() {
           >
             PRD Changes
           </button>
+          {impactGraphEnabled && (
+            <button
+              onClick={() => setActiveTab('impact-graph')}
+              className={`
+                flex-1 px-6 py-4 font-medium transition-all
+                ${activeTab === 'impact-graph'
+                  ? 'text-white border-b-2 border-primary-500 bg-surface-900'
+                  : 'text-surface-400 hover:text-white'
+                }
+              `}
+            >
+              Impact Graph
+            </button>
+          )}
         </div>
 
         {/* Tab Content */}
         <div className="p-6">
+          {activeTab === 'impact-graph' && impactGraphEnabled && id && (
+            <ImpactGraph reviewId={id} />
+          )}
           {activeTab === 'findings' && (
             <FindingsTabContent
               dashboard={dashboard}
@@ -569,6 +596,28 @@ export default function ReviewDetail() {
           predictionId={expertAskModal.predictionId}
           defaultQuestion={expertAskModal.question}
           reviewId={id}
+        />
+      )}
+
+      {/* Floating Chat Button */}
+      {chatEnabled && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary-500 text-white shadow-lg 
+                     hover:bg-primary-600 transition-all flex items-center justify-center z-40
+                     hover:scale-105 active:scale-95"
+          title="Ask about this review (Cmd+L)"
+        >
+          <Sparkles className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Chat Side Panel */}
+      {chatEnabled && (
+        <ChatPanel
+          reviewId={id}
+          isOpen={chatOpen}
+          onClose={() => setChatOpen(false)}
         />
       )}
 

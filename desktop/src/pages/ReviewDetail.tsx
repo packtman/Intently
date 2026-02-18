@@ -43,6 +43,9 @@ import {
 } from '../components/security'
 import type { ReviewStatus, DashboardData, Finding, CollaborationFeatures, CrossFunctionalFinding } from '../types'
 import TraceLogPanel from '../components/TraceLogPanel'
+import ChatPanel from '../components/chat/ChatPanel'
+import ReviewRequestPanel from '../components/review/ReviewRequestPanel'
+import ImpactGraph from '../components/review/ImpactGraph'
 
 // Error Boundary to catch any React rendering errors
 interface ErrorBoundaryProps {
@@ -115,8 +118,9 @@ function ReviewDetailContent() {
   const [aiOnlyFilter, setAiOnlyFilter] = useState(true)
   const [filterInitialized, setFilterInitialized] = useState(false)
   const [selectedDimension, setSelectedDimension] = useState<string | 'all'>('all')
-  const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool'>('findings')
+  const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool' | 'impact-graph'>('findings')
   const [expertAskModal, setExpertAskModal] = useState<{ isOpen: boolean; predictionId: string; question: string } | null>(null)
+  const [chatOpen, setChatOpen] = useState(false)
   
   // Track if we've triggered a manual refetch to avoid infinite loops
   const [manualRefetchTriggered, setManualRefetchTriggered] = useState(false)
@@ -230,6 +234,9 @@ function ReviewDetailContent() {
   const commentsEnabled = collaborationFeatures?.comments ?? false
   const teamAssignmentEnabled = collaborationFeatures?.team_assignment ?? false
   const expertFeedbackEnabled = collaborationFeatures?.expert_feedback ?? false
+  const chatEnabled = collaborationFeatures?.product_chat ?? false
+  const reviewRequestsEnabled = collaborationFeatures?.review_requests ?? false
+  const impactGraphEnabled = collaborationFeatures?.impact_graph ?? false
 
   // Initialize AI-only filter based on whether LLM was used
   useEffect(() => {
@@ -505,6 +512,9 @@ function ReviewDetailContent() {
         />
       )}
 
+      {/* Review Request Panel */}
+      {reviewRequestsEnabled && id && <ReviewRequestPanel reviewId={id} />}
+
       {/* PM Tool Tab Navigation */}
       <div className="card-glass rounded-2xl overflow-hidden">
         {/* Tabs */}
@@ -533,10 +543,27 @@ function ReviewDetailContent() {
           >
             PRD Changes
           </button>
+          {impactGraphEnabled && (
+            <button
+              onClick={() => setActiveTab('impact-graph')}
+              className={`
+                flex-1 px-6 py-4 font-medium transition-all
+                ${activeTab === 'impact-graph'
+                  ? 'text-white border-b-2 border-neon-500 bg-void-900'
+                  : 'text-void-400 hover:text-white'
+                }
+              `}
+            >
+              Impact Graph
+            </button>
+          )}
         </div>
 
         {/* Tab Content */}
         <div className="p-6">
+          {activeTab === 'impact-graph' && impactGraphEnabled && id && (
+            <ImpactGraph reviewId={id} />
+          )}
           {activeTab === 'pm-tool' && id && (
             <div className="space-y-6">
               {/* Quality Score & Effort Estimation */}
@@ -725,6 +752,29 @@ function ReviewDetailContent() {
           reviewId={id}
         />
       )}
+
+      {/* Floating Chat Button */}
+      {chatEnabled && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-neon-500 text-void-950 shadow-lg 
+                     hover:bg-neon-400 transition-all flex items-center justify-center z-40
+                     hover:scale-105 active:scale-95 shadow-neon-500/20"
+          title="Ask about this review (Cmd+L)"
+        >
+          <Sparkles className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Chat Side Panel */}
+      {chatEnabled && (
+        <ChatPanel
+          reviewId={id}
+          isOpen={chatOpen}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
+
     </div>
   )
 }

@@ -248,6 +248,18 @@ class FeatureFlags:
     # Enable prompt repetition globally for all LLM calls
     enable_prompt_repetition: bool = False
     
+    # ==================== P0: Core PM Experience ====================
+
+    # Enable product-aware chat (conversational AI grounded in reviews)
+    enable_product_chat: bool = True
+
+    # Enable formal review requests (PR-like review workflow)
+    enable_review_requests: bool = False
+
+    # Enable impact graph visualization (D3.js entity graph)
+    enable_impact_graph: bool = False
+
+
     # ==================== Scan Tracing ====================
     # Real-time trace log streaming for scan observability
     
@@ -308,6 +320,10 @@ class FeatureFlags:
             false_positive_model=os.getenv("FALSE_POSITIVE_MODEL", "disabled"),
             # Prompt repetition
             enable_prompt_repetition=_env_bool("FEATURE_PROMPT_REPETITION"),
+            # P0: Core PM Experience
+            enable_product_chat=_env_bool("FEATURE_PRODUCT_CHAT", True),
+            enable_review_requests=_env_bool("FEATURE_REVIEW_REQUESTS"),
+            enable_impact_graph=_env_bool("FEATURE_IMPACT_GRAPH"),
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
         )
@@ -357,6 +373,10 @@ class FeatureFlags:
             false_positive_model="disabled",
             # Prompt repetition
             enable_prompt_repetition=True,
+            # P0: Core PM Experience
+            enable_product_chat=True,
+            enable_review_requests=True,
+            enable_impact_graph=True,
             # Scan tracing
             enable_scan_tracing=True,
         )
@@ -405,6 +425,10 @@ class FeatureFlags:
             "false_positive_model": self.false_positive_model,
             # Prompt repetition
             "prompt_repetition": self.enable_prompt_repetition,
+            # P0: Core PM Experience
+            "product_chat": self.enable_product_chat,
+            "review_requests": self.enable_review_requests,
+            "impact_graph": self.enable_impact_graph,
             # Scan tracing
             "scan_tracing": self.enable_scan_tracing,
         }
@@ -472,6 +496,13 @@ class FeatureFlags:
         # Prompt repetition
         if self.enable_prompt_repetition:
             enabled.append("prompt_repetition")
+        # P0: Core PM Experience
+        if self.enable_product_chat:
+            enabled.append("product_chat")
+        if self.enable_review_requests:
+            enabled.append("review_requests")
+        if self.enable_impact_graph:
+            enabled.append("impact_graph")
         # Scan tracing
         if self.enable_scan_tracing:
             enabled.append("scan_tracing")

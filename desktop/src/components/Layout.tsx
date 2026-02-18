@@ -12,6 +12,7 @@ import {
   Shield,
   Layers,
   Sparkles,
+  BarChart3,
 } from 'lucide-react'
 import { useBackend } from '../hooks/useBackend'
 
@@ -29,6 +30,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/new', label: 'New Review', icon: FileSearch },
     { path: '/bulk', label: 'Bulk Analysis', icon: Layers },
     { path: '/generate', label: 'PRD Generator', icon: Sparkles },
+    { path: '/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/settings', label: 'Settings', icon: Settings },
   ]
 

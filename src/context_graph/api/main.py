@@ -31,6 +31,8 @@ from context_graph.api.collaboration_routes import router as collaboration_route
 from context_graph.api.pm_routes import router as pm_router
 from context_graph.api.bulk_prd_routes import router as bulk_prd_router
 from context_graph.api.prd_generator_routes import router as prd_generator_router
+from context_graph.api.chat_routes import router as chat_router
+from context_graph.api.review_request_routes import router as review_request_router
 from context_graph.config.features import get_features
 
 
@@ -97,6 +99,10 @@ def create_app() -> FastAPI:
     
     # Include PRD generator routes
     app.include_router(prd_generator_router, prefix="/api")
+    
+    # Include P0 feature routes (feature-flag protected)
+    app.include_router(chat_router, prefix="/api")
+    app.include_router(review_request_router, prefix="/api")
     
     # Health check
     @app.get("/health")
