@@ -64,38 +64,228 @@ PMs paste a PRD and run a full review (which takes time and costs LLM tokens) on
 
 ---
 
-## Feature 2: Finding Drill-Down Chat (Extend What Works)
+## Feature 2: Codebase-Aware Chat (the Big One)
 
 ### The Problem
-PMs see a finding like "Insufficient input validation on user-supplied data in API endpoint" and think: "What does that actually mean for my feature? What's the minimum fix? Can I ship without fixing this?" There's no way to ask follow-up questions about a specific finding.
+Current chat only knows about reviews and findings — structured data the system already produced.
+But a PM's real questions are about the **codebase itself**:
+
+- "How does our authentication work?"
+- "What happens when a payment fails — show me the error handling"
+- "Which services talk to the database directly?"
+- "Where is PII stored and who accesses it?"
+- "If I add a new notification channel, what files would I need to touch?"
+
+Today the PM has to go ask a developer or try to read the code themselves. **Intently already has
+filesystem access to the codebase** (local path or cloned GitHub repo). We just don't use it in chat.
 
 ### The Feature
-Extend the Product Chat (which the user already likes) with **finding-scoped conversations**. When a PM clicks on a finding, they can open a chat pre-loaded with that finding's full context (technical details, attack scenario, affected components, recommendation) and ask:
+Give the chat **full read access to the codebase**, like Cursor does for developers but oriented
+toward PM questions. The chat becomes a "talk to your codebase" interface where PMs can ask
+anything about code structure, data flows, dependencies, and patterns — without reading code.
 
-- "Explain this in business terms"
-- "What's the minimum fix to unblock shipping?"
-- "Is this actually exploitable given our auth setup?"
-- "Write me a Jira ticket for this"
+**Three layers of codebase context, progressively deeper:**
 
-The LLM already has all the context — the review data, the finding details, the codebase analysis. We just need to scope the conversation to a specific finding.
+#### Layer 1: Structural Index (always available, no file reads)
+On every review, we already build a `State` that includes:
+- All API endpoints (path, method, file, line)
+- All data models (name, file, fields)
+- Auth patterns, existing security controls
+- Entity list with types and source file paths
+
+This is already stored in SQLite per review. Inject it into chat context automatically
+when a review is scoped. The LLM can answer structural questions instantly:
+"You have 47 endpoints, 12 use OAuth2, 3 handle payment data."
+
+#### Layer 2: Smart File Retrieval (on-demand, reads actual files)
+When the PM asks a question that needs code detail, the system reads relevant files
+from the codebase. Key insight: **we already know which files matter** from the
+AST analysis and entity index. The retrieval strategy:
+
+1. **Keyword match** — match question keywords against the file/class/function index
+   from `HybridAnalyzer` AST results (already have: classes, functions, imports per file)
+2. **Entity match** — if the question mentions an entity name we know about, pull its
+   source file (entities already have `source` field with file path)
+3. **Finding match** — if the question is about a specific finding, pull the
+   `affected_components` and `source_reference` files
+4. **Targeted read** — read only the relevant portions of matched files (not the whole
+   codebase). Use AST line ranges to extract just the relevant class/function.
+
+Example flow:
+- PM asks: "How does our payment processing handle refunds?"
+- System searches AST index for functions/classes matching "payment", "refund"
+- Finds `payments/processor.py:RefundHandler` (lines 45-120) and `payments/models.py:Refund` (lines 10-35)
+- Reads those specific line ranges from disk
+- Injects the actual code into the LLM context
+- LLM answers grounded in real code with file citations
+
+#### Layer 3: Cross-File Flow Tracing (advanced, follows the graph)
+For questions about data flows and dependencies:
+- "What happens to user data after signup?"
+- "Trace the request from API to database for creating an order"
+
+Use the `ContextGraph` relationships + import analysis from `HybridAnalyzer` to follow
+the chain across files. Read each file in the chain. Present the LLM with an ordered
+sequence of code snippets showing the flow.
 
 ### What Exists to Build On
-- `ProductChat.answer()` — already takes `review_id` and gathers context from storage
-- `_gather_context()` — already loads findings, entities, review data
-- Each finding has: `technical_details`, `attack_scenario`, `business_impact`, `affected_components`, `recommendation`, `implementation_guidance`
-- Chat already has conversation memory and follow-up suggestions
+
+| Component | File | How It's Used |
+|---|---|---|
+| `State.codebase_path` | `core/models.py` | Stored per review — we know where the code lives |
+| `HybridAnalyzer` | `code_graph/hybrid_analyzer.py` | AST analysis: classes, functions, imports, decorators with file paths and line numbers |
+| `ASTResult` | `code_graph/hybrid_analyzer.py` | Per-file index: `classes[{name, line, end_line, methods}]`, `functions[{name, line, end_line, args, decorators}]` |
+| `State.entities` | `core/models.py` | Each entity has `name`, `entity_type`, `source` (file path) |
+| `State.api_endpoints` | `core/models.py` | Each endpoint has `path`, `method`, `file`, `line` |
+| `State.data_models` | `core/models.py` | Each model has `name`, `file`, `line` |
+| `ContextGraph` | `core/graph.py` | Entity relationships, can traverse `source_id` → `target_id` chains |
+| `ProductChat` | `chat/product_chat.py` | Already has `_gather_context()` + `_build_system_prompt()` + LLM call — extend these |
+| `SecurityFinding.affected_components` | `core/models.py` | List of file/component paths per finding |
+| `SQLiteReviewStorage.get_review()` | `storage/sqlite.py` | Returns full review with `state.codebase_path`, all entities, findings |
 
 ### Implementation Sketch
-- Add `finding_id` parameter to `ProductChat.answer()`
-- When `finding_id` is present, inject the full finding data (all fields) into the system prompt as primary context
-- Frontend: Add a small chat icon on each finding row in `ReviewDetail.tsx` — clicking it opens the ChatPanel with that finding pre-selected
-- The chat panel shows the finding title as conversation header
 
-### Why It's Good
-- Builds on the ONE feature the user already likes
-- Directly addresses the PM's #1 question when looking at findings: "What do I do about this?"
-- Zero new backend modules — just a parameter addition to existing chat
-- Converts findings from "read-only report items" to "conversation starters"
+#### Backend: `CodebaseReader` (new class)
+
+```python
+# src/context_graph/chat/codebase_reader.py
+
+class CodebaseReader:
+    """Reads code from the filesystem, guided by the AST index."""
+
+    def __init__(self, codebase_path: Path, state: State):
+        self.root = codebase_path
+        self.state = state
+        self._ast_index = self._build_index()  # Map of name -> (file, line_start, line_end)
+
+    def search(self, query: str, max_results: int = 5) -> list[CodeSnippet]:
+        """Find code relevant to a natural language query."""
+        # 1. Tokenize query, match against class/function/model names
+        # 2. Return ranked list of (file, line_range, code_text) snippets
+
+    def read_entity(self, entity_name: str) -> CodeSnippet | None:
+        """Read the code for a specific named entity."""
+
+    def read_file_range(self, file_path: str, start: int, end: int) -> str:
+        """Read specific lines from a file."""
+
+    def trace_flow(self, start_entity: str, max_depth: int = 5) -> list[CodeSnippet]:
+        """Follow imports/calls from one entity through the codebase."""
+```
+
+#### Backend: Extend `ProductChat._gather_context()`
+
+```python
+# In _gather_context(), add codebase-reading logic:
+
+if review and review.state.codebase_path:
+    codebase_path = Path(review.state.codebase_path)
+    if codebase_path.exists():
+        reader = CodebaseReader(codebase_path, review.state)
+
+        # Always inject structural summary
+        context["codebase_structure"] = {
+            "path": str(codebase_path),
+            "endpoints": review.state.api_endpoints[:30],
+            "models": review.state.data_models[:30],
+            "auth_patterns": review.state.auth_patterns,
+        }
+
+        # Smart file retrieval based on question
+        snippets = reader.search(question, max_results=5)
+        context["code_snippets"] = [
+            {"file": s.file, "lines": f"{s.start}-{s.end}", "code": s.text}
+            for s in snippets
+        ]
+        for s in snippets:
+            citations.append(Citation(
+                type="code",
+                id=s.file,
+                text=f"{s.file}:{s.start}-{s.end}",
+                url=f"file://{s.file}#L{s.start}",
+            ))
+```
+
+#### API: Add `finding_id` to scoped chat
+
+While we're extending chat, also add finding-scoped conversations:
+
+```python
+# In chat_routes.py ChatRequest:
+finding_id: str | None = Field(None, description="Scope to a specific finding")
+
+# In ProductChat._gather_context():
+if finding_id and review:
+    finding = next((f for f in review.all_findings if str(f.id) == finding_id), None)
+    if finding:
+        context["focused_finding"] = {
+            "title": finding.title,
+            "severity": finding.severity.value,
+            "technical_details": finding.technical_details,
+            "attack_scenario": finding.attack_scenario,
+            "business_impact": finding.business_impact,
+            "affected_components": finding.affected_components,
+            "recommendation": finding.recommendation,
+            "implementation_guidance": finding.implementation_guidance,
+        }
+        # Also read the affected component files
+        for comp in (finding.affected_components or []):
+            snippet = reader.read_entity(comp)
+            if snippet:
+                context["code_snippets"].append(...)
+```
+
+#### Frontend: Enhanced ChatPanel
+
+- Add a `codebasePath` prop — when set, show "Codebase connected" indicator
+- Code snippets in responses rendered with syntax highlighting
+- Citations of type "code" show as clickable file links (in desktop: open in editor)
+- Finding drill-down: chat icon on each finding row opens ChatPanel with finding pre-focused
+- Suggested questions adapt: "How does {endpoint} handle auth?" based on codebase structure
+
+#### Frontend: Standalone Chat Page (not just a side panel)
+
+The current chat is a 384px side panel on ReviewDetail. For codebase exploration,
+it deserves a **full page** — accessible from the sidebar nav. Think: a Cursor-like
+experience where the PM can explore the codebase conversationally without needing
+a review first.
+
+- New route: `/chat` — full-page chat with codebase selector
+- PM picks a codebase (from recent reviews or enters a path)
+- System runs `HybridAnalyzer.analyze_fast()` to build the index
+- PM chats with the codebase directly
+
+### What PMs Can Ask (Grouped by Use Case)
+
+**Understanding the codebase (no review needed):**
+- "Give me an overview of the codebase architecture"
+- "What are the main API endpoints and what do they do?"
+- "How does authentication work in this project?"
+- "What data models exist and which ones handle PII?"
+- "Show me how the payment flow works end to end"
+
+**During PRD writing (before review):**
+- "If I add a notification system, what existing code can I reuse?"
+- "What's the current error handling pattern — should I follow it?"
+- "Does the codebase already have a rate limiter I can use?"
+
+**After review (with findings):**
+- "Explain this SQL injection finding — show me the actual vulnerable code"
+- "What's the minimum code change to fix this auth bypass?"
+- "Which other endpoints have the same pattern as this finding?"
+
+**Cross-review questions (over time):**
+- "Which parts of the codebase have the most recurring findings?"
+- "Has the auth setup changed since the last review?"
+
+### Why It's the Big One
+
+- **Massively extends the feature the user already likes** (chat)
+- **Only possible because we already have filesystem access** — the codebase path is stored per review, and we already run AST analysis on it. We're sitting on all the data we need.
+- **Differentiated** — no other PM tool lets PMs "talk to their codebase." Developers have Cursor; PMs have nothing.
+- **Leverages every existing primitive**: parsers, analyzers, context graph, storage, findings, LLM providers
+- **Three natural entry points**: (1) standalone codebase chat, (2) review-scoped chat with code, (3) finding drill-down chat
+- **Incremental build path**: Layer 1 (structural index) is nearly free. Layer 2 (file reads) is the core. Layer 3 (flow tracing) is a stretch goal.
 
 ---
 
@@ -242,18 +432,20 @@ A **lightweight impact preview** that runs in seconds (no full LLM review):
 
 | Rank | Feature | Effort | Impact | Uses LLM? |
 |------|---------|--------|--------|------------|
-| 1 | **Finding Drill-Down Chat** | 1–2 days | High | Yes (extends existing chat) |
+| 1 | **Codebase-Aware Chat** (Layer 1: structural) | 2–3 days | Very High | Yes (extends existing chat) |
+| 1b | **Codebase-Aware Chat** (Layer 2: file reads) | 3–4 days | Very High | Yes |
 | 2 | **Smart PRD Gap Detection** | 2–3 days | High | No (pure logic) |
 | 3 | **Review Comparison** | 2–3 days | High | No (pure logic) |
 | 4 | **Finding Export** | 2–3 days | Medium-High | No |
 | 5 | **"What If" Quick Impact** | 3–4 days | High | No (optional) |
 | 6 | **Codebase Security Profile** | 4–5 days | High | No |
+| — | **Codebase-Aware Chat** (Layer 3: flow tracing) | 3–4 days | High | Yes (stretch) |
 
 ### Recommended order:
-1. **Finding Drill-Down Chat** first — lowest effort, highest signal, extends the feature the user already likes
+1. **Codebase-Aware Chat Layer 1+2** first — this is the defining feature. PMs can talk to their codebase like devs talk to Cursor. Layer 1 (structural index from existing State) is nearly free; Layer 2 (smart file retrieval) is the core work.
 2. **Smart PRD Gap Detection** — makes the tool feel intelligent before the user even runs a review
 3. **Review Comparison** — supports the core iterate-on-PRD loop
-4. Then either Export or "What If" depending on user feedback
+4. Then either Export, "What If", or Chat Layer 3 depending on user feedback
 
 ### What NOT to build (from old specs):
 - ~~Review Requests~~ — too workflow-heavy, JIRA-lite territory
