@@ -20,6 +20,11 @@ llm:
     temperature: 0.1
     max_tokens: 4096
 
+  # Prompt repetition: repeat the user prompt so the model gets a second
+  # attention pass over the entire input, improving accuracy with negligible
+  # latency overhead.  Disabled by default; also controllable per-request.
+  prompt_repetition: false
+
 # Codebase Analysis Settings
 codebase:
   # Languages to analyze

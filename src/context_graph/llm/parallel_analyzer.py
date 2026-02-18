@@ -85,24 +85,38 @@ class ParallelLLMAnalyzer:
         openai_model: str = "gpt-5.2",
         anthropic_model: str = "claude-opus-4-5-20251101",
         trace_collector: TraceCollector | None = None,
+        prompt_repetition: bool | None = None,
     ) -> None:
         self.providers: list[LLMProvider] = []
         self.tc: TraceCollector = trace_collector or _noop_collector()
+        self.prompt_repetition = prompt_repetition
         
         if openai_api_key:
-            self.providers.append(OpenAIProvider(
+            provider = OpenAIProvider(
                 api_key=openai_api_key,
                 model=openai_model,
-            ))
+            )
+            if prompt_repetition is not None:
+                provider.prompt_repetition_override = prompt_repetition
+            self.providers.append(provider)
         
         if anthropic_api_key:
-            self.providers.append(AnthropicProvider(
+            provider = AnthropicProvider(
                 api_key=anthropic_api_key,
                 model=anthropic_model,
-            ))
+            )
+            if prompt_repetition is not None:
+                provider.prompt_repetition_override = prompt_repetition
+            self.providers.append(provider)
         
         if not self.providers:
             raise ValueError("At least one API key must be provided")
+
+        if prompt_repetition:
+            self.tc.emit("info", "init",
+                          "Prompt repetition enabled — user prompts will be "
+                          "duplicated for a second attention pass",
+                          prompt_repetition=True)
         
         # Track false positive filter results per dimension (populated after each review)
         self.fp_filter_results: dict[str, FalsePositiveFilterResult] = {}

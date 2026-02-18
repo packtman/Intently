@@ -711,6 +711,7 @@ class FalsePositiveFilter:
         }
         if self.model_override:
             ctx["model_override"] = self.model_override
+        ctx["prompt_repetition"] = False
 
         request = AnalysisRequest(
             analysis_type=AnalysisType.SECURITY_REVIEW,

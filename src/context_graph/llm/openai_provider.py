@@ -54,6 +54,12 @@ class OpenAIProvider(LLMProvider):
         )
         
         user_content = self._build_user_prompt(request)
+
+        # Prompt repetition: duplicate the user content for a second attention pass
+        user_content = self._apply_prompt_repetition(
+            user_content,
+            enabled=self._resolve_prompt_repetition(request.context),
+        )
         
         # Allow per-request model override (e.g. faster model for FP filtering)
         effective_model = (
@@ -332,6 +338,7 @@ class OpenAIProvider(LLMProvider):
             context={
                 "custom_prompt": REFINEMENT_PROMPT,
                 "dimension": dimension,
+                "prompt_repetition": False,
             },
         )
         response = await self.analyze(request)

@@ -66,6 +66,7 @@ class ReviewConfig:
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     model_override: str | None = None  # Per-request LLM model override
+    prompt_repetition: bool | None = None  # Per-request prompt repetition override (None = use feature flag)
     
     # Thresholds
     min_severity: Severity = Severity.LOW
@@ -210,6 +211,8 @@ class SecurityReviewEngine:
                 if self.config.model_override:
                     kwargs["openai_model"] = self.config.model_override
                     kwargs["anthropic_model"] = self.config.model_override
+                if self.config.prompt_repetition is not None:
+                    kwargs["prompt_repetition"] = self.config.prompt_repetition
                 self._llm_analyzer = ParallelLLMAnalyzer(**kwargs)
         return self._llm_analyzer
     
