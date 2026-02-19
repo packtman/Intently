@@ -108,21 +108,22 @@ class ProductChat:
             question, review_id, finding_id=finding_id, codebase_path=codebase_path,
         )
 
-        # 2. Build conversation messages
+        # 2. Generate follow-up suggestions before _build_system_prompt
+        #    (which pops code_snippets/codebase_structure from context)
+        followups = self._suggest_followups(question, context)
+
+        # 3. Build conversation messages
         history = self._conversations.get(conv_id, [])
         history.append(ChatMessage(role="user", content=question))
 
-        # 3. Build the LLM prompt
+        # 4. Build the LLM prompt (mutates context via pop — must be after followups)
         system_prompt = self._build_system_prompt(context)
         messages = [{"role": "system", "content": system_prompt}]
         for msg in history[-10:]:  # Keep last 10 turns
             messages.append({"role": msg.role, "content": msg.content})
 
-        # 4. Call LLM
+        # 5. Call LLM
         answer_text = await self._call_llm(messages)
-
-        # 5. Generate follow-up suggestions
-        followups = self._suggest_followups(question, context)
 
         # 6. Record assistant message
         assistant_msg = ChatMessage(

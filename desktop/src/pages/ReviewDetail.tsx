@@ -739,6 +739,12 @@ function ReviewDetailContent() {
                 commentsEnabled={commentsEnabled}
                 teamAssignmentEnabled={teamAssignmentEnabled}
                 expertFeedbackEnabled={expertFeedbackEnabled}
+                chatEnabled={chatEnabled}
+                onChatAboutFinding={(fId, title) => {
+                  setChatFindingId(fId)
+                  setChatFindingTitle(title)
+                  setChatOpen(true)
+                }}
                 onFindingUpdated={() => refetchDashboard()}
               />
             ))}
@@ -1567,6 +1573,8 @@ function FindingRow({
   commentsEnabled = false,
   teamAssignmentEnabled = false,
   expertFeedbackEnabled = false,
+  chatEnabled = false,
+  onChatAboutFinding,
   onFindingUpdated,
 }: {
   finding: Finding
@@ -1577,6 +1585,8 @@ function FindingRow({
   commentsEnabled?: boolean
   teamAssignmentEnabled?: boolean
   expertFeedbackEnabled?: boolean
+  chatEnabled?: boolean
+  onChatAboutFinding?: (findingId: string, title: string) => void
   onFindingUpdated?: () => void
 }) {
   const severityColors: Record<string, string> = {
@@ -1719,11 +1729,23 @@ function FindingRow({
                 </div>
               )}
 
-              <div className="flex items-center gap-4 pt-2 border-t border-void-700 text-sm">
+              <div className="flex items-center justify-between pt-2 border-t border-void-700 text-sm">
                 <div>
                   <p className="text-xs text-void-500">Confidence</p>
                   <p className="text-white font-medium">{finding.confidence}</p>
                 </div>
+                {chatEnabled && onChatAboutFinding && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onChatAboutFinding(finding.id, finding.title)
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neon-500/10 border border-neon-500/30 text-neon-400 text-xs font-medium hover:bg-neon-500/20 transition-colors"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Ask about this
+                  </button>
+                )}
               </div>
 
               {/* Enhanced Deep Threat Analysis Details */}

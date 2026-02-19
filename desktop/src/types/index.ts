@@ -424,6 +424,7 @@ export interface CollaborationFeatures {
   prd_generator?: boolean
   // P0: Core PM Experience
   product_chat?: boolean
+  codebase_chat?: boolean
   review_requests?: boolean
   impact_graph?: boolean
 }
