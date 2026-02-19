@@ -174,6 +174,7 @@ export interface CollaborationFeatures {
   side_by_side_diff?: boolean
   // P0: Core PM Experience
   product_chat?: boolean
+  codebase_chat?: boolean
   review_requests?: boolean
   impact_graph?: boolean
 }

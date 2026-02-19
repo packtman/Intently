@@ -188,6 +188,8 @@ export default function ReviewDetail() {
   const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool' | 'impact-graph'>('findings')
   const [expertAskModal, setExpertAskModal] = useState<{ isOpen: boolean; predictionId: string; question: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
+  const [chatFindingId, setChatFindingId] = useState<string | undefined>(undefined)
+  const [chatFindingTitle, setChatFindingTitle] = useState<string | undefined>(undefined)
 
   // Fetch collaboration features (to know which features are enabled)
   const { data: collaborationFeatures } = useQuery<CollaborationFeatures>({
@@ -573,6 +575,12 @@ export default function ReviewDetail() {
               commentsEnabled={commentsEnabled}
               teamAssignmentEnabled={teamAssignmentEnabled}
               expertFeedbackEnabled={expertFeedbackEnabled}
+              chatEnabled={chatEnabled}
+              onChatAboutFinding={(findingId, title) => {
+                setChatFindingId(findingId)
+                setChatFindingTitle(title)
+                setChatOpen(true)
+              }}
               queryClient={queryClient}
             />
           )}
@@ -610,7 +618,11 @@ export default function ReviewDetail() {
       {/* Floating Chat Button */}
       {chatEnabled && (
         <button
-          onClick={() => setChatOpen(true)}
+          onClick={() => {
+            setChatFindingId(undefined)
+            setChatFindingTitle(undefined)
+            setChatOpen(true)
+          }}
           className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary-500 text-white shadow-lg 
                      hover:bg-primary-600 transition-all flex items-center justify-center z-40
                      hover:scale-105 active:scale-95"
@@ -624,8 +636,14 @@ export default function ReviewDetail() {
       {chatEnabled && (
         <ChatPanel
           reviewId={id}
+          findingId={chatFindingId}
+          findingTitle={chatFindingTitle}
           isOpen={chatOpen}
-          onClose={() => setChatOpen(false)}
+          onClose={() => {
+            setChatOpen(false)
+            setChatFindingId(undefined)
+            setChatFindingTitle(undefined)
+          }}
         />
       )}
 
@@ -647,6 +665,8 @@ function FindingsTabContent({
   commentsEnabled,
   teamAssignmentEnabled,
   expertFeedbackEnabled,
+  chatEnabled,
+  onChatAboutFinding,
   queryClient,
 }: {
   dashboard: DashboardData
@@ -661,6 +681,8 @@ function FindingsTabContent({
   commentsEnabled: boolean
   teamAssignmentEnabled: boolean
   expertFeedbackEnabled: boolean
+  chatEnabled?: boolean
+  onChatAboutFinding?: (findingId: string, title: string) => void
   queryClient: any
 }) {
   return (
@@ -815,6 +837,8 @@ function FindingsTabContent({
                 commentsEnabled={commentsEnabled}
                 teamAssignmentEnabled={teamAssignmentEnabled}
                 expertFeedbackEnabled={expertFeedbackEnabled}
+                chatEnabled={chatEnabled}
+                onChatAboutFinding={onChatAboutFinding}
                 onFindingUpdated={() => {
                   queryClient.invalidateQueries({ queryKey: ['review-dashboard', id] })
                 }}
@@ -1243,6 +1267,8 @@ function FindingRow({
   commentsEnabled,
   teamAssignmentEnabled,
   expertFeedbackEnabled,
+  chatEnabled,
+  onChatAboutFinding,
   onFindingUpdated,
 }: {
   finding: Finding
@@ -1253,6 +1279,8 @@ function FindingRow({
   commentsEnabled?: boolean
   teamAssignmentEnabled?: boolean
   expertFeedbackEnabled?: boolean
+  chatEnabled?: boolean
+  onChatAboutFinding?: (findingId: string, title: string) => void
   onFindingUpdated?: () => void
 }) {
   const severityColors: Record<string, string> = {
@@ -1423,16 +1451,30 @@ function FindingRow({
               </div>
             )}
 
-            {/* Confidence */}
-            <div className="flex items-center gap-4 pt-2 border-t border-surface-700">
-              <div>
-                <p className="text-xs text-surface-500">Confidence</p>
-                <p className="text-sm text-white font-medium">{finding.confidence}</p>
+            {/* Confidence + Chat */}
+            <div className="flex items-center justify-between pt-2 border-t border-surface-700">
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-xs text-surface-500">Confidence</p>
+                  <p className="text-sm text-white font-medium">{finding.confidence}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-surface-500">Category</p>
+                  <p className="text-sm text-white font-medium">{finding.category}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-surface-500">Category</p>
-                <p className="text-sm text-white font-medium">{finding.category}</p>
-              </div>
+              {chatEnabled && onChatAboutFinding && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onChatAboutFinding(finding.id, finding.title)
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-500/10 border border-primary-500/30 text-primary-400 text-xs font-medium hover:bg-primary-500/20 transition-colors"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Ask about this
+                </button>
+              )}
             </div>
 
             {/* Collaboration Components - only render if features are enabled */}

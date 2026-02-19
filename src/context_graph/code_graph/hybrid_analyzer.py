@@ -115,9 +115,7 @@ class HybridAnalyzer:
         start = time.time()
         
         result = HybridResult()
-        languages = languages or ["python", "typescript", "kotlin"]
         
-        # Discover files if not provided
         if file_paths is None:
             file_paths = self._discover_files(languages)
         
@@ -149,35 +147,74 @@ class HybridAnalyzer:
         
         return result
     
-    def _discover_files(self, languages: list[str]) -> list[Path]:
-        """Discover files to analyze."""
-        extensions = {
+    def _discover_files(self, languages: list[str] | None = None) -> list[Path]:
+        """Discover source files to analyze. If languages is None, discover all supported types."""
+        all_extensions = {
             "python": [".py"],
-            "typescript": [".ts", ".tsx", ".js", ".jsx"],
+            "typescript": [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"],
             "kotlin": [".kt", ".kts"],
+            "go": [".go"],
+            "java": [".java"],
+            "ruby": [".rb"],
+            "php": [".php"],
+            "rust": [".rs"],
+            "c": [".c", ".h"],
+            "cpp": [".cpp", ".cc", ".cxx", ".hpp", ".hxx"],
+            "csharp": [".cs"],
+            "swift": [".swift"],
+            "dart": [".dart"],
         }
         
+        if languages is None:
+            exts_to_scan = [ext for exts in all_extensions.values() for ext in exts]
+        else:
+            exts_to_scan = [ext for lang in languages for ext in all_extensions.get(lang, [])]
+        
         files = []
-        exclude = ["node_modules", "__pycache__", ".git", ".venv", "venv", "dist", "build"]
+        exclude_dirs = {
+            "node_modules", "__pycache__", ".git", ".venv", "venv",
+            "dist", "build", ".next", ".nuxt", "target", "vendor",
+            ".tox", "egg-info", ".eggs", "coverage", ".mypy_cache",
+        }
         
-        for lang in languages:
-            for ext in extensions.get(lang, []):
-                for file_path in self.workspace_path.rglob(f"*{ext}"):
-                    if not any(exc in str(file_path) for exc in exclude):
-                        files.append(file_path)
+        for file_path in self.workspace_path.rglob("*"):
+            if not file_path.is_file():
+                continue
+            if any(part in exclude_dirs for part in file_path.parts):
+                continue
+            if file_path.suffix.lower() in exts_to_scan:
+                files.append(file_path)
         
-        return files[:1000]  # Limit
+        return files[:2000]
     
     def _analyze_file_ast(self, file_path: Path) -> ASTResult | None:
-        """Analyze a single file with AST."""
+        """Analyze a single file with AST or regex depending on language."""
         suffix = file_path.suffix.lower()
         
         if suffix == ".py":
             return self._analyze_python_ast(file_path)
-        elif suffix in [".ts", ".tsx", ".js", ".jsx"]:
+        elif suffix in (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"):
             return self._analyze_typescript_regex(file_path)
-        elif suffix in [".kt", ".kts"]:
+        elif suffix in (".kt", ".kts"):
             return self._analyze_kotlin_regex(file_path)
+        elif suffix == ".go":
+            return self._analyze_go_regex(file_path)
+        elif suffix == ".java":
+            return self._analyze_java_regex(file_path)
+        elif suffix == ".rb":
+            return self._analyze_ruby_regex(file_path)
+        elif suffix == ".rs":
+            return self._analyze_rust_regex(file_path)
+        elif suffix == ".php":
+            return self._analyze_php_regex(file_path)
+        elif suffix in (".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hxx"):
+            return self._analyze_c_regex(file_path)
+        elif suffix == ".cs":
+            return self._analyze_csharp_regex(file_path)
+        elif suffix == ".swift":
+            return self._analyze_swift_regex(file_path)
+        elif suffix == ".dart":
+            return self._analyze_dart_regex(file_path)
         
         return None
     
@@ -243,7 +280,7 @@ class HybridAnalyzer:
         return result
     
     def _analyze_typescript_regex(self, file_path: Path) -> ASTResult:
-        """Analyze TypeScript with regex (fast fallback)."""
+        """Analyze TypeScript/JavaScript with regex patterns."""
         import re
         result = ASTResult(file_path=file_path)
         
@@ -252,38 +289,107 @@ class HybridAnalyzer:
         except Exception:
             return result
         
+        seen_names: set[str] = set()
+        
+        def _line(pos: int) -> int:
+            return content[:pos].count("\n") + 1
+        
         # Classes
-        for match in re.finditer(r'(?:export\s+)?class\s+(\w+)', content):
-            line = content[:match.start()].count("\n") + 1
-            result.classes.append({"name": match.group(1), "line": line})
-        
-        # Functions
-        for match in re.finditer(r'(?:export\s+)?(?:async\s+)?function\s+(\w+)', content):
-            line = content[:match.start()].count("\n") + 1
-            result.functions.append({"name": match.group(1), "line": line})
-        
-        # Arrow functions (const x = () => or const x = async () =>)
-        for match in re.finditer(r'(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>', content):
-            line = content[:match.start()].count("\n") + 1
-            result.functions.append({"name": match.group(1), "line": line})
+        for m in re.finditer(r'(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+(\w+)', content):
+            name = m.group(1)
+            if name not in seen_names:
+                seen_names.add(name)
+                result.classes.append({"name": name, "line": _line(m.start()), "kind": "class"})
         
         # Interfaces
-        for match in re.finditer(r'(?:export\s+)?interface\s+(\w+)', content):
-            line = content[:match.start()].count("\n") + 1
-            result.classes.append({"name": match.group(1), "line": line, "kind": "interface"})
+        for m in re.finditer(r'(?:export\s+)?interface\s+(\w+)', content):
+            name = m.group(1)
+            if name not in seen_names:
+                seen_names.add(name)
+                result.classes.append({"name": name, "line": _line(m.start()), "kind": "interface"})
         
-        # Imports - these are cross-file, mark for LSP
-        for match in re.finditer(r'import\s+.*from\s+[\'"]([^\'"]+)[\'"]', content):
-            line = content[:match.start()].count("\n") + 1
-            result.imports.append({"module": match.group(1), "line": line})
-            # Mark as unresolved - we don't know what's actually exported
-            result.unresolved_calls.append({
-                "name": match.group(1),
-                "line": line,
-                "context": "import resolution",
-            })
+        # Type aliases
+        for m in re.finditer(r'(?:export\s+)?type\s+(\w+)\s*[=<]', content):
+            name = m.group(1)
+            if name not in seen_names:
+                seen_names.add(name)
+                result.classes.append({"name": name, "line": _line(m.start()), "kind": "type"})
+        
+        # Enums
+        for m in re.finditer(r'(?:export\s+)?(?:const\s+)?enum\s+(\w+)', content):
+            name = m.group(1)
+            if name not in seen_names:
+                seen_names.add(name)
+                result.classes.append({"name": name, "line": _line(m.start()), "kind": "enum"})
+        
+        # Named function declarations
+        for m in re.finditer(r'(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)', content):
+            name = m.group(1)
+            decorators = self._detect_ts_route_markers(content, m.start(), name)
+            if name not in seen_names:
+                seen_names.add(name)
+                result.functions.append({"name": name, "line": _line(m.start()), "decorators": decorators})
+        
+        # Arrow functions assigned to const/let/var
+        for m in re.finditer(r'(?:export\s+)?(?:const|let|var)\s+(\w+)\s*(?::\s*[^=]+)?\s*=\s*(?:async\s*)?\(?', content):
+            name = m.group(1)
+            remaining = content[m.end():m.end() + 200]
+            if re.match(r'[^)]*\)\s*(?::\s*[^=]+)?\s*=>', remaining) or '=>' in remaining[:100]:
+                decorators = self._detect_ts_route_markers(content, m.start(), name)
+                if name not in seen_names:
+                    seen_names.add(name)
+                    result.functions.append({"name": name, "line": _line(m.start()), "decorators": decorators})
+        
+        # Express/Hono/Koa route patterns: app.get('/path', ...), router.post('/path', ...)
+        for m in re.finditer(
+            r'(?:app|router|server)\.(get|post|put|delete|patch|all|use)\s*\(\s*[\'"]([^\'"]+)[\'"]',
+            content,
+        ):
+            method = m.group(1).upper()
+            route_path = m.group(2)
+            route_name = f"{method} {route_path}"
+            if route_name not in seen_names:
+                seen_names.add(route_name)
+                result.functions.append({
+                    "name": route_name,
+                    "line": _line(m.start()),
+                    "decorators": [method.lower()],
+                    "route_path": route_path,
+                })
+        
+        # Next.js App Router: export async function GET/POST/PUT/DELETE/PATCH
+        for m in re.finditer(r'export\s+(?:async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b', content):
+            method = m.group(1)
+            route_name = f"Next.js {method} handler"
+            rel = str(file_path.relative_to(self.workspace_path)) if file_path.is_relative_to(self.workspace_path) else str(file_path)
+            if route_name not in seen_names:
+                seen_names.add(route_name)
+                result.functions.append({
+                    "name": route_name,
+                    "line": _line(m.start()),
+                    "decorators": [method.lower()],
+                    "route_path": rel,
+                })
+        
+        # Imports
+        for m in re.finditer(r'import\s+.*?from\s+[\'"]([^\'"]+)[\'"]', content):
+            result.imports.append({"module": m.group(1), "line": _line(m.start())})
         
         return result
+    
+    @staticmethod
+    def _detect_ts_route_markers(content: str, pos: int, name: str) -> list[str]:
+        """Detect if a TS/JS function is a route handler by checking decorators or context."""
+        markers: list[str] = []
+        # Check for NestJS-style decorators above the function
+        preceding = content[max(0, pos - 300):pos]
+        import re
+        for m in re.finditer(r'@(Get|Post|Put|Delete|Patch|Controller|Injectable|Module)\b', preceding):
+            markers.append(m.group(1).lower())
+        # Check if function name itself is a HTTP method (Next.js App Router)
+        if name.upper() in ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"):
+            markers.append(name.lower())
+        return markers
     
     def _analyze_kotlin_regex(self, file_path: Path) -> ASTResult:
         """Analyze Kotlin with regex (fast fallback)."""
@@ -305,6 +411,233 @@ class HybridAnalyzer:
             line = content[:match.start()].count("\n") + 1
             result.functions.append({"name": match.group(1), "line": line})
         
+        return result
+    
+    def _analyze_go_regex(self, file_path: Path) -> ASTResult:
+        """Analyze Go source files."""
+        import re
+        result = ASTResult(file_path=file_path)
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return result
+        
+        def _line(pos: int) -> int:
+            return content[:pos].count("\n") + 1
+        
+        for m in re.finditer(r'type\s+(\w+)\s+struct\b', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "struct"})
+        for m in re.finditer(r'type\s+(\w+)\s+interface\b', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "interface"})
+        for m in re.finditer(r'func\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)\s*\(', content):
+            result.functions.append({"name": m.group(1), "line": _line(m.start())})
+        # Gin/Echo/Chi route patterns
+        for m in re.finditer(r'\.(GET|POST|PUT|DELETE|PATCH|Handle|HandleFunc)\s*\(\s*[\'"]([^\'"]+)[\'"]', content):
+            method = m.group(1).upper()
+            result.functions.append({
+                "name": f"{method} {m.group(2)}",
+                "line": _line(m.start()),
+                "decorators": [method.lower()],
+                "route_path": m.group(2),
+            })
+        return result
+    
+    def _analyze_java_regex(self, file_path: Path) -> ASTResult:
+        """Analyze Java source files."""
+        import re
+        result = ASTResult(file_path=file_path)
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return result
+        
+        def _line(pos: int) -> int:
+            return content[:pos].count("\n") + 1
+        
+        for m in re.finditer(r'(?:public|private|protected)?\s*(?:abstract\s+)?(?:class|record)\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start())})
+        for m in re.finditer(r'(?:public|private|protected)?\s*interface\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "interface"})
+        for m in re.finditer(r'(?:public|private|protected)\s+(?:static\s+)?(?:[\w<>\[\],\s]+)\s+(\w+)\s*\(', content):
+            name = m.group(1)
+            if name not in ("if", "for", "while", "switch", "catch", "class", "new"):
+                decorators: list[str] = []
+                preceding = content[max(0, m.start() - 200):m.start()]
+                for dm in re.finditer(r'@(GetMapping|PostMapping|PutMapping|DeleteMapping|RequestMapping|GET|POST|PUT|DELETE)\b', preceding):
+                    decorators.append(dm.group(1).lower().replace("mapping", ""))
+                result.functions.append({"name": name, "line": _line(m.start()), "decorators": decorators})
+        return result
+    
+    def _analyze_ruby_regex(self, file_path: Path) -> ASTResult:
+        """Analyze Ruby source files."""
+        import re
+        result = ASTResult(file_path=file_path)
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return result
+        
+        def _line(pos: int) -> int:
+            return content[:pos].count("\n") + 1
+        
+        for m in re.finditer(r'class\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start())})
+        for m in re.finditer(r'module\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "module"})
+        for m in re.finditer(r'def\s+(\w+[?!]?)', content):
+            result.functions.append({"name": m.group(1), "line": _line(m.start())})
+        # Rails routes
+        for m in re.finditer(r'(get|post|put|patch|delete)\s+[\'"]([^\'"]+)[\'"]', content):
+            result.functions.append({
+                "name": f"{m.group(1).upper()} {m.group(2)}",
+                "line": _line(m.start()),
+                "decorators": [m.group(1)],
+                "route_path": m.group(2),
+            })
+        return result
+    
+    def _analyze_rust_regex(self, file_path: Path) -> ASTResult:
+        """Analyze Rust source files."""
+        import re
+        result = ASTResult(file_path=file_path)
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return result
+        
+        def _line(pos: int) -> int:
+            return content[:pos].count("\n") + 1
+        
+        for m in re.finditer(r'(?:pub\s+)?struct\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "struct"})
+        for m in re.finditer(r'(?:pub\s+)?enum\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "enum"})
+        for m in re.finditer(r'(?:pub\s+)?trait\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "trait"})
+        for m in re.finditer(r'(?:pub\s+)?(?:async\s+)?fn\s+(\w+)', content):
+            decorators: list[str] = []
+            preceding = content[max(0, m.start() - 200):m.start()]
+            for dm in re.finditer(r'#\[(get|post|put|delete|patch)\s*\(', preceding):
+                decorators.append(dm.group(1))
+            result.functions.append({"name": m.group(1), "line": _line(m.start()), "decorators": decorators})
+        return result
+    
+    def _analyze_php_regex(self, file_path: Path) -> ASTResult:
+        """Analyze PHP source files."""
+        import re
+        result = ASTResult(file_path=file_path)
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return result
+        
+        def _line(pos: int) -> int:
+            return content[:pos].count("\n") + 1
+        
+        for m in re.finditer(r'(?:abstract\s+)?class\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start())})
+        for m in re.finditer(r'interface\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "interface"})
+        for m in re.finditer(r'(?:public|private|protected|static|\s)+function\s+(\w+)', content):
+            result.functions.append({"name": m.group(1), "line": _line(m.start())})
+        for m in re.finditer(r'function\s+(\w+)\s*\(', content):
+            result.functions.append({"name": m.group(1), "line": _line(m.start())})
+        # Laravel routes
+        for m in re.finditer(r'Route::(get|post|put|patch|delete)\s*\(\s*[\'"]([^\'"]+)[\'"]', content):
+            result.functions.append({
+                "name": f"{m.group(1).upper()} {m.group(2)}",
+                "line": _line(m.start()),
+                "decorators": [m.group(1)],
+                "route_path": m.group(2),
+            })
+        return result
+    
+    def _analyze_c_regex(self, file_path: Path) -> ASTResult:
+        """Analyze C/C++ source files."""
+        import re
+        result = ASTResult(file_path=file_path)
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return result
+        
+        def _line(pos: int) -> int:
+            return content[:pos].count("\n") + 1
+        
+        for m in re.finditer(r'(?:class|struct)\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start())})
+        for m in re.finditer(r'(?:[\w*&:<>]+\s+)+(\w+)\s*\([^)]*\)\s*(?:const\s*)?(?:override\s*)?(?:noexcept\s*)?{', content):
+            name = m.group(1)
+            if name not in ("if", "for", "while", "switch", "catch", "return"):
+                result.functions.append({"name": name, "line": _line(m.start())})
+        return result
+    
+    def _analyze_csharp_regex(self, file_path: Path) -> ASTResult:
+        """Analyze C# source files."""
+        import re
+        result = ASTResult(file_path=file_path)
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return result
+        
+        def _line(pos: int) -> int:
+            return content[:pos].count("\n") + 1
+        
+        for m in re.finditer(r'(?:public|internal|private|protected)?\s*(?:abstract\s+|static\s+)?class\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start())})
+        for m in re.finditer(r'interface\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "interface"})
+        for m in re.finditer(r'(?:public|private|protected|internal)\s+(?:static\s+)?(?:async\s+)?(?:[\w<>\[\]?]+)\s+(\w+)\s*\(', content):
+            name = m.group(1)
+            if name not in ("if", "for", "while", "switch", "catch", "class", "new"):
+                decorators: list[str] = []
+                preceding = content[max(0, m.start() - 200):m.start()]
+                for dm in re.finditer(r'\[(HttpGet|HttpPost|HttpPut|HttpDelete|HttpPatch|Route)\b', preceding):
+                    decorators.append(dm.group(1).lower().replace("http", ""))
+                result.functions.append({"name": name, "line": _line(m.start()), "decorators": decorators})
+        return result
+    
+    def _analyze_swift_regex(self, file_path: Path) -> ASTResult:
+        """Analyze Swift source files."""
+        import re
+        result = ASTResult(file_path=file_path)
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return result
+        
+        def _line(pos: int) -> int:
+            return content[:pos].count("\n") + 1
+        
+        for m in re.finditer(r'(?:class|struct)\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start())})
+        for m in re.finditer(r'protocol\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "protocol"})
+        for m in re.finditer(r'(?:public\s+|private\s+|internal\s+|open\s+)?(?:static\s+)?func\s+(\w+)', content):
+            result.functions.append({"name": m.group(1), "line": _line(m.start())})
+        for m in re.finditer(r'enum\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start()), "kind": "enum"})
+        return result
+    
+    def _analyze_dart_regex(self, file_path: Path) -> ASTResult:
+        """Analyze Dart source files."""
+        import re
+        result = ASTResult(file_path=file_path)
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except Exception:
+            return result
+        
+        def _line(pos: int) -> int:
+            return content[:pos].count("\n") + 1
+        
+        for m in re.finditer(r'(?:abstract\s+)?class\s+(\w+)', content):
+            result.classes.append({"name": m.group(1), "line": _line(m.start())})
+        for m in re.finditer(r'(?:Future|void|int|String|bool|double|dynamic|[\w<>]+)\s+(\w+)\s*\(', content):
+            name = m.group(1)
+            if name not in ("if", "for", "while", "switch", "catch", "return", "class"):
+                result.functions.append({"name": name, "line": _line(m.start())})
         return result
     
     def _get_name(self, node: ast.expr | None) -> str:

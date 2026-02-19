@@ -123,6 +123,8 @@ function ReviewDetailContent() {
   const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool' | 'impact-graph'>('findings')
   const [expertAskModal, setExpertAskModal] = useState<{ isOpen: boolean; predictionId: string; question: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
+  const [chatFindingId, setChatFindingId] = useState<string | undefined>(undefined)
+  const [chatFindingTitle, setChatFindingTitle] = useState<string | undefined>(undefined)
   
   // Track if we've triggered a manual refetch to avoid infinite loops
   const [manualRefetchTriggered, setManualRefetchTriggered] = useState(false)
@@ -737,6 +739,12 @@ function ReviewDetailContent() {
                 commentsEnabled={commentsEnabled}
                 teamAssignmentEnabled={teamAssignmentEnabled}
                 expertFeedbackEnabled={expertFeedbackEnabled}
+                chatEnabled={chatEnabled}
+                onChatAboutFinding={(fId, title) => {
+                  setChatFindingId(fId)
+                  setChatFindingTitle(title)
+                  setChatOpen(true)
+                }}
                 onFindingUpdated={() => refetchDashboard()}
               />
             ))}
@@ -764,7 +772,11 @@ function ReviewDetailContent() {
       {/* Floating Chat Button */}
       {chatEnabled && (
         <button
-          onClick={() => setChatOpen(true)}
+          onClick={() => {
+            setChatFindingId(undefined)
+            setChatFindingTitle(undefined)
+            setChatOpen(true)
+          }}
           className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-neon-500 text-void-950 shadow-lg 
                      hover:bg-neon-400 transition-all flex items-center justify-center z-40
                      hover:scale-105 active:scale-95 shadow-neon-500/20"
@@ -778,8 +790,14 @@ function ReviewDetailContent() {
       {chatEnabled && (
         <ChatPanel
           reviewId={id}
+          findingId={chatFindingId}
+          findingTitle={chatFindingTitle}
           isOpen={chatOpen}
-          onClose={() => setChatOpen(false)}
+          onClose={() => {
+            setChatOpen(false)
+            setChatFindingId(undefined)
+            setChatFindingTitle(undefined)
+          }}
         />
       )}
 
@@ -1555,6 +1573,8 @@ function FindingRow({
   commentsEnabled = false,
   teamAssignmentEnabled = false,
   expertFeedbackEnabled = false,
+  chatEnabled = false,
+  onChatAboutFinding,
   onFindingUpdated,
 }: {
   finding: Finding
@@ -1565,6 +1585,8 @@ function FindingRow({
   commentsEnabled?: boolean
   teamAssignmentEnabled?: boolean
   expertFeedbackEnabled?: boolean
+  chatEnabled?: boolean
+  onChatAboutFinding?: (findingId: string, title: string) => void
   onFindingUpdated?: () => void
 }) {
   const severityColors: Record<string, string> = {
@@ -1707,11 +1729,23 @@ function FindingRow({
                 </div>
               )}
 
-              <div className="flex items-center gap-4 pt-2 border-t border-void-700 text-sm">
+              <div className="flex items-center justify-between pt-2 border-t border-void-700 text-sm">
                 <div>
                   <p className="text-xs text-void-500">Confidence</p>
                   <p className="text-white font-medium">{finding.confidence}</p>
                 </div>
+                {chatEnabled && onChatAboutFinding && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onChatAboutFinding(finding.id, finding.title)
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neon-500/10 border border-neon-500/30 text-neon-400 text-xs font-medium hover:bg-neon-500/20 transition-colors"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    Ask about this
+                  </button>
+                )}
               </div>
 
               {/* Enhanced Deep Threat Analysis Details */}
