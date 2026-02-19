@@ -61,6 +61,9 @@ Environment Variables:
 
     # Semantic Search (embedding-based code search for chat)
     FEATURE_SEMANTIC_SEARCH=true
+
+    # Codebase Security Profile (persistent profile across reviews)
+    FEATURE_CODEBASE_PROFILE=true
 """
 
 from __future__ import annotations
@@ -289,6 +292,14 @@ class FeatureFlags:
     # Enable product health overview
     enable_product_overview: bool = True
 
+    # ==================== Codebase Security Profile ====================
+    # Persistent codebase profile that accumulates across reviews
+
+    # Enable codebase security profile
+    # Builds a standing profile with attack surface, entity inventory,
+    # cumulative findings, coverage, and historical trends
+    enable_codebase_profile: bool = True
+
     # ==================== Scan Tracing ====================
     # Real-time trace log streaming for scan observability
     
@@ -361,6 +372,8 @@ class FeatureFlags:
             enable_approval_gates=_env_bool("FEATURE_APPROVAL_GATES", True),
             enable_review_analytics=_env_bool("FEATURE_REVIEW_ANALYTICS", True),
             enable_product_overview=_env_bool("FEATURE_PRODUCT_OVERVIEW", True),
+            # Codebase security profile
+            enable_codebase_profile=_env_bool("FEATURE_CODEBASE_PROFILE", True),
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
         )
@@ -422,6 +435,8 @@ class FeatureFlags:
             enable_approval_gates=True,
             enable_review_analytics=True,
             enable_product_overview=True,
+            # Codebase security profile
+            enable_codebase_profile=True,
             # Scan tracing
             enable_scan_tracing=True,
         )
@@ -482,6 +497,8 @@ class FeatureFlags:
             "approval_gates": self.enable_approval_gates,
             "review_analytics": self.enable_review_analytics,
             "product_overview": self.enable_product_overview,
+            # Codebase security profile
+            "codebase_profile": self.enable_codebase_profile,
             # Scan tracing
             "scan_tracing": self.enable_scan_tracing,
         }
@@ -571,6 +588,9 @@ class FeatureFlags:
             enabled.append("review_analytics")
         if self.enable_product_overview:
             enabled.append("product_overview")
+        # Codebase security profile
+        if self.enable_codebase_profile:
+            enabled.append("codebase_profile")
         # Scan tracing
         if self.enable_scan_tracing:
             enabled.append("scan_tracing")
