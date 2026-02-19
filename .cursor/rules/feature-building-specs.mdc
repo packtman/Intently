@@ -1,0 +1,75 @@
+---
+description: Agent MUST propose a structured implementation plan before writing any code for new features
+alwaysApply: true
+---
+
+# Feature Building — Plan First, Then Build
+
+## MANDATORY: Propose Before Coding
+
+When the task involves building a new feature or making a significant change (not a bug fix or trivial edit), you MUST:
+
+1. **Read the relevant existing files** to understand current architecture
+2. **Write the implementation plan** as a `.md` file in `docs/specs/` using the template below
+3. **Commit and push** the spec file
+4. **Proceed immediately** to implement the plan — do NOT wait for user approval
+5. Implement the plan, commit, and push
+
+The spec file serves as an async review artifact. The user can review it at their convenience, request changes, or approve it after the fact. Name the file descriptively, e.g. `docs/specs/CODEBASE_PROFILE_SPEC.md`.
+
+If the user's prompt already contains a detailed spec with file action tables, constraints, and implementation order, skip the proposal and start building immediately — the spec IS the plan.
+
+## Implementation Plan Template
+
+When writing a spec, use this structure:
+
+### Architecture Context
+- Which existing files are involved
+- What patterns to follow (reference specific files)
+- What must NOT break
+
+### Implementation Order (dependency-first)
+Numbered list of what to build and in what order:
+1. Core module/logic (no dependencies on other new code)
+2. Integration/wiring into existing code
+3. Frontend changes (BOTH `frontend/` and `desktop/`)
+4. Feature flag (all 5 locations in `features.py`)
+5. Dependencies (`pyproject.toml`)
+
+### File Action Table
+| File | Action |
+|------|--------|
+| `src/foo/bar.py` | **CREATE** — what it does |
+| `src/foo/baz.py` | **MODIFY** — what changes |
+| `frontend/src/components/Foo.tsx` | **MODIFY** — what changes |
+| `desktop/src/components/Foo.tsx` | **MODIFY** — same changes + backendUrl |
+
+### Key Implementation Details
+- Before/after snippets for critical modifications
+- Error handling and fallback behavior
+- Edge cases (feature disabled, missing API keys, large inputs)
+
+### Constraints Checklist
+- [ ] Type hints (`from __future__ import annotations`)
+- [ ] Feature flag in all 5 locations (class default, from_env, all_enabled, to_dict, get_enabled_features)
+- [ ] Dual-app: frontend AND desktop updated
+- [ ] Desktop uses `${backendUrl}`, frontend uses relative URLs
+- [ ] Lazy imports for heavy/optional dependencies
+- [ ] No breaking changes to existing APIs
+- [ ] Dependencies added to `pyproject.toml` (NOT requirements.txt)
+
+### Verification Plan
+- How to test it works
+- What backward compatibility to check
+
+## When to Skip the Plan
+
+Go straight to implementation (no proposal needed) when:
+- The user already provided a detailed spec with all the above information
+- It's a bug fix with a clear cause and fix
+- It's a trivial change (rename, typo, style fix, adding a comment)
+- The user explicitly says "just do it" or "implement directly"
+
+## Why This Matters
+
+This project has conventions that are easy to miss (5-location feature flags, dual frontend apps, desktop backendUrl). A plan catches these gaps BEFORE code is written, saving multiple correction rounds. Writing it as a `.md` file means the agent doesn't block waiting for approval and the user has a persistent artifact to review.
