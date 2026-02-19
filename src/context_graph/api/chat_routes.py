@@ -173,6 +173,8 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
             question=request.question,
             review_id=request.review_id,
             conversation_id=request.conversation_id,
+            finding_id=request.finding_id,
+            codebase_path=request.codebase_path,
             vector_index=vi,
         ):
             yield event

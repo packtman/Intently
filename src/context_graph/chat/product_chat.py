@@ -161,13 +161,17 @@ class ProductChat:
         question: str,
         review_id: str | None = None,
         conversation_id: str | None = None,
+        finding_id: str | None = None,
+        codebase_path: str | None = None,
         vector_index: Any | None = None,
     ) -> AsyncIterator[str]:
         """Stream an answer as SSE events."""
 
         conv_id = conversation_id or str(uuid4())
 
-        context, citations = await self._gather_context(question, review_id)
+        context, citations = await self._gather_context(
+            question, review_id, finding_id=finding_id, codebase_path=codebase_path,
+        )
         self._inject_codebase_context(question, context, citations, vector_index)
 
         history = self._conversations.get(conv_id, [])
@@ -427,13 +431,17 @@ class ProductChat:
     def _build_system_prompt(self, context: dict[str, Any]) -> str:
         """Build a grounded system prompt from gathered context."""
 
-        has_code = "code_snippets" in context or "codebase_structure" in context
+        has_code = any(k in context for k in (
+            "code_snippets", "codebase_structure", "codebase_snippets", "codebase_summary",
+        ))
         has_finding_focus = "focused_finding" in context
 
         # Build context in sections to stay within token limits
         # Keep code snippets separate so they render cleanly
         code_snippets = context.pop("code_snippets", None)
         codebase_structure = context.pop("codebase_structure", None)
+        codebase_snippets = context.pop("codebase_snippets", None)
+        codebase_summary = context.pop("codebase_summary", None)
 
         context_block = json.dumps(context, indent=2, default=str)
 
@@ -443,6 +451,9 @@ class ProductChat:
             code_section += json.dumps(codebase_structure, indent=2, default=str)
             code_section += "\n```"
 
+        if codebase_summary:
+            code_section += f"\n\nCODEBASE SUMMARY: {codebase_summary}"
+
         if code_snippets:
             code_section += "\n\nRELEVANT CODE SNIPPETS:"
             for snippet in code_snippets:
@@ -450,6 +461,9 @@ class ProductChat:
                 if snippet.get("symbol"):
                     code_section += f" ({snippet['type']}: {snippet['symbol']})"
                 code_section += f" ---\n```\n{snippet['code']}\n```"
+
+        if codebase_snippets:
+            code_section += f"\n\nRELEVANT CODE SNIPPETS:\n{codebase_snippets}"
 
         finding_instruction = ""
         if has_finding_focus:

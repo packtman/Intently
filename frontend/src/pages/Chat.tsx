@@ -27,12 +27,11 @@ interface ChatMessage {
 }
 
 interface CodebaseInfo {
-  codebase_path: string
-  total_indexed_symbols: number
-  endpoints: Array<{ name: string; method: string; file: string }>
-  data_models: Array<{ name: string; file: string }>
-  key_classes: Array<{ name: string; file: string }>
-  key_functions: Array<{ name: string; file: string }>
+  files_analyzed: number
+  classes: number
+  functions: number
+  embedding_status: string
+  embedding_chunks: number
 }
 
 export default function Chat() {
@@ -46,6 +45,7 @@ export default function Chat() {
   const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const pathInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -143,8 +143,15 @@ export default function Chat() {
         </label>
         <div className="flex gap-3">
           <div className="relative flex-1">
-            <FolderOpen className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500" />
+            <button
+              type="button"
+              onClick={() => pathInputRef.current?.focus()}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-500 hover:text-primary-400 transition-colors cursor-pointer"
+            >
+              <FolderOpen className="w-5 h-5" />
+            </button>
             <input
+              ref={pathInputRef}
               type="text"
               value={codebasePath}
               onChange={e => setCodebasePath(e.target.value)}
@@ -185,24 +192,23 @@ export default function Chat() {
             <div className="flex items-center gap-2 mb-3">
               <Code className="w-4 h-4 text-primary-400" />
               <span className="text-sm font-medium text-primary-400">
-                Codebase indexed: {codebaseInfo.total_indexed_symbols} symbols
+                Codebase indexed · {codebaseInfo.files_analyzed} files
               </span>
+              {codebaseInfo.embedding_status === 'ready' && (
+                <span className="text-xs text-cyan-400 ml-auto">⚡ Semantic search ready</span>
+              )}
             </div>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="text-center p-2 bg-surface-800/50 rounded-lg">
-                <p className="text-lg font-bold text-white">{codebaseInfo.endpoints.length}</p>
-                <p className="text-xs text-surface-400">Endpoints</p>
+                <p className="text-lg font-bold text-white">{codebaseInfo.files_analyzed}</p>
+                <p className="text-xs text-surface-400">Files</p>
               </div>
               <div className="text-center p-2 bg-surface-800/50 rounded-lg">
-                <p className="text-lg font-bold text-white">{codebaseInfo.data_models.length}</p>
-                <p className="text-xs text-surface-400">Models</p>
-              </div>
-              <div className="text-center p-2 bg-surface-800/50 rounded-lg">
-                <p className="text-lg font-bold text-white">{codebaseInfo.key_classes.length}</p>
+                <p className="text-lg font-bold text-white">{codebaseInfo.classes}</p>
                 <p className="text-xs text-surface-400">Classes</p>
               </div>
               <div className="text-center p-2 bg-surface-800/50 rounded-lg">
-                <p className="text-lg font-bold text-white">{codebaseInfo.key_functions.length}</p>
+                <p className="text-lg font-bold text-white">{codebaseInfo.functions}</p>
                 <p className="text-xs text-surface-400">Functions</p>
               </div>
             </div>
