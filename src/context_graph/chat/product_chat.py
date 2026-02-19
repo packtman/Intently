@@ -11,14 +11,26 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from context_graph.storage.base import ReviewStorage, CollaborationStorage
 
 logger = logging.getLogger(__name__)
+
+_vector_index_cache: dict[str, Any] = {}
+
+
+def _get_cached_vector_index(codebase_path: str) -> Any | None:
+    return _vector_index_cache.get(codebase_path)
+
+
+def set_cached_vector_index(codebase_path: str, index: Any) -> None:
+    _vector_index_cache[codebase_path] = index
 
 
 @dataclass
@@ -83,6 +95,7 @@ class ProductChat:
         question: str,
         review_id: str | None = None,
         conversation_id: str | None = None,
+        vector_index: Any | None = None,
     ) -> ChatResponse:
         """Answer a product question using existing data + LLM."""
 
@@ -90,6 +103,9 @@ class ProductChat:
 
         # 1. Gather grounded context from storage
         context, citations = await self._gather_context(question, review_id)
+
+        # 1b. Inject codebase context if available
+        self._inject_codebase_context(question, context, citations, vector_index)
 
         # 2. Build conversation messages
         history = self._conversations.get(conv_id, [])
@@ -122,6 +138,50 @@ class ProductChat:
             suggested_followups=followups,
             conversation_id=conv_id,
         )
+
+    async def answer_stream(
+        self,
+        question: str,
+        review_id: str | None = None,
+        conversation_id: str | None = None,
+        vector_index: Any | None = None,
+    ) -> AsyncIterator[str]:
+        """Stream an answer as SSE events."""
+
+        conv_id = conversation_id or str(uuid4())
+
+        context, citations = await self._gather_context(question, review_id)
+        self._inject_codebase_context(question, context, citations, vector_index)
+
+        history = self._conversations.get(conv_id, [])
+        history.append(ChatMessage(role="user", content=question))
+
+        system_prompt = self._build_system_prompt(context)
+        messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+        for msg in history[-10:]:
+            messages.append({"role": msg.role, "content": msg.content})
+
+        followups = self._suggest_followups(question, context)
+
+        full_answer = ""
+        try:
+            async for token in self._stream_llm(messages):
+                full_answer += token
+                yield f"data: {json.dumps({'token': token})}\n\n"
+        except Exception as exc:
+            logger.error("Streaming LLM failed: %s", exc)
+            error_msg = f"I encountered an error: {exc}"
+            yield f"data: {json.dumps({'token': error_msg})}\n\n"
+            full_answer = error_msg
+
+        citation_dicts = [
+            {"type": c.type, "id": c.id, "text": c.text, "url": c.url}
+            for c in citations
+        ]
+        yield f"data: {json.dumps({'done': True, 'citations': citation_dicts, 'suggested_followups': followups, 'conversation_id': conv_id})}\n\n"
+
+        history.append(ChatMessage(role="assistant", content=full_answer, citations=citations))
+        self._conversations[conv_id] = history
 
     # ------------------------------------------------------------------
     # Context gathering — queries existing storage
@@ -220,6 +280,55 @@ class ProductChat:
         return context, citations
 
     # ------------------------------------------------------------------
+    # Codebase context injection
+    # ------------------------------------------------------------------
+
+    def _inject_codebase_context(
+        self,
+        question: str,
+        context: dict[str, Any],
+        citations: list[Citation],
+        vector_index: Any | None = None,
+    ) -> None:
+        """Search the codebase index and inject matching snippets into context."""
+        from context_graph.config.features import get_features
+
+        codebase_states = getattr(self, "_codebase_states", {})
+        if not codebase_states:
+            return
+
+        for cb_path, state in codebase_states.items():
+            from context_graph.chat.codebase_reader import CodebaseReader
+
+            vi = vector_index
+            if vi is None and get_features().enable_semantic_search:
+                vi = _get_cached_vector_index(str(cb_path))
+
+            reader = CodebaseReader(cb_path, state, vector_index=vi)
+
+            if hasattr(reader, "vector_index") and reader.vector_index is not None and get_features().enable_semantic_search:
+                snippets = reader.hybrid_search(question, max_results=10)
+            else:
+                snippets = reader.search(question, max_results=5)
+
+            if snippets:
+                code_blocks = []
+                for s in snippets:
+                    code_blocks.append(
+                        f"### {s.file_path} (lines {s.start_line}-{s.end_line})"
+                        + (f" — {s.symbol_name}" if s.symbol_name else "")
+                        + f"\n```\n{s.text}\n```"
+                    )
+                    citations.append(Citation(
+                        type="code",
+                        id=f"{s.file_path}:{s.start_line}",
+                        text=f"{s.file_path}:{s.start_line}-{s.end_line}"
+                        + (f" ({s.symbol_name})" if s.symbol_name else ""),
+                    ))
+                context["codebase_snippets"] = "\n\n".join(code_blocks)
+                context["codebase_summary"] = reader.get_structure_summary()
+
+    # ------------------------------------------------------------------
     # LLM interaction
     # ------------------------------------------------------------------
 
@@ -306,6 +415,58 @@ Answer the user's question using the above context. Cite specific reviews, findi
             "Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable the chat feature.\n\n"
             "In the meantime, you can explore your review data through the dashboard."
         )
+
+    # ------------------------------------------------------------------
+    # Streaming LLM
+    # ------------------------------------------------------------------
+
+    async def _stream_llm(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        if self._openai_key:
+            async for token in self._stream_openai(messages):
+                yield token
+        elif self._anthropic_key:
+            async for token in self._stream_anthropic(messages):
+                yield token
+        else:
+            yield self._fallback_response(messages)
+
+    async def _stream_openai(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=self._openai_key)
+        response = await client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2048,
+            stream=True,
+        )
+        async for chunk in response:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
+
+    async def _stream_anthropic(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        from anthropic import AsyncAnthropic
+
+        client = AsyncAnthropic(api_key=self._anthropic_key)
+        system = ""
+        chat_messages = []
+        for m in messages:
+            if m["role"] == "system":
+                system = m["content"]
+            else:
+                chat_messages.append(m)
+
+        async with client.messages.stream(
+            model="claude-haiku-4-5-20251001",
+            system=system,
+            messages=chat_messages,
+            max_tokens=2048,
+            temperature=0.3,
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text
 
     # ------------------------------------------------------------------
     # Follow-up suggestions
