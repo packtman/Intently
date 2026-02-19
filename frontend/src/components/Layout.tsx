@@ -12,6 +12,7 @@ import {
   Settings,
   BarChart3,
   MessageSquare,
+  Server,
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -27,6 +28,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/bulk-analysis', icon: Layers, label: 'Bulk Analysis' },
     { path: '/prd-generator', icon: FileText, label: 'PRD Generator' },
     { path: '/chat', icon: MessageSquare, label: 'Codebase Chat' },
+    { path: '/codebase-profile', icon: Server, label: 'Codebase Profile' },
     { path: '/analytics', icon: BarChart3, label: 'Analytics' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ]
