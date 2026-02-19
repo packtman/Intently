@@ -14,6 +14,7 @@ import {
   Sparkles,
   BarChart3,
   MessageSquare,
+  Server,
 } from 'lucide-react'
 import { useBackend } from '../hooks/useBackend'
 
@@ -32,6 +33,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/bulk', label: 'Bulk Analysis', icon: Layers },
     { path: '/generate', label: 'PRD Generator', icon: Sparkles },
     { path: '/chat', label: 'Codebase Chat', icon: MessageSquare },
+    { path: '/codebase-profile', label: 'Codebase Profile', icon: Server },
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/settings', label: 'Settings', icon: Settings },
   ]

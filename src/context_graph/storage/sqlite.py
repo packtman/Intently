@@ -698,6 +698,25 @@ CREATE TABLE IF NOT EXISTS patterns (
 CREATE INDEX IF NOT EXISTS idx_patterns_type ON patterns(pattern_type);
 """
 
+CODEBASE_PROFILES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS codebase_profiles (
+    id TEXT PRIMARY KEY,
+    codebase_path TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    attack_surface_json TEXT NOT NULL,
+    entity_inventory_json TEXT NOT NULL,
+    cumulative_findings_json TEXT NOT NULL,
+    coverage_json TEXT NOT NULL,
+    historical_trend_json TEXT NOT NULL,
+    review_count INTEGER DEFAULT 0,
+    last_review_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_codebase_profiles_path ON codebase_profiles(codebase_path);
+"""
+
 SCHEMA_VERSION_TABLE = """
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY
@@ -974,6 +993,7 @@ class SQLiteCollaborationStorage(CollaborationStorage):
             await db.executescript(REVIEW_REQUESTS_SCHEMA)
             await db.executescript(CONSENSUS_VOTES_SCHEMA)
             await db.executescript(PATTERNS_SCHEMA)
+            await db.executescript(CODEBASE_PROFILES_SCHEMA)
             await db.commit()
         
         self._initialized = True
@@ -1711,6 +1731,149 @@ class SQLiteCollaborationStorage(CollaborationStorage):
             "by_type": by_type,
             "by_decision": by_decision,
             "most_applied_patterns": most_applied,
+        }
+    
+    # ==================== Codebase Security Profile ====================
+    
+    async def save_codebase_profile(
+        self,
+        profile_id: str,
+        codebase_path: str,
+        display_name: str,
+        attack_surface: dict[str, Any],
+        entity_inventory: dict[str, Any],
+        cumulative_findings: dict[str, Any],
+        coverage: dict[str, Any],
+        historical_trend: dict[str, Any],
+        review_count: int,
+        last_review_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Save or update a codebase security profile."""
+        await self._ensure_initialized()
+        
+        now = datetime.now().isoformat()
+        
+        async with aiosqlite.connect(self.db_path) as db:
+            # Check if profile exists for created_at
+            async with db.execute(
+                "SELECT created_at FROM codebase_profiles WHERE id = ?", (profile_id,)
+            ) as cursor:
+                existing = await cursor.fetchone()
+            
+            created_at = existing[0] if existing else now
+            
+            await db.execute(
+                """
+                INSERT OR REPLACE INTO codebase_profiles 
+                (id, codebase_path, display_name, attack_surface_json, entity_inventory_json,
+                 cumulative_findings_json, coverage_json, historical_trend_json,
+                 review_count, last_review_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    profile_id,
+                    codebase_path,
+                    display_name,
+                    json.dumps(attack_surface),
+                    json.dumps(entity_inventory),
+                    json.dumps(cumulative_findings),
+                    json.dumps(coverage),
+                    json.dumps(historical_trend),
+                    review_count,
+                    last_review_id,
+                    created_at,
+                    now,
+                )
+            )
+            await db.commit()
+        
+        return {
+            "id": profile_id,
+            "codebase_path": codebase_path,
+            "display_name": display_name,
+            "attack_surface": attack_surface,
+            "entity_inventory": entity_inventory,
+            "cumulative_findings": cumulative_findings,
+            "coverage": coverage,
+            "historical_trend": historical_trend,
+            "review_count": review_count,
+            "last_review_id": last_review_id,
+            "created_at": created_at,
+            "updated_at": now,
+        }
+    
+    async def get_codebase_profile(self, profile_id: str) -> dict[str, Any] | None:
+        """Get a codebase profile by ID."""
+        await self._ensure_initialized()
+        
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM codebase_profiles WHERE id = ?", (profile_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+        
+        if not row:
+            return None
+        
+        return self._row_to_profile(row)
+    
+    async def get_codebase_profile_by_path(self, codebase_path: str) -> dict[str, Any] | None:
+        """Get a codebase profile by codebase path."""
+        await self._ensure_initialized()
+        
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM codebase_profiles WHERE codebase_path = ?", (codebase_path,)
+            ) as cursor:
+                row = await cursor.fetchone()
+        
+        if not row:
+            return None
+        
+        return self._row_to_profile(row)
+    
+    async def list_codebase_profiles(self) -> list[dict[str, Any]]:
+        """List all codebase profiles (summary view)."""
+        await self._ensure_initialized()
+        
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM codebase_profiles ORDER BY updated_at DESC"
+            ) as cursor:
+                rows = await cursor.fetchall()
+        
+        return [self._row_to_profile(row) for row in rows]
+    
+    async def delete_codebase_profile(self, profile_id: str) -> bool:
+        """Delete a codebase profile."""
+        await self._ensure_initialized()
+        
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "DELETE FROM codebase_profiles WHERE id = ?", (profile_id,)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+    
+    @staticmethod
+    def _row_to_profile(row: Any) -> dict[str, Any]:
+        """Convert a database row to a profile dict."""
+        return {
+            "id": row["id"],
+            "codebase_path": row["codebase_path"],
+            "display_name": row["display_name"],
+            "attack_surface": json.loads(row["attack_surface_json"]),
+            "entity_inventory": json.loads(row["entity_inventory_json"]),
+            "cumulative_findings": json.loads(row["cumulative_findings_json"]),
+            "coverage": json.loads(row["coverage_json"]),
+            "historical_trend": json.loads(row["historical_trend_json"]),
+            "review_count": row["review_count"],
+            "last_review_id": row["last_review_id"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
         }
 
 

@@ -36,6 +36,7 @@ from context_graph.api.review_request_routes import router as review_request_rou
 from context_graph.api.live_analysis_routes import router as live_analysis_router
 from context_graph.api.analytics_routes import router as analytics_router
 from context_graph.api.version_history_routes import router as version_history_router
+from context_graph.api.codebase_profile_routes import router as codebase_profile_router
 from context_graph.config.features import get_features
 
 
@@ -111,6 +112,9 @@ def create_app() -> FastAPI:
     app.include_router(live_analysis_router, prefix="/api")
     app.include_router(analytics_router, prefix="/api")
     app.include_router(version_history_router, prefix="/api")
+    
+    # Include codebase profile routes (feature-flag protected)
+    app.include_router(codebase_profile_router, prefix="/api")
     
     # Health check
     @app.get("/health")

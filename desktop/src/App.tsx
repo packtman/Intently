@@ -10,6 +10,7 @@ import BulkAnalysis from './pages/BulkAnalysis'
 import PRDGenerator from './pages/PRDGenerator'
 import Analytics from './pages/Analytics'
 import Chat from './pages/Chat'
+import CodebaseProfile from './pages/CodebaseProfile'
 import { BackendProvider } from './hooks/useBackend'
 
 function App() {
@@ -51,6 +52,7 @@ function App() {
           <Route path="/bulk" element={<BulkAnalysis />} />
           <Route path="/generate" element={<PRDGenerator />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/codebase-profile" element={<CodebaseProfile />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/reviews" element={<Reviews />} />
           <Route path="/review/:id" element={<ReviewDetail />} />
