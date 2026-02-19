@@ -58,6 +58,9 @@ Environment Variables:
     
     # Codebase-Aware Chat (read code files from codebase in chat context)
     FEATURE_CODEBASE_CHAT=true
+
+    # Semantic Search (embedding-based code search for chat)
+    FEATURE_SEMANTIC_SEARCH=true
 """
 
 from __future__ import annotations
@@ -260,6 +263,9 @@ class FeatureFlags:
     # Extends product_chat with filesystem access to answer code questions
     enable_codebase_chat: bool = True
 
+    # Enable embedding-based semantic search for codebase chat
+    enable_semantic_search: bool = True
+
     # Enable formal review requests (PR-like review workflow)
     enable_review_requests: bool = False
 
@@ -346,6 +352,7 @@ class FeatureFlags:
             # P0: Core PM Experience
             enable_product_chat=_env_bool("FEATURE_PRODUCT_CHAT", True),
             enable_codebase_chat=_env_bool("FEATURE_CODEBASE_CHAT", True),
+            enable_semantic_search=_env_bool("FEATURE_SEMANTIC_SEARCH", True),
             enable_review_requests=_env_bool("FEATURE_REVIEW_REQUESTS"),
             enable_impact_graph=_env_bool("FEATURE_IMPACT_GRAPH"),
             # P1: Enhanced PM Experience
@@ -406,6 +413,7 @@ class FeatureFlags:
             # P0: Core PM Experience
             enable_product_chat=True,
             enable_codebase_chat=True,
+            enable_semantic_search=True,
             enable_review_requests=True,
             enable_impact_graph=True,
             # P1: Enhanced PM Experience
@@ -465,6 +473,7 @@ class FeatureFlags:
             # P0: Core PM Experience
             "product_chat": self.enable_product_chat,
             "codebase_chat": self.enable_codebase_chat,
+            "semantic_search": self.enable_semantic_search,
             "review_requests": self.enable_review_requests,
             "impact_graph": self.enable_impact_graph,
             # P1: Enhanced PM Experience
@@ -545,6 +554,8 @@ class FeatureFlags:
             enabled.append("product_chat")
         if self.enable_codebase_chat:
             enabled.append("codebase_chat")
+        if self.enable_semantic_search:
+            enabled.append("semantic_search")
         if self.enable_review_requests:
             enabled.append("review_requests")
         if self.enable_impact_graph:

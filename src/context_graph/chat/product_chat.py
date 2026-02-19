@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +23,16 @@ from uuid import uuid4
 from context_graph.storage.base import ReviewStorage, CollaborationStorage
 
 logger = logging.getLogger(__name__)
+
+_vector_index_cache: dict[str, Any] = {}
+
+
+def _get_cached_vector_index(codebase_path: str) -> Any | None:
+    return _vector_index_cache.get(codebase_path)
+
+
+def set_cached_vector_index(codebase_path: str, index: Any) -> None:
+    _vector_index_cache[codebase_path] = index
 
 
 @dataclass
@@ -88,6 +99,7 @@ class ProductChat:
         conversation_id: str | None = None,
         finding_id: str | None = None,
         codebase_path: str | None = None,
+        vector_index: Any | None = None,
     ) -> ChatResponse:
         """Answer a product question using existing data + LLM.
 
@@ -107,6 +119,9 @@ class ProductChat:
         context, citations = await self._gather_context(
             question, review_id, finding_id=finding_id, codebase_path=codebase_path,
         )
+
+        # 1b. Inject codebase context via indexed _codebase_states (if available)
+        self._inject_codebase_context(question, context, citations, vector_index)
 
         # 2. Generate follow-up suggestions before _build_system_prompt
         #    (which pops code_snippets/codebase_structure from context)
@@ -140,6 +155,50 @@ class ProductChat:
             suggested_followups=followups,
             conversation_id=conv_id,
         )
+
+    async def answer_stream(
+        self,
+        question: str,
+        review_id: str | None = None,
+        conversation_id: str | None = None,
+        vector_index: Any | None = None,
+    ) -> AsyncIterator[str]:
+        """Stream an answer as SSE events."""
+
+        conv_id = conversation_id or str(uuid4())
+
+        context, citations = await self._gather_context(question, review_id)
+        self._inject_codebase_context(question, context, citations, vector_index)
+
+        history = self._conversations.get(conv_id, [])
+        history.append(ChatMessage(role="user", content=question))
+
+        system_prompt = self._build_system_prompt(context)
+        messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+        for msg in history[-10:]:
+            messages.append({"role": msg.role, "content": msg.content})
+
+        followups = self._suggest_followups(question, context)
+
+        full_answer = ""
+        try:
+            async for token in self._stream_llm(messages):
+                full_answer += token
+                yield f"data: {json.dumps({'token': token})}\n\n"
+        except Exception as exc:
+            logger.error("Streaming LLM failed: %s", exc)
+            error_msg = f"I encountered an error: {exc}"
+            yield f"data: {json.dumps({'token': error_msg})}\n\n"
+            full_answer = error_msg
+
+        citation_dicts = [
+            {"type": c.type, "id": c.id, "text": c.text, "url": c.url}
+            for c in citations
+        ]
+        yield f"data: {json.dumps({'done': True, 'citations': citation_dicts, 'suggested_followups': followups, 'conversation_id': conv_id})}\n\n"
+
+        history.append(ChatMessage(role="assistant", content=full_answer, citations=citations))
+        self._conversations[conv_id] = history
 
     # ------------------------------------------------------------------
     # Context gathering — queries existing storage
@@ -239,12 +298,22 @@ class ProductChat:
         elif codebase_path:
             resolved_codebase = codebase_path
 
-        if resolved_codebase:
-            self._inject_codebase_context(
-                context, citations, question, resolved_codebase,
-                state=review.state if review else None,
-                finding_components=self._get_finding_components(review, finding_id),
-            )
+        # Legacy direct-path codebase injection (when codebase not yet indexed via /chat/index-codebase)
+        if resolved_codebase and not getattr(self, "_codebase_states", {}):
+            from context_graph.chat.codebase_reader import CodebaseIndex, CodebaseReader
+            from context_graph.code_graph.hybrid_analyzer import HybridAnalyzer
+
+            cb_path = Path(resolved_codebase)
+            if cb_path.is_dir():
+                try:
+                    analyzer = HybridAnalyzer(cb_path)
+                    hybrid_result = analyzer.analyze_fast()
+                    index = CodebaseIndex.from_ast_results(hybrid_result.ast_results)
+                    if not hasattr(self, "_codebase_states"):
+                        self._codebase_states = {}
+                    self._codebase_states[resolved_codebase] = index
+                except Exception as exc:
+                    logger.warning("Auto-index of codebase failed: %s", exc)
 
         # Load collaboration stats if question is about feedback/patterns
         if any(kw in q_lower for kw in [
@@ -260,63 +329,53 @@ class ProductChat:
         return context, citations
 
     # ------------------------------------------------------------------
-    # Codebase-aware context injection
+    # Codebase context injection
     # ------------------------------------------------------------------
 
     def _inject_codebase_context(
         self,
+        question: str,
         context: dict[str, Any],
         citations: list[Citation],
-        question: str,
-        codebase_path: str,
-        *,
-        state: Any | None = None,
-        finding_components: list[str] | None = None,
+        vector_index: Any | None = None,
     ) -> None:
-        """Inject codebase structure and relevant code snippets into context."""
+        """Search the codebase index and inject matching snippets into context."""
         from context_graph.config.features import get_features
 
-        if not get_features().enable_codebase_chat:
+        codebase_states = getattr(self, "_codebase_states", {})
+        if not codebase_states:
             return
 
-        cb_path = Path(codebase_path)
-        if not cb_path.exists():
-            logger.debug("Codebase path does not exist: %s", codebase_path)
-            return
+        for cb_path, state in codebase_states.items():
+            from context_graph.chat.codebase_reader import CodebaseReader
 
-        from context_graph.chat.codebase_reader import CodebaseReader
+            vi = vector_index
+            if vi is None and get_features().enable_semantic_search:
+                vi = _get_cached_vector_index(str(cb_path))
 
-        reader = CodebaseReader(cb_path, state)
+            reader = CodebaseReader(cb_path, state, vector_index=vi)
 
-        # Layer 1: structural summary (always)
-        context["codebase_structure"] = reader.get_structure_summary()
+            if hasattr(reader, "vector_index") and reader.vector_index is not None and get_features().enable_semantic_search:
+                snippets = reader.hybrid_search(question, max_results=10)
+            else:
+                snippets = reader.search(question, max_results=5)
 
-        # Layer 2: smart file retrieval based on the question
-        snippets = reader.search(question, max_results=5)
-
-        # Also read files for focused finding's affected components
-        if finding_components:
-            for comp in finding_components[:3]:
-                entity_snippet = reader.read_entity(comp)
-                if entity_snippet and not any(s.file == entity_snippet.file and s.start_line == entity_snippet.start_line for s in snippets):
-                    snippets.append(entity_snippet)
-
-        if snippets:
-            context["code_snippets"] = []
-            for s in snippets[:8]:
-                context["code_snippets"].append({
-                    "file": s.file,
-                    "lines": f"{s.start_line}-{s.end_line}",
-                    "symbol": s.symbol_name,
-                    "type": s.symbol_type,
-                    "code": s.text,
-                })
-                citations.append(Citation(
-                    type="code",
-                    id=s.file,
-                    text=f"{s.file}:{s.start_line}-{s.end_line} ({s.symbol_name})" if s.symbol_name else f"{s.file}:{s.start_line}-{s.end_line}",
-                    url="",
-                ))
+            if snippets:
+                code_blocks = []
+                for s in snippets:
+                    code_blocks.append(
+                        f"### {s.file_path} (lines {s.start_line}-{s.end_line})"
+                        + (f" — {s.symbol_name}" if s.symbol_name else "")
+                        + f"\n```\n{s.text}\n```"
+                    )
+                    citations.append(Citation(
+                        type="code",
+                        id=f"{s.file_path}:{s.start_line}",
+                        text=f"{s.file_path}:{s.start_line}-{s.end_line}"
+                        + (f" ({s.symbol_name})" if s.symbol_name else ""),
+                    ))
+                context["codebase_snippets"] = "\n\n".join(code_blocks)
+                context["codebase_summary"] = reader.get_structure_summary()
 
     def _inject_finding_context(
         self,
@@ -485,6 +544,58 @@ Answer the user's question using the above context. Cite specific files, reviews
             "Set OPENAI_API_KEY or ANTHROPIC_API_KEY to enable the chat feature.\n\n"
             "In the meantime, you can explore your review data through the dashboard."
         )
+
+    # ------------------------------------------------------------------
+    # Streaming LLM
+    # ------------------------------------------------------------------
+
+    async def _stream_llm(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        if self._openai_key:
+            async for token in self._stream_openai(messages):
+                yield token
+        elif self._anthropic_key:
+            async for token in self._stream_anthropic(messages):
+                yield token
+        else:
+            yield self._fallback_response(messages)
+
+    async def _stream_openai(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=self._openai_key)
+        response = await client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2048,
+            stream=True,
+        )
+        async for chunk in response:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
+
+    async def _stream_anthropic(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        from anthropic import AsyncAnthropic
+
+        client = AsyncAnthropic(api_key=self._anthropic_key)
+        system = ""
+        chat_messages = []
+        for m in messages:
+            if m["role"] == "system":
+                system = m["content"]
+            else:
+                chat_messages.append(m)
+
+        async with client.messages.stream(
+            model="claude-haiku-4-5-20251001",
+            system=system,
+            messages=chat_messages,
+            max_tokens=2048,
+            temperature=0.3,
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text
 
     # ------------------------------------------------------------------
     # Follow-up suggestions
