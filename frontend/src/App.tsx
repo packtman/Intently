@@ -11,6 +11,7 @@ import PRDGenerator from './pages/PRDGenerator'
 import Analytics from './pages/Analytics'
 import Chat from './pages/Chat'
 import CodebaseProfile from './pages/CodebaseProfile'
+import ThreatCanvas from './pages/ThreatCanvas'
 import Settings from './pages/Settings'
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
         <Route path="/prd-generator" element={<PRDGenerator />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/codebase-profile" element={<CodebaseProfile />} />
+        <Route path="/threat-canvas" element={<ThreatCanvas />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
