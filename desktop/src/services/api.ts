@@ -34,6 +34,10 @@ import type {
   GeneratedPRD,
   PRDGeneratorStatus,
   PRDGeneratorConfig,
+  // Threat canvas types
+  CanvasState,
+  CanvasSummary,
+  SuggestThreatsResponse,
 } from '../types'
 
 class ApiService {
@@ -555,6 +559,69 @@ class ApiService {
     return this.fetch(`/api/prd-generator/${generationId}`, {
       method: 'DELETE',
     })
+  }
+
+  // ==================== Interactive Threat Canvas ====================
+
+  async createThreatCanvas(data: {
+    title?: string
+    review_id?: string
+    nodes?: any[]
+    edges?: any[]
+    boundaries?: any[]
+  }): Promise<CanvasState> {
+    return this.fetch('/api/threat-canvas', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async listThreatCanvases(): Promise<CanvasSummary[]> {
+    return this.fetch('/api/threat-canvas')
+  }
+
+  async getThreatCanvas(canvasId: string): Promise<CanvasState> {
+    return this.fetch(`/api/threat-canvas/${canvasId}`)
+  }
+
+  async updateThreatCanvas(canvasId: string, data: {
+    title?: string
+    nodes?: any[]
+    edges?: any[]
+    boundaries?: any[]
+    threats?: any[]
+    metadata?: Record<string, any>
+  }): Promise<CanvasState> {
+    return this.fetch(`/api/threat-canvas/${canvasId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteThreatCanvas(canvasId: string): Promise<{ status: string }> {
+    return this.fetch(`/api/threat-canvas/${canvasId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async suggestThreats(canvasId: string): Promise<SuggestThreatsResponse> {
+    return this.fetch(`/api/threat-canvas/${canvasId}/suggest`, {
+      method: 'POST',
+    })
+  }
+
+  async populateCanvasFromReview(canvasId: string, reviewId: string): Promise<CanvasState> {
+    return this.fetch(`/api/threat-canvas/${canvasId}/populate`, {
+      method: 'POST',
+      body: JSON.stringify({ review_id: reviewId }),
+    })
+  }
+
+  async exportThreatCanvas(canvasId: string, format: 'markdown' | 'json' = 'markdown'): Promise<string> {
+    if (!this.baseUrlCached) await this.getBaseUrl()
+    const response = await fetch(`${this.baseUrl}/api/threat-canvas/${canvasId}/export?format=${format}`)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return response.text()
   }
 }
 

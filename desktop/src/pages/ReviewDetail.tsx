@@ -120,7 +120,7 @@ function ReviewDetailContent() {
   const [aiOnlyFilter, setAiOnlyFilter] = useState(true)
   const [filterInitialized, setFilterInitialized] = useState(false)
   const [selectedDimension, setSelectedDimension] = useState<string | 'all'>('all')
-  const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool' | 'impact-graph'>('findings')
+  const [activeTab, setActiveTab] = useState<'findings' | 'pm-tool' | 'impact-graph' | 'threat-canvas'>('findings')
   const [expertAskModal, setExpertAskModal] = useState<{ isOpen: boolean; predictionId: string; question: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [chatFindingId, setChatFindingId] = useState<string | undefined>(undefined)
@@ -241,6 +241,7 @@ function ReviewDetailContent() {
   const chatEnabled = collaborationFeatures?.product_chat ?? false
   const reviewRequestsEnabled = collaborationFeatures?.review_requests ?? false
   const impactGraphEnabled = collaborationFeatures?.impact_graph ?? false
+  const threatCanvasEnabled = collaborationFeatures?.threat_canvas ?? false
 
   // Initialize AI-only filter based on whether LLM was used
   useEffect(() => {
@@ -567,12 +568,42 @@ function ReviewDetailContent() {
               Impact Graph
             </button>
           )}
+          {threatCanvasEnabled && (
+            <button
+              onClick={() => setActiveTab('threat-canvas')}
+              className={`
+                flex-1 px-6 py-4 font-medium transition-all
+                ${activeTab === 'threat-canvas'
+                  ? 'text-white border-b-2 border-neon-500 bg-void-900'
+                  : 'text-void-400 hover:text-white'
+                }
+              `}
+            >
+              Threat Canvas
+            </button>
+          )}
         </div>
 
         {/* Tab Content */}
         <div className="p-6">
           {activeTab === 'impact-graph' && impactGraphEnabled && id && (
             <ImpactGraph reviewId={id} />
+          )}
+          {activeTab === 'threat-canvas' && threatCanvasEnabled && id && (
+            <div className="text-center py-8">
+              <Shield className="w-12 h-12 text-neon-400 mx-auto mb-4" />
+              <p className="text-white font-medium mb-2">Open Threat Canvas</p>
+              <p className="text-void-400 text-sm mb-4">
+                Model threats visually on an interactive canvas with AI suggestions.
+              </p>
+              <a
+                href={`/threat-canvas?review=${id}`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-neon-500 rounded-lg text-void-950 font-medium hover:bg-neon-400 transition-all"
+              >
+                <Shield className="w-4 h-4" />
+                Open Canvas
+              </a>
+            </div>
           )}
           {activeTab === 'pm-tool' && id && (
             <div className="space-y-6">

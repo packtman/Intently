@@ -1,5 +1,5 @@
 ---
-description: Feature flag conventions — defaults must match in class AND from_env()
+description: Feature flag conventions — defaults must match in class AND from_env(), and FeatureFlagsResponse must be updated
 globs: src/context_graph/config/features.py
 alwaysApply: false
 ---
@@ -27,9 +27,22 @@ enable_live_analysis: bool = True
 enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS", True),
 ```
 
-When adding or changing a feature flag, update ALL FOUR locations:
-1. Class field default
-2. `from_env()` call (with matching default)
-3. `all_enabled()` return
-4. `to_dict()` return
-5. `get_enabled_features()` method
+When adding or changing a feature flag, update ALL SIX locations:
+1. Class field default in `features.py`
+2. `from_env()` call (with matching default) in `features.py`
+3. `all_enabled()` return in `features.py`
+4. `to_dict()` return in `features.py`
+5. `get_enabled_features()` method in `features.py`
+6. **`FeatureFlagsResponse` model in `src/context_graph/api/collaboration_routes.py`** — this is the Pydantic model that the frontend calls via `GET /api/collaboration/features`. If a field is missing here, Pydantic silently drops it from the response and the frontend sees `undefined` (treated as `false`), making the feature invisible in the UI even when correctly enabled in `features.py`.
+
+```python
+# In collaboration_routes.py — ❌ BAD: new flag added to features.py but not here
+class FeatureFlagsResponse(BaseModel):
+    impact_graph: bool = False
+    # threat_canvas missing → frontend gets undefined → feature never shows in UI
+
+# ✅ GOOD: keep in sync with features.py
+class FeatureFlagsResponse(BaseModel):
+    impact_graph: bool = False
+    threat_canvas: bool = False  # must be added here too
+```

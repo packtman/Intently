@@ -427,6 +427,8 @@ export interface CollaborationFeatures {
   codebase_chat?: boolean
   review_requests?: boolean
   impact_graph?: boolean
+  // Interactive Threat Canvas
+  threat_canvas?: boolean
 }
 
 export interface ValidationStats {
@@ -785,5 +787,83 @@ export interface PRDGeneratorConfig {
   supported_languages: string[]
   max_files_to_analyze: number
   ai_required: boolean
+}
+
+// ==================== Interactive Threat Canvas Types ====================
+
+export type CanvasNodeType = 'actor' | 'process' | 'data_store' | 'external'
+
+export interface CanvasNode {
+  id: string
+  type: CanvasNodeType
+  label: string
+  x: number
+  y: number
+  width: number
+  height: number
+  properties: Record<string, any>
+}
+
+export interface CanvasEdge {
+  id: string
+  source_id: string
+  target_id: string
+  label: string
+  data_classification: string
+  protocol: string
+  bidirectional: boolean
+}
+
+export interface CanvasTrustBoundary {
+  id: string
+  label: string
+  x: number
+  y: number
+  width: number
+  height: number
+  trust_level: number
+  color: string
+}
+
+export interface ThreatOverlay {
+  id: string
+  threat_id: string
+  category: string
+  title: string
+  description: string
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  affected_node_ids: string[]
+  affected_edge_ids: string[]
+  mitigation: string
+  confidence: number
+  source: 'ai' | 'manual'
+}
+
+export interface CanvasState {
+  canvas_id: string
+  review_id?: string
+  title: string
+  nodes: CanvasNode[]
+  edges: CanvasEdge[]
+  boundaries: CanvasTrustBoundary[]
+  threats: ThreatOverlay[]
+  metadata: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export interface CanvasSummary {
+  canvas_id: string
+  review_id?: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SuggestThreatsResponse {
+  threats: ThreatOverlay[]
+  count: number
+  by_category: Record<string, number>
+  by_severity: Record<string, number>
 }
 

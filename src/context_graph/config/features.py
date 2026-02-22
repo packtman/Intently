@@ -64,6 +64,9 @@ Environment Variables:
 
     # Codebase Security Profile (persistent profile across reviews)
     FEATURE_CODEBASE_PROFILE=true
+
+    # Interactive Threat Canvas (visual drag-and-drop threat modeling)
+    FEATURE_THREAT_CANVAS=true
 """
 
 from __future__ import annotations
@@ -273,7 +276,7 @@ class FeatureFlags:
     enable_review_requests: bool = False
 
     # Enable impact graph visualization (D3.js entity graph)
-    enable_impact_graph: bool = False
+    enable_impact_graph: bool = True
 
     # ==================== P1: Enhanced PM Experience ====================
 
@@ -307,6 +310,14 @@ class FeatureFlags:
     # When enabled, scans emit granular trace events that are streamed
     # to the frontend via Server-Sent Events.
     enable_scan_tracing: bool = True
+
+    # ==================== Interactive Threat Canvas ====================
+    # Visual drag-and-drop threat modeling canvas
+
+    # Enable interactive threat model canvas
+    # Provides a visual canvas for mapping data flows, trust boundaries,
+    # and actors with AI-powered threat suggestions on the topology
+    enable_threat_canvas: bool = True
     
     # ==================== Utility Methods ====================
     
@@ -365,7 +376,7 @@ class FeatureFlags:
             enable_codebase_chat=_env_bool("FEATURE_CODEBASE_CHAT", True),
             enable_semantic_search=_env_bool("FEATURE_SEMANTIC_SEARCH", True),
             enable_review_requests=_env_bool("FEATURE_REVIEW_REQUESTS"),
-            enable_impact_graph=_env_bool("FEATURE_IMPACT_GRAPH"),
+            enable_impact_graph=_env_bool("FEATURE_IMPACT_GRAPH", True),
             # P1: Enhanced PM Experience
             enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS"),
             enable_prd_version_history=_env_bool("FEATURE_PRD_VERSION_HISTORY", True),
@@ -376,6 +387,8 @@ class FeatureFlags:
             enable_codebase_profile=_env_bool("FEATURE_CODEBASE_PROFILE", True),
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
+            # Interactive threat canvas
+            enable_threat_canvas=_env_bool("FEATURE_THREAT_CANVAS", True),
         )
     
     @classmethod
@@ -439,6 +452,8 @@ class FeatureFlags:
             enable_codebase_profile=True,
             # Scan tracing
             enable_scan_tracing=True,
+            # Interactive threat canvas
+            enable_threat_canvas=True,
         )
     
     def to_dict(self) -> dict[str, Any]:
@@ -501,6 +516,8 @@ class FeatureFlags:
             "codebase_profile": self.enable_codebase_profile,
             # Scan tracing
             "scan_tracing": self.enable_scan_tracing,
+            # Interactive threat canvas
+            "threat_canvas": self.enable_threat_canvas,
         }
     
     def get_enabled_features(self) -> list[str]:
@@ -594,6 +611,9 @@ class FeatureFlags:
         # Scan tracing
         if self.enable_scan_tracing:
             enabled.append("scan_tracing")
+        # Interactive threat canvas
+        if self.enable_threat_canvas:
+            enabled.append("threat_canvas")
         return enabled
 
 

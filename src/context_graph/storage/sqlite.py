@@ -717,6 +717,19 @@ CREATE TABLE IF NOT EXISTS codebase_profiles (
 CREATE INDEX IF NOT EXISTS idx_codebase_profiles_path ON codebase_profiles(codebase_path);
 """
 
+THREAT_CANVAS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS threat_canvases (
+    id TEXT PRIMARY KEY,
+    review_id TEXT,
+    title TEXT NOT NULL,
+    canvas_state_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_threat_canvases_review ON threat_canvases(review_id);
+"""
+
 SCHEMA_VERSION_TABLE = """
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY
@@ -994,6 +1007,7 @@ class SQLiteCollaborationStorage(CollaborationStorage):
             await db.executescript(CONSENSUS_VOTES_SCHEMA)
             await db.executescript(PATTERNS_SCHEMA)
             await db.executescript(CODEBASE_PROFILES_SCHEMA)
+            await db.executescript(THREAT_CANVAS_SCHEMA)
             await db.commit()
         
         self._initialized = True
@@ -1874,6 +1888,108 @@ class SQLiteCollaborationStorage(CollaborationStorage):
             "last_review_id": row["last_review_id"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+        }
+
+    # ==================== Threat Canvas ====================
+
+    async def save_threat_canvas(
+        self,
+        canvas_id: str,
+        title: str,
+        canvas_state: dict[str, Any],
+        review_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create or update a threat canvas."""
+        await self._ensure_initialized()
+
+        now = datetime.now().isoformat()
+
+        async with aiosqlite.connect(self.db_path) as db:
+            existing = await db.execute(
+                "SELECT created_at FROM threat_canvases WHERE id = ?", (canvas_id,)
+            )
+            row = await existing.fetchone()
+            created_at = row[0] if row else now
+
+            await db.execute(
+                """
+                INSERT OR REPLACE INTO threat_canvases
+                    (id, review_id, title, canvas_state_json, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (canvas_id, review_id, title, json.dumps(canvas_state), created_at, now),
+            )
+            await db.commit()
+
+        return {
+            "canvas_id": canvas_id,
+            "review_id": review_id,
+            "title": title,
+            "created_at": created_at,
+            "updated_at": now,
+            **canvas_state,
+        }
+
+    async def get_threat_canvas(self, canvas_id: str) -> dict[str, Any] | None:
+        """Get a threat canvas by ID."""
+        await self._ensure_initialized()
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM threat_canvases WHERE id = ?", (canvas_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+
+        if not row:
+            return None
+
+        return self._row_to_canvas(row)
+
+    async def list_threat_canvases(self) -> list[dict[str, Any]]:
+        """List all threat canvases (summary view)."""
+        await self._ensure_initialized()
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT id, review_id, title, created_at, updated_at FROM threat_canvases ORDER BY updated_at DESC"
+            ) as cursor:
+                rows = await cursor.fetchall()
+
+        return [
+            {
+                "canvas_id": row["id"],
+                "review_id": row["review_id"],
+                "title": row["title"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            }
+            for row in rows
+        ]
+
+    async def delete_threat_canvas(self, canvas_id: str) -> bool:
+        """Delete a threat canvas."""
+        await self._ensure_initialized()
+
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "DELETE FROM threat_canvases WHERE id = ?", (canvas_id,)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    @staticmethod
+    def _row_to_canvas(row: Any) -> dict[str, Any]:
+        """Convert a database row to a canvas dict."""
+        state = json.loads(row["canvas_state_json"])
+        return {
+            "canvas_id": row["id"],
+            "review_id": row["review_id"],
+            "title": row["title"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            **state,
         }
 
 

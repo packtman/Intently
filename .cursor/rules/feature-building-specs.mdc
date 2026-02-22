@@ -51,7 +51,7 @@ Numbered list of what to build and in what order:
 
 ### Constraints Checklist
 - [ ] Type hints (`from __future__ import annotations`)
-- [ ] Feature flag in all 5 locations (class default, from_env, all_enabled, to_dict, get_enabled_features)
+- [ ] Feature flag in all 6 locations (class default, from_env, all_enabled, to_dict, get_enabled_features, FeatureFlagsResponse in collaboration_routes.py)
 - [ ] Dual-app: frontend AND desktop updated
 - [ ] Desktop uses `${backendUrl}`, frontend uses relative URLs
 - [ ] Lazy imports for heavy/optional dependencies

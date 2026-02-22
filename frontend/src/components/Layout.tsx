@@ -29,6 +29,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/prd-generator', icon: FileText, label: 'PRD Generator' },
     { path: '/chat', icon: MessageSquare, label: 'Codebase Chat' },
     { path: '/codebase-profile', icon: Server, label: 'Codebase Profile' },
+    { path: '/threat-canvas', icon: Shield, label: 'Threat Canvas' },
     { path: '/analytics', icon: BarChart3, label: 'Analytics' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ]

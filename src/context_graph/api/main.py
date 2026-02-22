@@ -37,6 +37,7 @@ from context_graph.api.live_analysis_routes import router as live_analysis_route
 from context_graph.api.analytics_routes import router as analytics_router
 from context_graph.api.version_history_routes import router as version_history_router
 from context_graph.api.codebase_profile_routes import router as codebase_profile_router
+from context_graph.api.threat_canvas_routes import router as threat_canvas_router
 from context_graph.config.features import get_features
 
 
@@ -115,6 +116,9 @@ def create_app() -> FastAPI:
     
     # Include codebase profile routes (feature-flag protected)
     app.include_router(codebase_profile_router, prefix="/api")
+    
+    # Include threat canvas routes (feature-flag protected)
+    app.include_router(threat_canvas_router, prefix="/api")
     
     # Health check
     @app.get("/health")
