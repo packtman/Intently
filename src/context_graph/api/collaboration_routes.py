@@ -141,6 +141,7 @@ class FeatureFlagsResponse(BaseModel):
     product_chat: bool = False
     review_requests: bool = False
     impact_graph: bool = False
+    threat_canvas: bool = False
 
 
 # ==================== Feature Flags Endpoint ====================

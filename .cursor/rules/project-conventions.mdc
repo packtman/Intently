@@ -28,7 +28,7 @@ When adding a new feature, ALL of these must be completed — not just the backe
 2. **Frontend page/component** — create or update the UI in `frontend/src/`
 3. **Desktop page/component** — mirror the UI in `desktop/src/` (with base URL)
 4. **Wire it in** — import and render the component in the appropriate page
-5. **Feature flag** — add flag in `features.py` (see feature-flags rule for 5-location checklist)
+5. **Feature flag** — add flag in `features.py` AND `FeatureFlagsResponse` in `collaboration_routes.py` (see feature-flags rule for 6-location checklist)
 6. **Route registration** — add `app.include_router()` in `src/context_graph/api/main.py`
 
 A component that exists but is never imported/rendered is NOT complete.

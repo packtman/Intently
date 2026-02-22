@@ -55,12 +55,16 @@ export default function ThreatCanvasPage() {
   }, [])
 
   const createCanvas = useCallback(async () => {
-    const canvas = await api.createThreatCanvas({
-      title: 'New Threat Model',
-      review_id: reviewId || undefined,
-    })
-    queryClient.invalidateQueries({ queryKey: ['threat-canvases'] })
-    await loadCanvas(canvas.canvas_id)
+    try {
+      const canvas = await api.createThreatCanvas({
+        title: 'New Threat Model',
+        review_id: reviewId || undefined,
+      })
+      queryClient.invalidateQueries({ queryKey: ['threat-canvases'] })
+      await loadCanvas(canvas.canvas_id)
+    } catch (err) {
+      console.error('Failed to create canvas:', err)
+    }
   }, [reviewId, queryClient, loadCanvas])
 
   // Auto-load first canvas or create one

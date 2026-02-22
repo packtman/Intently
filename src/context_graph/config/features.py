@@ -276,7 +276,7 @@ class FeatureFlags:
     enable_review_requests: bool = False
 
     # Enable impact graph visualization (D3.js entity graph)
-    enable_impact_graph: bool = False
+    enable_impact_graph: bool = True
 
     # ==================== P1: Enhanced PM Experience ====================
 
@@ -317,7 +317,7 @@ class FeatureFlags:
     # Enable interactive threat model canvas
     # Provides a visual canvas for mapping data flows, trust boundaries,
     # and actors with AI-powered threat suggestions on the topology
-    enable_threat_canvas: bool = False
+    enable_threat_canvas: bool = True
     
     # ==================== Utility Methods ====================
     
@@ -376,7 +376,7 @@ class FeatureFlags:
             enable_codebase_chat=_env_bool("FEATURE_CODEBASE_CHAT", True),
             enable_semantic_search=_env_bool("FEATURE_SEMANTIC_SEARCH", True),
             enable_review_requests=_env_bool("FEATURE_REVIEW_REQUESTS"),
-            enable_impact_graph=_env_bool("FEATURE_IMPACT_GRAPH"),
+            enable_impact_graph=_env_bool("FEATURE_IMPACT_GRAPH", True),
             # P1: Enhanced PM Experience
             enable_live_analysis=_env_bool("FEATURE_LIVE_ANALYSIS"),
             enable_prd_version_history=_env_bool("FEATURE_PRD_VERSION_HISTORY", True),
@@ -388,7 +388,7 @@ class FeatureFlags:
             # Scan tracing
             enable_scan_tracing=_env_bool("FEATURE_SCAN_TRACING", True),
             # Interactive threat canvas
-            enable_threat_canvas=_env_bool("FEATURE_THREAT_CANVAS"),
+            enable_threat_canvas=_env_bool("FEATURE_THREAT_CANVAS", True),
         )
     
     @classmethod
