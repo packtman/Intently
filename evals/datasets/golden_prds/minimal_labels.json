@@ -1,0 +1,14 @@
+{
+  "title": "Add user profiles",
+  "features": [
+    "update display name",
+    "update avatar"
+  ],
+  "user_stories": [],
+  "api_endpoints": [],
+  "data_entities": [],
+  "auth_requirements": [],
+  "data_sensitivity_keywords": [],
+  "external_integrations": [],
+  "_note": "Minimal PRD — parser should extract what it can without hallucinating"
+}

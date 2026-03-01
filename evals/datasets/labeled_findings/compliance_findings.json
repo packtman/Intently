@@ -1,0 +1,57 @@
+[
+  {
+    "id": "COMP-TP-001",
+    "title": "PCI-DSS: Payment data handling without tokenization",
+    "description": "The checkout flow accepts payment method IDs but the order model stores payment_intent_id without proper PCI scope documentation.",
+    "severity": "high",
+    "category": "pci_cardholder_data",
+    "framework": "pci_dss",
+    "control_id": "Req-3.4",
+    "label": "true_positive",
+    "label_reason": "Payment data handling present without documented PCI compliance scope"
+  },
+  {
+    "id": "COMP-TP-002",
+    "title": "SOC 2: Missing access control audit trail",
+    "description": "Administrative operations on the product catalog have no audit logging.",
+    "severity": "medium",
+    "category": "soc2_security",
+    "framework": "soc2",
+    "control_id": "CC6.1",
+    "label": "true_positive",
+    "label_reason": "No audit logging for product CRUD operations"
+  },
+  {
+    "id": "COMP-TP-003",
+    "title": "GDPR: No Data Processing Agreement documentation",
+    "description": "Integration with Stripe processes user data without documented DPA.",
+    "severity": "medium",
+    "category": "non_compliance",
+    "framework": "gdpr",
+    "control_id": "Art-28",
+    "label": "true_positive",
+    "label_reason": "Third-party integration processes PII; DPA required under GDPR"
+  },
+  {
+    "id": "COMP-FP-001",
+    "title": "HIPAA: PHI handling not compliant",
+    "description": "Application may handle Protected Health Information without HIPAA safeguards.",
+    "severity": "high",
+    "category": "hipaa_phi_handling",
+    "framework": "hipaa",
+    "control_id": "164.312",
+    "label": "false_positive",
+    "label_reason": "This is an e-commerce app — no PHI is processed; HIPAA does not apply"
+  },
+  {
+    "id": "COMP-TP-004",
+    "title": "SOC 2: Insufficient encryption in transit",
+    "description": "No TLS enforcement configured at the application level.",
+    "severity": "medium",
+    "category": "soc2_security",
+    "framework": "soc2",
+    "control_id": "CC6.7",
+    "label": "true_positive",
+    "label_reason": "No HTTPS redirect or TLS enforcement middleware in FastAPI app"
+  }
+]

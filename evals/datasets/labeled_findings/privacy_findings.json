@@ -1,0 +1,74 @@
+[
+  {
+    "id": "PRIV-TP-001",
+    "title": "PII stored without encryption at rest",
+    "description": "Shipping addresses (PII) are stored in the orders table as plain JSON without field-level encryption.",
+    "severity": "high",
+    "category": "data_disclosure",
+    "data_subjects": ["customers"],
+    "personal_data_types": ["address", "name", "phone"],
+    "applicable_regulations": ["GDPR", "CCPA"],
+    "label": "true_positive",
+    "label_reason": "Order.shipping_address is a JSON column with no encryption"
+  },
+  {
+    "id": "PRIV-TP-002",
+    "title": "User SSN stored in database",
+    "description": "The User model contains an SSN column which is highly sensitive PII.",
+    "severity": "critical",
+    "category": "data_disclosure",
+    "data_subjects": ["users"],
+    "personal_data_types": ["ssn"],
+    "applicable_regulations": ["GDPR", "CCPA"],
+    "label": "true_positive",
+    "label_reason": "SSN column in User model with no apparent need"
+  },
+  {
+    "id": "PRIV-TP-003",
+    "title": "No data retention policy for audit logs",
+    "description": "Audit logs contain user IDs and IP addresses but have no expiration or deletion mechanism.",
+    "severity": "medium",
+    "category": "non_compliance",
+    "data_subjects": ["users"],
+    "personal_data_types": ["ip_address", "user_id"],
+    "applicable_regulations": ["GDPR"],
+    "label": "true_positive",
+    "label_reason": "No TTL or cleanup mechanism for audit_logs table"
+  },
+  {
+    "id": "PRIV-FP-001",
+    "title": "Product images may contain EXIF metadata with location data",
+    "description": "Uploaded product images may retain GPS coordinates in EXIF metadata.",
+    "severity": "low",
+    "category": "data_disclosure",
+    "data_subjects": ["sellers"],
+    "personal_data_types": ["location"],
+    "applicable_regulations": ["GDPR"],
+    "label": "false_positive",
+    "label_reason": "Product images are uploaded by merchants, not users — speculative without evidence of EXIF retention"
+  },
+  {
+    "id": "PRIV-TP-004",
+    "title": "Missing consent mechanism for data collection",
+    "description": "User registration collects email, name, phone, and SSN without documented consent flow.",
+    "severity": "high",
+    "category": "unawareness",
+    "data_subjects": ["users"],
+    "personal_data_types": ["email", "name", "phone", "ssn"],
+    "applicable_regulations": ["GDPR", "CCPA"],
+    "label": "true_positive",
+    "label_reason": "No consent endpoint or checkbox flow in the registration code"
+  },
+  {
+    "id": "PRIV-TP-005",
+    "title": "No data export/deletion endpoint (right to erasure)",
+    "description": "No API endpoint exists for users to request export or deletion of their personal data.",
+    "severity": "high",
+    "category": "non_compliance",
+    "data_subjects": ["users"],
+    "personal_data_types": ["all"],
+    "applicable_regulations": ["GDPR", "CCPA"],
+    "label": "true_positive",
+    "label_reason": "GDPR Art 17 requires right to erasure; no such endpoint exists"
+  }
+]

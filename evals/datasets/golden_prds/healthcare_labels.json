@@ -1,0 +1,51 @@
+{
+  "title": "Patient Portal",
+  "features": [
+    "Patient login with MFA",
+    "View medical records",
+    "Schedule and manage appointments",
+    "Secure messaging with healthcare providers",
+    "Prescription refill requests",
+    "Insurance information management",
+    "Emergency contact management"
+  ],
+  "user_stories": [
+    "As a patient, I want to view my lab results online so that I don't have to call the office.",
+    "As a patient, I want to message my doctor securely so that I can ask follow-up questions.",
+    "As a patient, I want to schedule appointments online so that I don't have to wait on hold."
+  ],
+  "api_endpoints": [
+    {"method": "GET",  "path": "/api/patients/{id}/records"},
+    {"method": "POST", "path": "/api/appointments"},
+    {"method": "GET",  "path": "/api/appointments"},
+    {"method": "POST", "path": "/api/messages"},
+    {"method": "GET",  "path": "/api/messages"},
+    {"method": "POST", "path": "/api/prescriptions/{id}/refill"}
+  ],
+  "data_entities": [
+    {"name": "Patient", "has_pii": true, "has_phi": true},
+    {"name": "MedicalRecord", "has_pii": true, "has_phi": true}
+  ],
+  "auth_requirements": [
+    "MFA",
+    "encryption at rest",
+    "encryption in transit",
+    "audit logging",
+    "session timeout",
+    "RBAC"
+  ],
+  "data_sensitivity_keywords": [
+    "PHI",
+    "HIPAA",
+    "PII",
+    "SSN",
+    "encrypted"
+  ],
+  "external_integrations": [
+    "Epic",
+    "Cerner",
+    "Twilio"
+  ],
+  "expected_compliance_frameworks": ["hipaa", "soc2"],
+  "expected_privacy_findings_min": 5
+}

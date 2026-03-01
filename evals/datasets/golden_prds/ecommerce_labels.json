@@ -1,0 +1,59 @@
+{
+  "title": "E-Commerce Product Catalog & Cart",
+  "features": [
+    "Product catalog with categories and filters",
+    "Full-text product search",
+    "Shopping cart with session persistence",
+    "Inventory tracking with real-time stock updates",
+    "Wishlist functionality",
+    "Product reviews and ratings",
+    "Price history tracking",
+    "Checkout flow with address validation",
+    "Order creation and confirmation",
+    "Stripe payment integration"
+  ],
+  "user_stories": [
+    "As a shopper, I want to browse products by category so that I can find what I'm looking for.",
+    "As a shopper, I want to search for products by name or description so that I can quickly find specific items.",
+    "As a shopper, I want to add items to my cart so that I can purchase multiple items at once.",
+    "As a returning customer, I want my cart to persist across sessions so that I don't lose my selections.",
+    "As a shopper, I want to see real-time stock availability so that I don't add out-of-stock items."
+  ],
+  "api_endpoints": [
+    {"method": "GET",    "path": "/api/products"},
+    {"method": "GET",    "path": "/api/products/{id}"},
+    {"method": "GET",    "path": "/api/products/search"},
+    {"method": "POST",   "path": "/api/cart/items"},
+    {"method": "PUT",    "path": "/api/cart/items/{id}"},
+    {"method": "DELETE", "path": "/api/cart/items/{id}"},
+    {"method": "GET",    "path": "/api/cart"},
+    {"method": "POST",   "path": "/api/checkout"},
+    {"method": "POST",   "path": "/api/orders"},
+    {"method": "GET",    "path": "/api/orders/{id}"},
+    {"method": "POST",   "path": "/api/products/{id}/reviews"},
+    {"method": "GET",    "path": "/api/products/{id}/reviews"}
+  ],
+  "data_entities": [
+    {"name": "Product", "has_pii": false},
+    {"name": "CartItem", "has_pii": false},
+    {"name": "Order", "has_pii": true}
+  ],
+  "auth_requirements": [
+    "authentication required",
+    "server-side validation",
+    "rate limiting",
+    "input sanitization",
+    "webhook verification"
+  ],
+  "data_sensitivity_keywords": [
+    "PII",
+    "shipping address",
+    "payment",
+    "PCI"
+  ],
+  "external_integrations": [
+    "Stripe",
+    "Algolia",
+    "AWS S3"
+  ]
+}

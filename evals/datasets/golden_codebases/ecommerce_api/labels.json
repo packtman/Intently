@@ -1,0 +1,36 @@
+{
+  "api_endpoints": [
+    {"method": "GET",    "path": "/api/products"},
+    {"method": "GET",    "path": "/api/products/{product_id}"},
+    {"method": "GET",    "path": "/api/products/search"},
+    {"method": "POST",   "path": "/api/cart/items"},
+    {"method": "GET",    "path": "/api/cart"},
+    {"method": "DELETE", "path": "/api/cart/items/{item_id}"},
+    {"method": "POST",   "path": "/api/checkout"},
+    {"method": "POST",   "path": "/api/orders"},
+    {"method": "GET",    "path": "/api/orders/{order_id}"},
+    {"method": "POST",   "path": "/api/products/{product_id}/reviews"}
+  ],
+  "data_models": [
+    "Product",
+    "CartItem",
+    "Order",
+    "Review"
+  ],
+  "auth_patterns": [
+    "HTTPBearer"
+  ],
+  "security_controls": [
+    "authentication"
+  ],
+  "known_vulnerabilities": [
+    {"type": "sql_injection", "location": "search_products", "description": "Raw query string interpolation in LIKE clause"},
+    {"type": "idor", "location": "get_order", "description": "No auth check on order ownership"},
+    {"type": "missing_auth", "location": "create_review", "description": "Review creation requires no authentication"},
+    {"type": "xss", "location": "create_review", "description": "No input sanitization on review content"},
+    {"type": "missing_csrf", "location": "checkout", "description": "No CSRF protection on checkout"}
+  ],
+  "pii_fields": [
+    {"model": "Order", "field": "shipping_address", "type": "address"}
+  ]
+}
