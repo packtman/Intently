@@ -79,6 +79,15 @@ line-length = 100
 select = ["E", "F", "I", "N", "W", "UP"]
 ignore = ["E501"]
 
+[tool.pytest.ini_options]
+testpaths = ["evals", "src/context_graph/tests"]
+asyncio_mode = "auto"
+markers = [
+    "p0: Ship-blocking evals (run on every PR)",
+    "p1: Quality bar evals (run weekly)",
+    "p2: Comprehensive evals (run monthly)",
+]
+
 [tool.mypy]
 python_version = "3.10"
 strict = true

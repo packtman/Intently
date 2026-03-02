@@ -1,0 +1,74 @@
+{
+  "title": "User Authentication System",
+  "features": [
+    "User registration with email verification",
+    "Secure password storage using bcrypt",
+    "Login with email/password",
+    "OAuth 2.0 integration for social login",
+    "TOTP-based two-factor authentication",
+    "JWT access tokens with short expiry",
+    "Refresh token rotation",
+    "Password reset via email",
+    "Account lockout after failed attempts",
+    "Audit logging for authentication events"
+  ],
+  "user_stories": [
+    "As a new user, I want to register with my email and password so that I can create an account.",
+    "As an existing user, I want to log in with my Google account so that I don't need to remember another password.",
+    "As a security-conscious user, I want to enable two-factor authentication so that my account is more secure.",
+    "As a user who forgot my password, I want to reset it via email so that I can regain access to my account."
+  ],
+  "api_endpoints": [
+    {"method": "POST", "path": "/api/auth/register"},
+    {"method": "POST", "path": "/api/auth/login"},
+    {"method": "POST", "path": "/api/auth/logout"},
+    {"method": "POST", "path": "/api/auth/refresh"},
+    {"method": "POST", "path": "/api/auth/password/reset"},
+    {"method": "POST", "path": "/api/auth/password/confirm"},
+    {"method": "POST", "path": "/api/auth/mfa/setup"},
+    {"method": "POST", "path": "/api/auth/mfa/verify"},
+    {"method": "GET",  "path": "/api/auth/oauth/{provider}"},
+    {"method": "GET",  "path": "/api/auth/oauth/{provider}/callback"}
+  ],
+  "data_entities": [
+    {"name": "User", "has_pii": true},
+    {"name": "RefreshToken", "has_pii": false},
+    {"name": "AuthAuditLog", "has_pii": true}
+  ],
+  "auth_requirements": [
+    "bcrypt",
+    "JWT",
+    "refresh token",
+    "MFA",
+    "TOTP",
+    "OAuth 2.0",
+    "account lockout",
+    "HTTPS",
+    "rate limiting"
+  ],
+  "data_sensitivity_keywords": [
+    "PII",
+    "GDPR",
+    "password",
+    "email"
+  ],
+  "external_integrations": [
+    "Google OAuth",
+    "GitHub OAuth",
+    "SendGrid",
+    "Redis"
+  ],
+  "expected_security_findings": {
+    "min_count": 5,
+    "must_cover_categories": [
+      "broken_authentication",
+      "sensitive_data_exposure",
+      "injection"
+    ],
+    "must_cover_severities": ["critical", "high", "medium"]
+  },
+  "expected_privacy_findings": {
+    "min_count": 3,
+    "must_cover": ["PII handling", "data retention", "GDPR"]
+  }
+}
