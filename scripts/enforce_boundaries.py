@@ -82,6 +82,13 @@ SECURITY_PATTERNS = [
         "fix": "Use a template engine with auto-escaping or html.escape() for user-supplied values.",
     },
     {
+        "id": "SQL_INJECTION",
+        "pattern": r'f["\'].*\b(?:SELECT|INSERT|UPDATE|DELETE|DROP)\b.*{.*}.*["\']',
+        "severity": "critical",
+        "message": "Potential SQL injection: f-string with interpolated values in SQL query.",
+        "fix": "Use parameterized queries with ? placeholders instead of f-string interpolation.",
+    },
+    {
         "id": "OAUTH_WITHOUT_PKCE",
         "pattern": r"authorization_code.*(?!code_challenge)",
         "severity": "high",

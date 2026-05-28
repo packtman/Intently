@@ -133,7 +133,7 @@ jobs:
               },
               {
                   "id": "SEC003_SQL_INJECTION",
-                  "pattern": r'f["\'].*(?:SELECT|INSERT|UPDATE|DELETE|DROP).*{.*}.*["\']',
+                  "pattern": r'f["\'].*\b(?:SELECT|INSERT|UPDATE|DELETE|DROP)\b.*{.*}.*["\']',
                   "severity": "critical",
                   "message": "Potential SQL injection: f-string in SQL query",
                   "remediation": "Use parameterized queries with ? placeholders"
