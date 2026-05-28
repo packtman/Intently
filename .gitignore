@@ -77,5 +77,8 @@ data/
 # Comparison/test output
 comparison-*.json
 
+# Agent runtime artifacts
+.agent_logs/
+
 # Internal docs (not for repo)
 AI-Powered Product Review Platform.md

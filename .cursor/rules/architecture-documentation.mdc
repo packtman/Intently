@@ -1,0 +1,29 @@
+# Architecture Documentation Rule
+
+## Applies To
+All files in the repository.
+
+## Rule
+
+**No architectural decision is valid unless it is documented in the `docs/` folder.**
+
+When making changes that affect:
+- Module boundaries or import relationships
+- New external dependencies
+- API contract changes (new routes, changed request/response shapes)
+- Security-sensitive flows (auth, token handling, input sanitization)
+- New infrastructure or deployment concerns
+
+You MUST:
+1. Check `docs/golden_principles.md` for conflicts with established principles.
+2. Create or update a document in `docs/design-docs/` explaining the rationale.
+3. If the change introduces a new feature, ensure a spec exists in `docs/specs/`.
+4. Run `scripts/enforce_boundaries.py` to verify structural integrity before committing.
+
+## Rationale
+
+Agents operating without documentation context will make inconsistent decisions over time. The docs/ folder is the system of record — it prevents architectural drift and ensures every agent inherits the same constraints.
+
+## Enforcement
+
+The `scripts/enforce_boundaries.py` script statically validates module boundaries. The `.github/workflows/agent_review.yml` workflow runs Intently's own analyzers against every PR to catch violations before merge.

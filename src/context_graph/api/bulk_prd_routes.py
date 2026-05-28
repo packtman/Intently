@@ -22,6 +22,24 @@ from context_graph.tracing import get_collector
 router = APIRouter(prefix="/bulk", tags=["bulk-prd-analysis"])
 
 
+def _create_parser_factory():
+    """Factory that produces MarkdownPRDParser instances for dependency injection."""
+    from context_graph.parsers import MarkdownPRDParser
+    return MarkdownPRDParser
+
+
+def _create_review_engine_factory():
+    """Factory that produces configured SecurityReviewEngine instances for dependency injection."""
+    from context_graph.security.review_engine import SecurityReviewEngine, ReviewConfig
+
+    def factory(**kwargs):
+        trace_collector = kwargs.pop("trace_collector", None)
+        config = ReviewConfig(**kwargs)
+        return SecurityReviewEngine(config, trace_collector=trace_collector)
+
+    return factory
+
+
 # In-memory store for bulk analysis results
 bulk_results_store: dict[str, Any] = {}
 bulk_status_store: dict[str, dict[str, Any]] = {}
@@ -226,11 +244,13 @@ async def analyze_bulk_prds(
             use_llm=request.use_llm and bool(openai_key or anthropic_key),
         )
         
-        # Run analysis
+        # Run analysis (inject parser and review engine to respect domain boundaries)
         analyzer = BulkPRDAnalyzer(
             openai_api_key=openai_key,
             anthropic_api_key=anthropic_key,
             trace_collector=tc,
+            parser_factory=_create_parser_factory(),
+            review_engine_factory=_create_review_engine_factory(),
         )
         
         if tc:
@@ -533,6 +553,8 @@ async def _run_bulk_analysis_background(
         analyzer = BulkPRDAnalyzer(
             openai_api_key=openai_key,
             anthropic_api_key=anthropic_key,
+            parser_factory=_create_parser_factory(),
+            review_engine_factory=_create_review_engine_factory(),
         )
         
         tc.emit("info", "bulk", f"Starting bulk analysis of {len(prd_files)} PRDs...")
