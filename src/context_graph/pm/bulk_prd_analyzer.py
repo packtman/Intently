@@ -18,11 +18,32 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Protocol
 from uuid import UUID, uuid4
 
 from context_graph.config.features import get_features
 from context_graph.core.models import Intent, State, ReviewDimension, Severity
+
+
+# ==================== Dependency Injection Protocols ====================
+
+
+class PRDParserProtocol(Protocol):
+    """Protocol for PRD parsers — allows pm/ to consume parsers without importing them."""
+
+    def parse(self, content: str, source: str) -> Intent: ...
+
+
+class ReviewEngineProtocol(Protocol):
+    """Protocol for review engines — allows pm/ to consume security review without importing it."""
+
+    async def review(self, intent: Intent, state: State) -> Any: ...
+
+
+# Factory type: given keyword config args, returns a review engine
+ReviewEngineFactory = Callable[..., ReviewEngineProtocol]
+# Factory type: returns a PRD parser instance
+PRDParserFactory = Callable[[], PRDParserProtocol]
 
 
 logger = logging.getLogger(__name__)
@@ -307,11 +328,15 @@ class BulkPRDAnalyzer:
         openai_api_key: str | None = None,
         anthropic_api_key: str | None = None,
         trace_collector: Any | None = None,
+        parser_factory: PRDParserFactory | None = None,
+        review_engine_factory: ReviewEngineFactory | None = None,
     ) -> None:
         self.openai_api_key = openai_api_key
         self.anthropic_api_key = anthropic_api_key
         self._trace_collector = trace_collector
         self._codebase_tracker = get_codebase_tracker()
+        self._parser_factory = parser_factory
+        self._review_engine_factory = review_engine_factory
     
     async def analyze(self, request: BulkAnalysisRequest) -> BulkAnalysisResult:
         """
@@ -474,8 +499,12 @@ class BulkPRDAnalyzer:
             # Parse PRD content
             if tc:
                 tc.emit("info", "prd_parse", f"[{tag}] Parsing PRD...", prd=tag)
-            from context_graph.parsers import MarkdownPRDParser
-            parser = MarkdownPRDParser()
+            if self._parser_factory is None:
+                raise ValueError(
+                    "No parser_factory provided to BulkPRDAnalyzer. "
+                    "Pass a PRDParserFactory (e.g., MarkdownPRDParser) at construction time."
+                )
+            parser = self._parser_factory()
             intent = parser.parse(prd.content, prd.file_name)
             intent.raw_content = prd.content
             intent.source_document = prd.file_path
@@ -507,8 +536,12 @@ class BulkPRDAnalyzer:
                         f"{len(state.data_models)} models",
                         prd=tag, files=state.files_analyzed)
             
-            # Configure review engine
-            from context_graph.security.review_engine import SecurityReviewEngine, ReviewConfig
+            # Configure review engine via injected factory
+            if self._review_engine_factory is None:
+                raise ValueError(
+                    "No review_engine_factory provided to BulkPRDAnalyzer. "
+                    "Pass a ReviewEngineFactory at construction time."
+                )
             
             # Determine if LLM analysis is available
             llm_enabled = request.use_llm and bool(self.openai_api_key or self.anthropic_api_key)
@@ -520,7 +553,7 @@ class BulkPRDAnalyzer:
                         f"{', '.join(dim_names)} analysis...",
                         prd=tag, llm=llm_enabled, dimensions=dim_names)
             
-            config = ReviewConfig(
+            engine = self._review_engine_factory(
                 dimensions=prd.dimensions,
                 use_llm=llm_enabled,
                 llm_only=llm_enabled,
@@ -528,9 +561,8 @@ class BulkPRDAnalyzer:
                 use_graph_analysis=not llm_enabled,
                 openai_api_key=self.openai_api_key,
                 anthropic_api_key=self.anthropic_api_key,
+                trace_collector=tc,
             )
-            
-            engine = SecurityReviewEngine(config, trace_collector=tc)
             review_result = await engine.review(intent, state)
             
             # Extract findings summary
@@ -663,6 +695,8 @@ async def analyze_bulk_prds(
     dimensions: list[str] | None = None,
     openai_api_key: str | None = None,
     anthropic_api_key: str | None = None,
+    parser_factory: PRDParserFactory | None = None,
+    review_engine_factory: ReviewEngineFactory | None = None,
 ) -> BulkAnalysisResult:
     """
     Convenience function to analyze multiple PRDs.
@@ -673,6 +707,8 @@ async def analyze_bulk_prds(
         dimensions: List of dimension names to analyze
         openai_api_key: OpenAI API key for LLM analysis
         anthropic_api_key: Anthropic API key for LLM analysis
+        parser_factory: Factory that creates a PRD parser instance
+        review_engine_factory: Factory that creates a configured review engine
         
     Returns:
         BulkAnalysisResult with all results
@@ -720,6 +756,8 @@ async def analyze_bulk_prds(
     analyzer = BulkPRDAnalyzer(
         openai_api_key=openai_api_key,
         anthropic_api_key=anthropic_api_key,
+        parser_factory=parser_factory,
+        review_engine_factory=review_engine_factory,
     )
     
     return await analyzer.analyze(request)
