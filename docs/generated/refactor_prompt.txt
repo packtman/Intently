@@ -45,14 +45,6 @@ You are reviewing the Intently codebase for technical debt and style violations.
 ## Top Refactor Candidates:
 [
   {
-    "file": "src/context_graph/integrations/github.py",
-    "line": 1,
-    "category": "file_size",
-    "description": "File has 563 lines (threshold: 500). Consider decomposition.",
-    "priority": "medium",
-    "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-  },
-  {
     "file": "src/context_graph/analyzers/architecture_analyzer.py",
     "line": 1,
     "category": "file_size",
@@ -77,26 +69,10 @@ You are reviewing the Intently codebase for technical debt and style violations.
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
   {
-    "file": "src/context_graph/storage/sqlite.py",
+    "file": "src/context_graph/lsp/client.py",
     "line": 1,
     "category": "file_size",
-    "description": "File has 2012 lines (threshold: 500). Consider decomposition.",
-    "priority": "medium",
-    "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-  },
-  {
-    "file": "src/context_graph/storage/memory.py",
-    "line": 1,
-    "category": "file_size",
-    "description": "File has 642 lines (threshold: 500). Consider decomposition.",
-    "priority": "medium",
-    "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-  },
-  {
-    "file": "src/context_graph/chat/product_chat.py",
-    "line": 1,
-    "category": "file_size",
-    "description": "File has 654 lines (threshold: 500). Consider decomposition.",
+    "description": "File has 866 lines (threshold: 500). Consider decomposition.",
     "priority": "medium",
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
@@ -109,26 +85,18 @@ You are reviewing the Intently codebase for technical debt and style violations.
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
   {
-    "file": "src/context_graph/security/architecture_patterns.py",
+    "file": "src/context_graph/storage/memory.py",
     "line": 1,
     "category": "file_size",
-    "description": "File has 641 lines (threshold: 500). Consider decomposition.",
+    "description": "File has 642 lines (threshold: 500). Consider decomposition.",
     "priority": "medium",
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
   {
-    "file": "src/context_graph/security/dimension_orchestrator.py",
+    "file": "src/context_graph/storage/sqlite.py",
     "line": 1,
     "category": "file_size",
-    "description": "File has 1254 lines (threshold: 500). Consider decomposition.",
-    "priority": "medium",
-    "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-  },
-  {
-    "file": "src/context_graph/security/privacy_analyzer.py",
-    "line": 1,
-    "category": "file_size",
-    "description": "File has 777 lines (threshold: 500). Consider decomposition.",
+    "description": "File has 2012 lines (threshold: 500). Consider decomposition.",
     "priority": "medium",
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
@@ -141,18 +109,10 @@ You are reviewing the Intently codebase for technical debt and style violations.
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
   {
-    "file": "src/context_graph/security/engineering_patterns.py",
+    "file": "src/context_graph/security/privacy_analyzer.py",
     "line": 1,
     "category": "file_size",
-    "description": "File has 513 lines (threshold: 500). Consider decomposition.",
-    "priority": "medium",
-    "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-  },
-  {
-    "file": "src/context_graph/security/review_engine.py",
-    "line": 1,
-    "category": "file_size",
-    "description": "File has 1637 lines (threshold: 500). Consider decomposition.",
+    "description": "File has 777 lines (threshold: 500). Consider decomposition.",
     "priority": "medium",
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
@@ -165,42 +125,82 @@ You are reviewing the Intently codebase for technical debt and style violations.
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
   {
-    "file": "src/context_graph/code_graph/builder.py",
+    "file": "src/context_graph/security/engineering_patterns.py",
     "line": 1,
     "category": "file_size",
-    "description": "File has 1045 lines (threshold: 500). Consider decomposition.",
+    "description": "File has 513 lines (threshold: 500). Consider decomposition.",
     "priority": "medium",
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
   {
-    "file": "src/context_graph/code_graph/graph.py",
+    "file": "src/context_graph/security/dimension_orchestrator.py",
     "line": 1,
     "category": "file_size",
-    "description": "File has 522 lines (threshold: 500). Consider decomposition.",
+    "description": "File has 1254 lines (threshold: 500). Consider decomposition.",
     "priority": "medium",
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
   {
-    "file": "src/context_graph/code_graph/hybrid_analyzer.py",
+    "file": "src/context_graph/security/architecture_patterns.py",
     "line": 1,
     "category": "file_size",
-    "description": "File has 895 lines (threshold: 500). Consider decomposition.",
+    "description": "File has 641 lines (threshold: 500). Consider decomposition.",
     "priority": "medium",
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
   {
-    "file": "src/context_graph/pm/prd_generator.py",
+    "file": "src/context_graph/security/review_engine.py",
     "line": 1,
     "category": "file_size",
-    "description": "File has 1389 lines (threshold: 500). Consider decomposition.",
+    "description": "File has 1637 lines (threshold: 500). Consider decomposition.",
     "priority": "medium",
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   },
   {
-    "file": "src/context_graph/pm/prd_change_generator.py",
+    "file": "src/context_graph/core/models.py",
     "line": 1,
     "category": "file_size",
-    "description": "File has 533 lines (threshold: 500). Consider decomposition.",
+    "description": "File has 932 lines (threshold: 500). Consider decomposition.",
+    "priority": "medium",
+    "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+  },
+  {
+    "file": "src/context_graph/llm/parallel_analyzer.py",
+    "line": 1,
+    "category": "file_size",
+    "description": "File has 1379 lines (threshold: 500). Consider decomposition.",
+    "priority": "medium",
+    "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+  },
+  {
+    "file": "src/context_graph/llm/provider.py",
+    "line": 1,
+    "category": "file_size",
+    "description": "File has 1077 lines (threshold: 500). Consider decomposition.",
+    "priority": "medium",
+    "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+  },
+  {
+    "file": "src/context_graph/llm/iterative_analyzer.py",
+    "line": 1,
+    "category": "file_size",
+    "description": "File has 539 lines (threshold: 500). Consider decomposition.",
+    "priority": "medium",
+    "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+  },
+  {
+    "file": "src/context_graph/llm/false_positive_filter.py",
+    "line": 1,
+    "category": "file_size",
+    "description": "File has 840 lines (threshold: 500). Consider decomposition.",
+    "priority": "medium",
+    "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+  },
+  {
+    "file": "src/context_graph/llm/analysis_categories.py",
+    "line": 1,
+    "category": "file_size",
+    "description": "File has 528 lines (threshold: 500). Consider decomposition.",
     "priority": "medium",
     "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
   }
