@@ -13,26 +13,10 @@
   },
   "candidates": [
     {
-      "file": "src/context_graph/integrations/github.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 563 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
       "file": "src/context_graph/analyzers/architecture_analyzer.py",
       "line": 1,
       "category": "file_size",
       "description": "File has 664 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/analyzers/infrastructure_analyzer.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 577 lines (threshold: 500). Consider decomposition.",
       "priority": "medium",
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
@@ -45,114 +29,10 @@
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
     {
-      "file": "src/context_graph/storage/sqlite.py",
+      "file": "src/context_graph/analyzers/infrastructure_analyzer.py",
       "line": 1,
       "category": "file_size",
-      "description": "File has 2012 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/storage/memory.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 642 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/chat/product_chat.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 654 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/config/features.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 690 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/security/architecture_patterns.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 641 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/security/dimension_orchestrator.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 1254 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/security/privacy_analyzer.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 777 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/security/compliance_analyzer.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 803 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/security/engineering_patterns.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 513 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/security/review_engine.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 1637 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/security/cross_functional_detector.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 586 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/code_graph/builder.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 1045 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/code_graph/graph.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 522 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
-      "file": "src/context_graph/code_graph/hybrid_analyzer.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 895 lines (threshold: 500). Consider decomposition.",
+      "description": "File has 577 lines (threshold: 500). Consider decomposition.",
       "priority": "medium",
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
@@ -181,18 +61,82 @@
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
     {
-      "file": "src/context_graph/core/models.py",
+      "file": "src/context_graph/lsp/client.py",
       "line": 1,
       "category": "file_size",
-      "description": "File has 932 lines (threshold: 500). Consider decomposition.",
+      "description": "File has 866 lines (threshold: 500). Consider decomposition.",
       "priority": "medium",
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
     {
-      "file": "src/context_graph/api/collaboration_routes.py",
+      "file": "src/context_graph/config/features.py",
       "line": 1,
       "category": "file_size",
-      "description": "File has 934 lines (threshold: 500). Consider decomposition.",
+      "description": "File has 690 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/security/review_engine.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 1637 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/security/privacy_analyzer.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 777 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/security/engineering_patterns.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 513 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/security/cross_functional_detector.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 586 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/security/architecture_patterns.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 641 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/security/compliance_analyzer.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 803 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/security/dimension_orchestrator.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 1254 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/core/models.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 932 lines (threshold: 500). Consider decomposition.",
       "priority": "medium",
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
@@ -213,6 +157,14 @@
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
     {
+      "file": "src/context_graph/api/collaboration_routes.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 934 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
       "file": "src/context_graph/api/routes.py",
       "line": 1,
       "category": "file_size",
@@ -225,6 +177,14 @@
       "line": 1,
       "category": "file_size",
       "description": "File has 528 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/llm/iterative_analyzer.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 539 lines (threshold: 500). Consider decomposition.",
       "priority": "medium",
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
@@ -245,14 +205,6 @@
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
     {
-      "file": "src/context_graph/llm/iterative_analyzer.py",
-      "line": 1,
-      "category": "file_size",
-      "description": "File has 539 lines (threshold: 500). Consider decomposition.",
-      "priority": "medium",
-      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
-    },
-    {
       "file": "src/context_graph/llm/false_positive_filter.py",
       "line": 1,
       "category": "file_size",
@@ -261,10 +213,58 @@
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
     {
-      "file": "src/context_graph/lsp/client.py",
+      "file": "src/context_graph/chat/product_chat.py",
       "line": 1,
       "category": "file_size",
-      "description": "File has 866 lines (threshold: 500). Consider decomposition.",
+      "description": "File has 654 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/storage/memory.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 642 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/storage/sqlite.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 2012 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/code_graph/hybrid_analyzer.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 895 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/code_graph/graph.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 522 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/code_graph/builder.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 1045 lines (threshold: 500). Consider decomposition.",
+      "priority": "medium",
+      "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
+    },
+    {
+      "file": "src/context_graph/integrations/github.py",
+      "line": 1,
+      "category": "file_size",
+      "description": "File has 563 lines (threshold: 500). Consider decomposition.",
       "priority": "medium",
       "suggested_fix": "Split into multiple focused modules following single-responsibility principle."
     },
@@ -341,48 +341,8 @@
       "suggested_fix": "Add return type: def run_for_provider(...) -> ReturnType:"
     },
     {
-      "file": "src/context_graph/analyzers/python_analyzer.py",
-      "line": 26,
-      "category": "docstrings",
-      "description": "Function 'supported_extensions' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/analyzers/json_analyzer.py",
-      "line": 16,
-      "category": "docstrings",
-      "description": "Function 'supported_extensions' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
       "file": "src/context_graph/analyzers/architecture_analyzer.py",
       "line": 60,
-      "category": "docstrings",
-      "description": "Function 'supported_extensions' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/analyzers/typescript_analyzer.py",
-      "line": 24,
-      "category": "docstrings",
-      "description": "Function 'supported_extensions' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/analyzers/infrastructure_analyzer.py",
-      "line": 61,
-      "category": "docstrings",
-      "description": "Function 'supported_extensions' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/analyzers/yaml_analyzer.py",
-      "line": 16,
       "category": "docstrings",
       "description": "Function 'supported_extensions' missing docstring",
       "priority": "low",
@@ -397,7 +357,23 @@
       "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
     },
     {
-      "file": "src/context_graph/analyzers/kotlin_analyzer.py",
+      "file": "src/context_graph/analyzers/python_analyzer.py",
+      "line": 26,
+      "category": "docstrings",
+      "description": "Function 'supported_extensions' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/analyzers/infrastructure_analyzer.py",
+      "line": 61,
+      "category": "docstrings",
+      "description": "Function 'supported_extensions' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/analyzers/typescript_analyzer.py",
       "line": 24,
       "category": "docstrings",
       "description": "Function 'supported_extensions' missing docstring",
@@ -405,146 +381,26 @@
       "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
     },
     {
-      "file": "src/context_graph/chat/vector_index.py",
-      "line": 58,
+      "file": "src/context_graph/analyzers/yaml_analyzer.py",
+      "line": 16,
       "category": "docstrings",
-      "description": "Function 'embedding_text' missing docstring",
+      "description": "Function 'supported_extensions' missing docstring",
       "priority": "low",
       "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
     },
     {
-      "file": "src/context_graph/chat/vector_index.py",
-      "line": 155,
+      "file": "src/context_graph/analyzers/json_analyzer.py",
+      "line": 16,
       "category": "docstrings",
-      "description": "Function 'is_ready' missing docstring",
+      "description": "Function 'supported_extensions' missing docstring",
       "priority": "low",
       "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
     },
     {
-      "file": "src/context_graph/chat/vector_index.py",
-      "line": 204,
+      "file": "src/context_graph/analyzers/kotlin_analyzer.py",
+      "line": 24,
       "category": "docstrings",
-      "description": "Function 'search' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/chat/product_chat.py",
-      "line": 34,
-      "category": "docstrings",
-      "description": "Function 'set_cached_vector_index' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/config/features.py",
-      "line": 673,
-      "category": "docstrings",
-      "description": "Function 'decorator' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/config/features.py",
-      "line": 675,
-      "category": "docstrings",
-      "description": "Function 'wrapper' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/security/dimension_orchestrator.py",
-      "line": 89,
-      "category": "docstrings",
-      "description": "Function 'finding_count' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/security/dimension_orchestrator.py",
-      "line": 93,
-      "category": "docstrings",
-      "description": "Function 'critical_count' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/security/dimension_orchestrator.py",
-      "line": 97,
-      "category": "docstrings",
-      "description": "Function 'high_count' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/security/dimension_orchestrator.py",
-      "line": 134,
-      "category": "docstrings",
-      "description": "Function 'total_findings' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/security/canvas_threat_analyzer.py",
-      "line": 18,
-      "category": "docstrings",
-      "description": "Class 'CanvasNodeType' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/security/review_engine.py",
-      "line": 161,
-      "category": "docstrings",
-      "description": "Function 'critical_count' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/security/review_engine.py",
-      "line": 165,
-      "category": "docstrings",
-      "description": "Function 'high_count' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/code_graph/graph.py",
-      "line": 111,
-      "category": "docstrings",
-      "description": "Function 'to_dict' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/code_graph/graph.py",
-      "line": 157,
-      "category": "docstrings",
-      "description": "Function 'to_dict' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/code_graph/graph.py",
-      "line": 239,
-      "category": "docstrings",
-      "description": "Function 'node_count' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/code_graph/graph.py",
-      "line": 285,
-      "category": "docstrings",
-      "description": "Function 'edge_count' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/code_graph/graph.py",
-      "line": 456,
-      "category": "docstrings",
-      "description": "Function 'dfs' missing docstring",
+      "description": "Function 'supported_extensions' missing docstring",
       "priority": "low",
       "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
     },
@@ -585,6 +441,134 @@
       "line": 425,
       "category": "docstrings",
       "description": "Function 'analyze_with_semaphore' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/lsp/models.py",
+      "line": 72,
+      "category": "docstrings",
+      "description": "Function 'to_dict' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/lsp/models.py",
+      "line": 111,
+      "category": "docstrings",
+      "description": "Function 'to_dict' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/lsp/models.py",
+      "line": 143,
+      "category": "docstrings",
+      "description": "Function 'to_dict' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/lsp/models.py",
+      "line": 177,
+      "category": "docstrings",
+      "description": "Function 'to_dict' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/lsp/models.py",
+      "line": 215,
+      "category": "docstrings",
+      "description": "Function 'to_dict' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/lsp/models.py",
+      "line": 237,
+      "category": "docstrings",
+      "description": "Function 'to_dict' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/lsp/models.py",
+      "line": 262,
+      "category": "docstrings",
+      "description": "Function 'to_dict' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/config/features.py",
+      "line": 673,
+      "category": "docstrings",
+      "description": "Function 'decorator' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/config/features.py",
+      "line": 675,
+      "category": "docstrings",
+      "description": "Function 'wrapper' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/security/review_engine.py",
+      "line": 161,
+      "category": "docstrings",
+      "description": "Function 'critical_count' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/security/review_engine.py",
+      "line": 165,
+      "category": "docstrings",
+      "description": "Function 'high_count' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/security/canvas_threat_analyzer.py",
+      "line": 18,
+      "category": "docstrings",
+      "description": "Class 'CanvasNodeType' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/security/dimension_orchestrator.py",
+      "line": 89,
+      "category": "docstrings",
+      "description": "Function 'finding_count' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/security/dimension_orchestrator.py",
+      "line": 93,
+      "category": "docstrings",
+      "description": "Function 'critical_count' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/security/dimension_orchestrator.py",
+      "line": 97,
+      "category": "docstrings",
+      "description": "Function 'high_count' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/security/dimension_orchestrator.py",
+      "line": 134,
+      "category": "docstrings",
+      "description": "Function 'total_findings' missing docstring",
       "priority": "low",
       "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
     },
@@ -649,22 +633,6 @@
       "line": 711,
       "category": "docstrings",
       "description": "Function 'findings_by_category' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/api/main.py",
-      "line": 126,
-      "category": "docstrings",
-      "description": "Function 'health_check' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
-      "file": "src/context_graph/api/main.py",
-      "line": 142,
-      "category": "docstrings",
-      "description": "Function 'root' missing docstring",
       "priority": "low",
       "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
     },
@@ -749,6 +717,14 @@
       "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
     },
     {
+      "file": "src/context_graph/api/analytics_routes.py",
+      "line": 187,
+      "category": "docstrings",
+      "description": "Class 'EvaluateGatesResponse' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
       "file": "src/context_graph/api/bulk_prd_routes.py",
       "line": 35,
       "category": "docstrings",
@@ -773,18 +749,42 @@
       "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
     },
     {
-      "file": "src/context_graph/api/analytics_routes.py",
-      "line": 187,
-      "category": "docstrings",
-      "description": "Class 'EvaluateGatesResponse' missing docstring",
-      "priority": "low",
-      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
-    },
-    {
       "file": "src/context_graph/api/codebase_profile_routes.py",
       "line": 33,
       "category": "docstrings",
       "description": "Class 'BuildProfileRequest' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/api/main.py",
+      "line": 126,
+      "category": "docstrings",
+      "description": "Function 'health_check' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/api/main.py",
+      "line": 142,
+      "category": "docstrings",
+      "description": "Function 'root' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/llm/openai_provider.py",
+      "line": 45,
+      "category": "docstrings",
+      "description": "Function 'provider_name' missing docstring",
+      "priority": "low",
+      "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
+    },
+    {
+      "file": "src/context_graph/llm/anthropic_provider.py",
+      "line": 37,
+      "category": "docstrings",
+      "description": "Function 'provider_name' missing docstring",
       "priority": "low",
       "suggested_fix": "Add a docstring explaining purpose, parameters, and return value."
     },
